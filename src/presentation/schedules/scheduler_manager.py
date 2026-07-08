@@ -1,5 +1,3 @@
-from datetime import datetime, timezone
-
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -19,8 +17,7 @@ def start_scheduler() -> BackgroundScheduler:
         trigger='interval',
         hours=4,
         id='daily_youtube_capture_job',
-        replace_existing=True,
-        next_run_time=datetime.now(timezone.utc)
+        replace_existing=True
     )
 
     logger.info("🚀 Scheduler running in the background! Executing now, and then every 4 hours.")
