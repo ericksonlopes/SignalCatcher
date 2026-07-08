@@ -12,7 +12,7 @@ class CreateSourceUseCase:
         self.logger = logger
 
     def execute(self, data: SourceCreateDTO) -> SourceResponseDTO:
-        self.logger.debug("Iniciando a criação de uma nova fonte de conteúdo.", context={"source_type": data.type, "source_url": data.url})
+        self.logger.debug("Iniciando a criação de uma nova fonte de conteúdo.", context={"source_platform": data.source_platform, "source_url": data.url})
         
         # Maps DTO to Entity
         source_entity = SourceDtoMapper.to_entity(data)
