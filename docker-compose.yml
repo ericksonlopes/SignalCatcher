@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: signalcatcher_app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER-eriberry}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD-1d0?3tP6J9Cj}
+      POSTGRES_HOST: ${POSTGRES_HOST-192.168.0.10}
+      POSTGRES_DATABASE: ${POSTGRES_DATABASE-signalcatcher}
+      LIST_LOG_LEVELS: ${LIST_LOG_LEVELS:-ERROR,WARNING,INFO}
+
