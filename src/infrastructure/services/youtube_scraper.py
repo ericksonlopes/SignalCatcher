@@ -49,7 +49,8 @@ class YouTubeScraperService(IYouTubeScraper):
             except Exception as e:
                 if attempt == retries - 1:
                     raise
-                self.logger.warning(f"Attempt {attempt + 1} failed: {e}. Retrying in {delay} seconds...", context={"attempt": attempt + 1, "error": str(e)})
+                self.logger.warning(f"Attempt {attempt + 1} failed: {e}. Retrying in {delay} seconds...",
+                                    context={"attempt": attempt + 1, "error": str(e)})
                 time.sleep(delay)
         return None
 
@@ -90,30 +91,6 @@ class YouTubeScraperService(IYouTubeScraper):
             )
             return YouTubeChannelResultDTO(channel_name=channel_name, videos=videos)
         except Exception as e:
-            self.logger.error(f"Channel extraction failed for {channel_url}", context={"channel_url": channel_url, "error": str(e)})
+            self.logger.error(f"Channel extraction failed for {channel_url}",
+                              context={"channel_url": channel_url, "error": str(e)})
             raise
-
-
-if __name__ == "__main__":
-    from pprint import pprint
-    from src.infrastructure.loggers.logger import Logger
-    
-    global_logger = Logger()
-
-    # Usage example:
-    channel = "https://www.youtube.com/@juniorfernandesreviews"
-    global_logger.debug(f"Starting extraction for channel: {channel}")
-
-    service = YouTubeScraperService(logger=global_logger)
-    result = service.extract_channel_videos(channel)
-
-    global_logger.debug("\n--- Result ---")
-    global_logger.debug(f"Channel: {result.channel_name}")
-    global_logger.debug(f"Total videos: {len(result.videos)}")
-
-    if result.videos:
-        pprint(result.videos[0].model_dump())
-
-        for idx, video in enumerate(result.videos, start=1):
-            global_logger.debug(f"{video.id}. {video.title} ({video.url})")
-
