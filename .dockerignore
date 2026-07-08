@@ -29,7 +29,5 @@ docker-compose*.yml
 .dockerignore
 
 # Docs and misc
-README.md
 LICENSE
-*.md
 docs/
