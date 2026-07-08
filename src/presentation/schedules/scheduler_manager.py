@@ -13,18 +13,17 @@ def start_scheduler() -> BackgroundScheduler:
 
     scheduler = BackgroundScheduler(jobstores=jobstores)
 
-    # Runs every day at 3 AM
+    # Runs every 4 hours
     scheduler.add_job(
         daily_youtube_capture_job,
-        trigger='cron',
-        hour=3,
-        minute=0,
+        trigger='interval',
+        hours=4,
         id='daily_youtube_capture_job',
         replace_existing=True,
         next_run_time=datetime.now(timezone.utc)
     )
 
-    logger.info("🚀 Scheduler running in the background! Executing now, and then daily at 03:00.")
+    logger.info("🚀 Scheduler running in the background! Executing now, and then every 4 hours.")
     scheduler.start()
 
     return scheduler
