@@ -6,7 +6,7 @@ services:
     container_name: signalcatcher_app
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "5001:8000"
     environment:
       POSTGRES_USER: ${POSTGRES_USER-eriberry}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD-1d0?3tP6J9Cj}
