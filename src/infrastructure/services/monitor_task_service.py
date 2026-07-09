@@ -40,12 +40,10 @@ class MonitorTaskService(IMonitorTaskService):
 
         # Execute extraction using the scraper interface
         try:
-            result = scraper_func(source.url)
+            items = scraper_func(source.url)
         except Exception as e:
             self.logger.error(f"Error extracting {source.url}: {e}", context={"url": source.url, "error": str(e)})
             return 0
-
-        items = result.videos
 
         self.logger.debug(f"  Contents found: {len(items)}", context={"items_count": len(items)})
 

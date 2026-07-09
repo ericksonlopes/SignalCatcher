@@ -5,7 +5,6 @@ from yt_dlp import YoutubeDL
 
 from src.application.interfaces.ilogger import ILogger
 from src.domain.interfaces.scraper import IYouTubeScraper
-from src.domain.models.youtube_channel_result_dto import YouTubeChannelResultDTO
 from src.domain.models.youtube_video_dto import YouTubeVideoDTO
 
 
@@ -54,10 +53,10 @@ class YouTubeScraperService(IYouTubeScraper):
                 time.sleep(delay)
         return None
 
-    def extract_channel_videos(self, channel_url: str) -> YouTubeChannelResultDTO:
+    def extract_channel_videos(self, channel_url: str) -> list[YouTubeVideoDTO]:
         """Extracts all videos from a YouTube channel with metadata.
 
-        Returns a YouTubeChannelResultDTO.
+        Returns a list of YouTubeVideoDTO objects.
         Uses extract_flat to avoid downloading any video content.
         """
         self.logger.debug(f"Starting channel video extraction for {channel_url}", context={"channel_url": channel_url})
@@ -89,8 +88,38 @@ class YouTubeScraperService(IYouTubeScraper):
                 f"Channel: {channel_name} | Count: {len(videos)}",
                 context={"channel_name": channel_name, "video_count": len(videos)}
             )
-            return YouTubeChannelResultDTO(channel_name=channel_name, videos=videos)
+            return videos
         except Exception as e:
             self.logger.error(f"Channel extraction failed for {channel_url}",
                               context={"channel_url": channel_url, "error": str(e)})
+            raise
+
+    def extract_video_info(self, video_url: str) -> YouTubeVideoDTO:
+        """Extracts metadata from a single YouTube video.
+
+        Returns a YouTubeVideoDTO containing video metadata.
+        Uses extract_flat to avoid downloading any video content.
+        """
+        self.logger.debug(f"Starting video extraction for {video_url}", context={"video_url": video_url})
+
+        def _extract():
+            ydl_opts = self._get_common_ydl_opts()
+            
+            with YoutubeDL(ydl_opts) as ydl:
+                video_info = ydl.extract_info(video_url, download=False)
+                if not video_info:
+                    raise Exception("Failed to extract video information.")
+
+                return YouTubeVideoDTO(
+                    id=video_info.get("id"),
+                    title=video_info.get("title"),
+                    channel=video_info.get("channel") or video_info.get("uploader") or "YouTube",
+                    url=video_url,
+                )
+
+        try:
+            return self._run_with_retry(_extract)
+        except Exception as e:
+            self.logger.error(f"Video extraction failed for {video_url}",
+                              context={"video_url": video_url, "error": str(e)})
             raise

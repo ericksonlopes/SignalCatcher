@@ -38,9 +38,11 @@ app = FastAPI(
 # Register routes
 from src.presentation.api.routes import source_routes
 from src.presentation.api.routes import scheduler_routes
+from src.presentation.api.routes import content_routes
 
 app.include_router(source_routes.router, prefix="/api/sources", tags=["Sources"])
 app.include_router(scheduler_routes.router, prefix="/api/scheduler", tags=["Scheduler"])
+app.include_router(content_routes.router, prefix="/api/content", tags=["Content"])
 
 
 @app.get("/status", tags=["Health"])

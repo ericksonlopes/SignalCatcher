@@ -7,3 +7,4 @@ class YouTubeVideoDTO(BaseModel):
     id: str
     title: Optional[str] = None
     url: str
+    channel: Optional[str] = None
