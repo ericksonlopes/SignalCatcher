@@ -1,144 +1,144 @@
 # 📡 SignalCatcher
 
-**SignalCatcher** é uma aplicação backend para monitoramento automatizado de fontes de conteúdo (como canais do YouTube). Ela realiza capturas diárias de novos vídeos publicados, registra os metadados em um banco de dados PostgreSQL e expõe uma API REST para gerenciamento das fontes e dos jobs agendados.
+**SignalCatcher** is a backend application for automated monitoring of content sources (such as YouTube channels). It performs daily captures of newly published videos, records metadata in a PostgreSQL database, and exposes a REST API for managing sources and scheduled jobs.
 
 ---
 
-## ✨ Funcionalidades
+## ✨ Features
 
-- 🔎 **Monitoramento de canais do YouTube** — Extrai metadados de vídeos via `yt-dlp`
-- ⏰ **Captura diária agendada** — Job automático executado às 03:00 UTC (com execução imediata ao iniciar)
-- 🗄️ **Persistência em PostgreSQL** — Armazenamento de fontes e conteúdos capturados
-- 🌐 **API REST (FastAPI)** — Endpoints para cadastrar fontes e disparar jobs manualmente
-- 🐳 **Docker** — Deploy simplificado com `docker-compose`
-- 🔄 **Migrações com Alembic** — Versionamento automático do schema do banco
+- 🔎 **YouTube Channel Monitoring** — Extracts video metadata via `yt-dlp`
+- ⏰ **Scheduled Daily Capture** — Automated job runs at 03:00 UTC (with immediate execution on startup)
+- 🗄️ **PostgreSQL Persistence** — Storage of captured sources and content
+- 🌐 **REST API (FastAPI)** — Endpoints to register sources and manually trigger jobs
+- 🐳 **Docker** — Simplified deployment with `docker-compose`
+- 🔄 **Alembic Migrations** — Automatic database schema versioning
 
 ---
 
-## 🏗️ Arquitetura
+## 🏗️ Architecture
 
-O projeto segue uma **Arquitetura Limpa (Clean Architecture)** organizada em camadas:
+The project follows a **Clean Architecture** organized in layers:
 
 ```
 src/
-├── config/              # Configurações (variáveis de ambiente via Pydantic Settings)
-├── domain/              # Entidades, enums e interfaces (contratos)
+├── config/              # Configuration (environment variables via Pydantic Settings)
+├── domain/              # Entities, enums, and interfaces (contracts)
 │   ├── models/          # SourceEntity, ContentEntity, DTOs
-│   ├── interfaces/      # Interfaces de repositórios e serviços
+│   ├── interfaces/      # Repository and service interfaces
 │   └── models/enums/    # SourcePlatform, ContentStatus
-├── application/         # Casos de uso e DTOs de entrada/saída
+├── application/         # Use cases and input/output DTOs
 │   ├── use_cases/       # CreateSourceUseCase, RunDailyCaptureUseCase
 │   ├── dtos/            # SourceCreateDTO, SourceResponseDTO
-│   ├── interfaces/      # ILogger e outras interfaces da aplicação
-│   └── mappers/         # Mapeadores entre camadas
-├── infrastructure/      # Implementações concretas
-│   ├── repositories/    # Repositórios SQLAlchemy + conector do banco
+│   ├── interfaces/      # ILogger and other application interfaces
+│   └── mappers/         # Mappers between layers
+├── infrastructure/      # Concrete implementations
+│   ├── repositories/    # SQLAlchemy repositories + database connector
 │   ├── services/        # YouTubeScraperService, MonitorTaskService
-│   └── loggers/         # Logger customizado
-└── presentation/        # Camada de entrada (API e scheduler)
-    ├── api/             # Rotas FastAPI + injeção de dependências
+│   └── loggers/         # Custom logger
+└── presentation/        # Entry layer (API and scheduler)
+    ├── api/             # FastAPI routes + dependency injection
     │   └── routes/      # source_routes, scheduler_routes
-    └── schedules/       # APScheduler (jobs e gerenciador)
-        └── jobs/        # Jobs agendados (daily_youtube_capture_job)
+    └── schedules/       # APScheduler (jobs and manager)
+        └── jobs/        # Scheduled jobs (daily_youtube_capture_job)
 ```
 
 ---
 
-## 🚀 Começando
+## 🚀 Getting Started
 
-### Pré-requisitos
+### Prerequisites
 
 - **Python** 3.10+
-- **PostgreSQL** em execução e acessível
-- **uv** (gerenciador de pacotes Python) — [Instalação](https://docs.astral.sh/uv/)
-- **Docker** e **Docker Compose** (opcional, para deploy containerizado)
+- **PostgreSQL** running and accessible
+- **uv** (Python package manager) — [Installation](https://docs.astral.sh/uv/)
+- **Docker** and **Docker Compose** (optional, for containerized deployment)
 
-### Instalação Local
+### Local Installation
 
-1. **Clone o repositório:**
+1. **Clone the repository:**
 
 ```bash
 git clone https://github.com/ericksonlopes/SignalCatcher.git
 cd SignalCatcher
 ```
 
-2. **Configure as variáveis de ambiente:**
+2. **Configure environment variables:**
 
-Crie um arquivo `.env` na raiz do projeto:
+Create a `.env` file in the project root:
 
 ```env
-POSTGRES_USER=seu_usuario
-POSTGRES_PASSWORD=sua_senha
+POSTGRES_USER=your_user
+POSTGRES_PASSWORD=your_password
 POSTGRES_HOST=localhost
 POSTGRES_DATABASE=signalcatcher
 LIST_LOG_LEVELS=ERROR,WARNING,INFO
 ```
 
-3. **Instale as dependências:**
+3. **Install dependencies:**
 
 ```bash
 uv sync
 ```
 
-4. **Execute as migrações do banco:**
+4. **Run database migrations:**
 
 ```bash
 uv run alembic upgrade head
 ```
 
-5. **Inicie a aplicação:**
+5. **Start the application:**
 
 ```bash
 uv run uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
-A API estará disponível em: **http://127.0.0.1:8000**
+The API will be available at: **http://127.0.0.1:8000**
 
 ---
 
-### Usando Docker
+### Using Docker
 
 ```bash
 docker-compose up --build -d
 ```
 
-> O container executa automaticamente as migrações (`alembic upgrade head`) antes de iniciar o servidor.
+> The container automatically runs migrations (`alembic upgrade head`) before starting the server.
 
 ---
 
-## 📚 Endpoints da API
+## 📚 API Endpoints
 
-A documentação interativa (Swagger UI) está disponível em: **http://localhost:8000/docs**
+Interactive documentation (Swagger UI) is available at: **http://localhost:8000/docs**
 
 ### Health Check
 
-| Método | Rota      | Descrição                 |
+| Method | Route     | Description               |
 |--------|-----------|---------------------------|
-| `GET`  | `/status` | Retorna o status da API   |
+| `GET`  | `/status` | Returns the API status    |
 
-### Sources (Fontes)
+### Sources
 
-| Método | Rota            | Descrição                                             |
-|--------|-----------------|-------------------------------------------------------|
-| `POST` | `/api/sources/` | Cadastra uma nova fonte de conteúdo para monitoramento |
+| Method | Route           | Description                                       |
+|--------|-----------------|---------------------------------------------------|
+| `POST` | `/api/sources/` | Registers a new content source for monitoring     |
 
-**Exemplo de body (POST):**
+**Body example (POST):**
 
 ```json
 {
-  "name": "Nome do Canal",
-  "url": "https://www.youtube.com/@canal",
+  "name": "Channel Name",
+  "url": "https://www.youtube.com/@channel",
   "source_platform": "youtube"
 }
 ```
 
-### Scheduler (Agendador)
+### Scheduler
 
-| Método | Rota                              | Descrição                                |
-|--------|-----------------------------------|------------------------------------------|
-| `POST` | `/api/scheduler/jobs/{job_id}/run` | Dispara manualmente um job pelo seu ID   |
+| Method | Route                              | Description                            |
+|--------|------------------------------------|----------------------------------------|
+| `POST` | `/api/scheduler/jobs/{job_id}/run` | Manually triggers a job by its ID      |
 
-**Exemplo:**
+**Example:**
 
 ```bash
 curl -X POST http://localhost:8000/api/scheduler/jobs/daily_youtube_capture_job/run
@@ -146,58 +146,58 @@ curl -X POST http://localhost:8000/api/scheduler/jobs/daily_youtube_capture_job/
 
 ---
 
-## ⚙️ Variáveis de Ambiente
+## ⚙️ Environment Variables
 
-| Variável             | Descrição                                         | Exemplo              |
+| Variable             | Description                                       | Example              |
 |----------------------|---------------------------------------------------|----------------------|
-| `POSTGRES_USER`      | Usuário do PostgreSQL                             | `postgres`           |
-| `POSTGRES_PASSWORD`  | Senha do PostgreSQL                               | `senha_segura`       |
-| `POSTGRES_HOST`      | Host do PostgreSQL                                | `localhost`           |
-| `POSTGRES_DATABASE`  | Nome do banco de dados                            | `signalcatcher`      |
-| `LIST_LOG_LEVELS`    | Níveis de log (separados por vírgula)             | `ERROR,WARNING,INFO` |
+| `POSTGRES_USER`      | PostgreSQL user                                   | `postgres`           |
+| `POSTGRES_PASSWORD`  | PostgreSQL password                               | `secure_password`    |
+| `POSTGRES_HOST`      | PostgreSQL host                                   | `localhost`          |
+| `POSTGRES_DATABASE`  | Database name                                     | `signalcatcher`      |
+| `LIST_LOG_LEVELS`    | Log levels (comma-separated)                      | `ERROR,WARNING,INFO` |
 
 ---
 
-## 🛠️ Stack Tecnológica
+## 🛠️ Technology Stack
 
-| Tecnologia        | Finalidade                         |
+| Technology        | Purpose                            |
 |-------------------|------------------------------------|
-| **FastAPI**       | Framework web / API REST           |
-| **Uvicorn**       | Servidor ASGI                      |
-| **SQLAlchemy**    | ORM / acesso ao banco de dados     |
-| **Alembic**       | Migrações do banco de dados        |
-| **Pydantic**      | Validação e serialização de dados  |
-| **APScheduler**   | Agendamento de tarefas em background |
-| **yt-dlp**        | Extração de metadados do YouTube   |
-| **PostgreSQL**    | Banco de dados relacional          |
-| **Docker**        | Containerização da aplicação       |
+| **FastAPI**       | Web framework / REST API           |
+| **Uvicorn**       | ASGI server                        |
+| **SQLAlchemy**    | ORM / database access              |
+| **Alembic**       | Database migrations                |
+| **Pydantic**      | Data validation and serialization  |
+| **APScheduler**   | Background task scheduling         |
+| **yt-dlp**        | YouTube metadata extraction        |
+| **PostgreSQL**    | Relational database                |
+| **Docker**        | Application containerization       |
 
 ---
 
-## 📂 Pipeline de Conteúdo
+## 📂 Content Pipeline
 
-O conteúdo capturado passa pelos seguintes status:
+Captured content goes through the following statuses:
 
 ```
 PENDING_DOWNLOAD → DOWNLOADING → DOWNLOADED
                                        ↘ ERROR
 ```
 
-| Status              | Descrição                                |
+| Status              | Description                              |
 |---------------------|------------------------------------------|
-| `PENDING_DOWNLOAD`  | Detectado, aguardando processamento      |
-| `DOWNLOADING`       | Em processo de download                  |
-| `DOWNLOADED`        | Download concluído com sucesso           |
-| `ERROR`             | Falha durante o processo                 |
+| `PENDING_DOWNLOAD`  | Detected, awaiting processing            |
+| `DOWNLOADING`       | In the process of downloading            |
+| `DOWNLOADED`        | Download completed successfully          |
+| `ERROR`             | Failed during the process                |
 
 ---
 
-## 📄 Licença
+## 📄 License
 
-Este projeto é de uso pessoal. Consulte o autor para informações sobre licenciamento.
+This project is for personal use. Consult the author for licensing information.
 
 ---
 
 <p align="center">
-  Desenvolvido com ❤️ por <a href="https://github.com/ericksonlopes">Erickson Lopes</a>
+  Developed with ❤️ by <a href="https://github.com/ericksonlopes">Erickson Lopes</a>
 </p>
