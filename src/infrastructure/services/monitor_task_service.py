@@ -1,4 +1,5 @@
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from src.application.interfaces.ilogger import ILogger
 from src.domain.interfaces.content_repository import IContentRepository
@@ -65,7 +66,7 @@ class MonitorTaskService(IMonitorTaskService):
             new_count += 1
 
         # Update last_checked_at
-        source.last_checked_at = datetime.now()
+        source.last_checked_at = datetime.now(ZoneInfo("America/Sao_Paulo")).replace(tzinfo=None)
         self.monitored_source_repository.update(source)
 
         return new_count

@@ -1,4 +1,8 @@
 from datetime import datetime
+from zoneinfo import ZoneInfo
+
+def get_brazil_time():
+    return datetime.now(ZoneInfo("America/Sao_Paulo")).replace(tzinfo=None)
 
 from sqlalchemy import Column, Integer, String, DateTime, Enum, Boolean
 
@@ -15,7 +19,7 @@ class MonitoredSourceModel(Base):
     url = Column(String, unique=True, nullable=False)  # Channel/profile URL
     source_platform = Column(Enum(SourcePlatform), nullable=False, default=SourcePlatform.YOUTUBE)  # Source platform
     active = Column(Boolean, nullable=False, default=True)  # Active/inactive
-    created_at = Column(DateTime, default=datetime.now)
+    created_at = Column(DateTime, default=get_brazil_time)
     last_checked_at = Column(DateTime, nullable=True)  # Last time it was checked
 
     def __repr__(self):
