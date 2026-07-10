@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlalchemy import Column, Integer, String, DateTime, Enum
 
@@ -17,9 +17,9 @@ class ContentModel(Base):
     source_platform = Column(Enum(SourcePlatform), nullable=False, default=SourcePlatform.YOUTUBE)  # Source platform
     origin = Column(String, nullable=False)  # Where the content came from (e.g., channel/profile name)
     status = Column(Enum(ContentStatus), nullable=False, default=ContentStatus.PENDING_DOWNLOAD)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc),
-                        onupdate=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now,
+                        onupdate=datetime.now)
 
     def __repr__(self):
         return f"<ContentModel(external_id='{self.external_id}', source_platform='{self.source_platform}', status='{self.status}')>"

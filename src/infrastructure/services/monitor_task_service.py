@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 
 from src.application.interfaces.ilogger import ILogger
 from src.domain.interfaces.content_repository import IContentRepository
@@ -65,7 +65,7 @@ class MonitorTaskService(IMonitorTaskService):
             new_count += 1
 
         # Update last_checked_at
-        source.last_checked_at = datetime.now(timezone.utc)
+        source.last_checked_at = datetime.now()
         self.monitored_source_repository.update(source)
 
         return new_count

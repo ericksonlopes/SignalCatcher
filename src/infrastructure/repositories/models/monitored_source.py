@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlalchemy import Column, Integer, String, DateTime, Enum, Boolean
 
@@ -15,7 +15,7 @@ class MonitoredSourceModel(Base):
     url = Column(String, unique=True, nullable=False)  # Channel/profile URL
     source_platform = Column(Enum(SourcePlatform), nullable=False, default=SourcePlatform.YOUTUBE)  # Source platform
     active = Column(Boolean, nullable=False, default=True)  # Active/inactive
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=datetime.now)
     last_checked_at = Column(DateTime, nullable=True)  # Last time it was checked
 
     def __repr__(self):
