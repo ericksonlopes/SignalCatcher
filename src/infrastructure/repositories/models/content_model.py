@@ -21,6 +21,7 @@ class ContentModel(Base):
     source_platform = Column(Enum(SourcePlatform), nullable=False, default=SourcePlatform.YOUTUBE)  # Source platform
     origin = Column(String, nullable=False)  # Where the content came from (e.g., channel/profile name)
     status = Column(Enum(ContentStatus), nullable=False, default=ContentStatus.PENDING_DOWNLOAD)
+    error_info = Column(String, nullable=True)  # Store specific error details
     created_at = Column(DateTime, default=get_brazil_time)
     updated_at = Column(DateTime, default=get_brazil_time,
                         onupdate=get_brazil_time)

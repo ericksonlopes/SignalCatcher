@@ -1,5 +1,5 @@
 from src.domain.models.source_entity import SourceEntity
-from src.infrastructure.repositories.models.monitored_source import MonitoredSourceModel
+from src.infrastructure.repositories.models.monitored_source_model import MonitoredSourceModel
 
 
 class SourceMapper:

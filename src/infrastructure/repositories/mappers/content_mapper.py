@@ -1,5 +1,5 @@
 from src.domain.models.content_entity import ContentEntity
-from src.infrastructure.repositories.models.content import ContentModel
+from src.infrastructure.repositories.models.content_model import ContentModel
 
 
 class ContentMapper:

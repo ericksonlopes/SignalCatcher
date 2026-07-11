@@ -3,7 +3,7 @@ from src.domain.interfaces.content_repository import IContentRepository
 from src.domain.models.content_entity import ContentEntity
 from src.infrastructure.repositories.connector import ConnectorPostgres
 from src.infrastructure.repositories.mappers.content_mapper import ContentMapper
-from src.infrastructure.repositories.models.content import ContentModel
+from src.infrastructure.repositories.models.content_model import ContentModel
 
 
 class ContentRepository(IContentRepository):

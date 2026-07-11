@@ -5,7 +5,7 @@ from src.domain.interfaces.monitored_source_repository import IMonitoredSourceRe
 from src.domain.models.source_entity import SourceEntity
 from src.infrastructure.repositories.connector import ConnectorPostgres
 from src.infrastructure.repositories.mappers.source_mapper import SourceMapper
-from src.infrastructure.repositories.models.monitored_source import MonitoredSourceModel
+from src.infrastructure.repositories.models.monitored_source_model import MonitoredSourceModel
 
 
 class MonitoredSourceRepository(IMonitoredSourceRepository):
