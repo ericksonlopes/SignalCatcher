@@ -7,3 +7,4 @@ class ContentStatus(str, enum.Enum):
     DOWNLOADING = "DOWNLOADING"
     DOWNLOADED = "DOWNLOADED"
     ERROR = "ERROR"
+    MEMBERS_ONLY = "MEMBERS_ONLY"

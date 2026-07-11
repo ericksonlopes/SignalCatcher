@@ -51,10 +51,15 @@ def main():
                 session.commit()
                 print(f"Successfully downloaded: {content.title}")
             except Exception as e:
+                error_msg = str(e).lower()
                 print(f"Error downloading {content.title}: {e}")
-                # Update status to ERROR and save error info
-                content.status = ContentStatus.ERROR
+                # Save error info
                 content.error_info = str(e)
+                # Check if it's a members-only error
+                if "members-only content like this video" in error_msg or "members on level" in error_msg:
+                    content.status = ContentStatus.MEMBERS_ONLY
+                else:
+                    content.status = ContentStatus.ERROR
                 session.commit()
 
 
