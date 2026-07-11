@@ -123,3 +123,36 @@ class YouTubeScraperService(IYouTubeScraper):
             self.logger.error(f"Video extraction failed for {video_url}",
                               context={"video_url": video_url, "error": str(e)})
             raise
+
+    def extract_playlist_videos(self, playlist_url: str) -> list[YouTubeVideoDTO]:
+        """Extracts all videos from a YouTube playlist.
+
+        Returns a list of YouTubeVideoDTO objects.
+        Uses extract_flat to avoid downloading any video content.
+        """
+        self.logger.debug(f"Starting playlist video extraction for {playlist_url}", context={"playlist_url": playlist_url})
+
+        def _extract():
+            ydl_opts = self._get_common_ydl_opts()
+            ydl_opts.update({"extract_flat": "in_playlist", "ignore_unavailable": True})
+
+            with YoutubeDL(ydl_opts) as ydl:
+                playlist_info = ydl.extract_info(playlist_url, download=False)
+                if not playlist_info or "entries" not in playlist_info:
+                    return []
+
+                return self._parse_channel_entries(playlist_info["entries"])
+
+        try:
+            videos = self._run_with_retry(_extract)
+
+            self.logger.debug(
+                f"Playlist videos extracted successfully. "
+                f"Count: {len(videos)}",
+                context={"playlist_url": playlist_url, "video_count": len(videos)}
+            )
+            return videos
+        except Exception as e:
+            self.logger.error(f"Playlist extraction failed for {playlist_url}",
+                              context={"playlist_url": playlist_url, "error": str(e)})
+            raise

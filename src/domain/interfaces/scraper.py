@@ -27,3 +27,15 @@ class IYouTubeScraper(Protocol):
             A YouTubeVideoDTO containing video metadata.
         """
         ...
+
+    def extract_playlist_videos(self, playlist_url: str) -> list[YouTubeVideoDTO]:
+        """
+        Extracts videos from a YouTube playlist.
+        
+        Args:
+            playlist_url: The YouTube playlist URL.
+            
+        Returns:
+            A list of YouTubeVideoDTO objects.
+        """
+        ...
