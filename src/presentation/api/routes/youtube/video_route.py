@@ -1,3 +1,4 @@
+from typing import Annotated
 from fastapi import APIRouter, HTTPException, Depends
 
 from src.application.use_cases.add_content_from_link_use_case import AddContentFromLinkUseCase
@@ -17,7 +18,7 @@ def get_add_content_use_case() -> AddContentFromLinkUseCase:
 
 @router.post("/content")
 def add_youtube_content_from_link(request: YouTubeVideoAddRequest,
-                                  use_case: AddContentFromLinkUseCase = Depends(get_add_content_use_case)):
+                                  use_case: Annotated[AddContentFromLinkUseCase, Depends(get_add_content_use_case)]):
     """
     Adds a new content from a given YouTube link.
     It extracts the video metadata (title, channel) and creates a content entity.

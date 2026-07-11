@@ -1,3 +1,4 @@
+from typing import Annotated
 from fastapi import APIRouter, HTTPException, Depends
 
 from src.application.use_cases.add_content_from_playlist_use_case import AddContentFromPlaylistUseCase
@@ -17,7 +18,7 @@ def get_add_playlist_use_case() -> AddContentFromPlaylistUseCase:
 
 @router.post("/playlist")
 def add_youtube_content_from_playlist(request: YouTubePlaylistAddRequest,
-                                      use_case: AddContentFromPlaylistUseCase = Depends(get_add_playlist_use_case)):
+                                      use_case: Annotated[AddContentFromPlaylistUseCase, Depends(get_add_playlist_use_case)]):
     """
     Adds new content from a given YouTube playlist.
     It extracts metadata from all videos in the playlist and creates content entities.

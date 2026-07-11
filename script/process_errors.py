@@ -55,6 +55,10 @@ def main():
                 # Check if it's a members-only error
                 if "members-only content like this video" in error_msg or "members on level" in error_msg:
                     content.status = ContentStatus.MEMBERS_ONLY
+                elif "sign in to confirm your age" in error_msg:
+                    content.status = ContentStatus.AGE_RESTRICTED
+                elif "private video" in error_msg and "sign in if you've been granted access" in error_msg:
+                    content.status = ContentStatus.PRIVATE_VIDEO
                 else:
                     content.status = ContentStatus.ERROR
                 session.commit()

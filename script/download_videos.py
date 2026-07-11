@@ -18,7 +18,7 @@ def download_video(url: str, content_id: str, origin: str, output_path: str):
     os.makedirs(final_output_path, exist_ok=True)
     ydl_opts = {
         'outtmpl': f'{final_output_path}/{content_id}_%(title)s.%(ext)s',
-        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        'format': 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best[ext=mp4]/best',
         'ffmpeg_location': r'C:\Users\ofcer\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.1.2-full_build\bin',
         'quiet': False
     }
@@ -62,6 +62,10 @@ def main():
                 # Check if it's a members-only error
                 if "members-only content like this video" in error_msg or "members on level" in error_msg:
                     content.status = ContentStatus.MEMBERS_ONLY
+                elif "sign in to confirm your age" in error_msg:
+                    content.status = ContentStatus.AGE_RESTRICTED
+                elif "private video" in error_msg and "sign in if you've been granted access" in error_msg:
+                    content.status = ContentStatus.PRIVATE_VIDEO
                 else:
                     content.status = ContentStatus.ERROR
                 session.commit()
