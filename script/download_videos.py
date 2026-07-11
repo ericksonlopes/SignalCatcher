@@ -1,7 +1,11 @@
 import os
+import sys
 import re
+import logging
 
 import yt_dlp
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 from src.domain.models.enums.content_status import ContentStatus
 from src.infrastructure.repositories.connector import ConnectorPostgres
@@ -23,7 +27,7 @@ def download_video(url: str, content_id: str, origin: str, output_path: str):
 
 
 def main():
-    print("Starting video download process...")
+    logging.info("Starting video download process...")
     output_path = r"D:\Youtube"
     while True:
         with ConnectorPostgres() as session:
@@ -33,10 +37,10 @@ def main():
             ).first()
 
             if not content:
-                print("No more videos pending download. Finishing.")
+                logging.info("No more videos pending download. Finishing.")
                 break
 
-            print(f"\nProcessing content: {content.title} ({content.url})")
+            logging.info(f"Processing content: {content.title} ({content.url})")
 
             # Update status to DOWNLOADING
             content.status = ContentStatus.DOWNLOADING
@@ -49,10 +53,10 @@ def main():
                 # Update status to DOWNLOADED
                 content.status = ContentStatus.DOWNLOADED
                 session.commit()
-                print(f"Successfully downloaded: {content.title}")
+                logging.info(f"Successfully downloaded: {content.title}")
             except Exception as e:
                 error_msg = str(e).lower()
-                print(f"Error downloading {content.title}: {e}")
+                logging.error(f"Error downloading {content.title}: {e}")
                 # Save error info
                 content.error_info = str(e)
                 # Check if it's a members-only error
@@ -61,6 +65,11 @@ def main():
                 else:
                     content.status = ContentStatus.ERROR
                 session.commit()
+                
+                # Check for YouTube bot detection
+                if "sign in to confirm you’re not a bot" in error_msg or "sign in to confirm you're not a bot" in error_msg:
+                    logging.critical("YouTube bot detection triggered! Stopping the system to prevent IP ban.")
+                    sys.exit(1)
 
 
 if __name__ == "__main__":

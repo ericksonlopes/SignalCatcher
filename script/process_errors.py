@@ -1,5 +1,8 @@
 import sys
 import os
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Add the root directory of the project to PYTHONPATH so that we can import from src
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -12,7 +15,7 @@ from src.domain.models.enums.content_status import ContentStatus
 from download_videos import download_video
 
 def main():
-    print("Starting error retry process...")
+    logging.info("Starting error retry process...")
     output_path = r"D:\Youtube"
     
     with ConnectorPostgres() as session:
@@ -22,14 +25,14 @@ def main():
         ).all()
         
         if not error_contents:
-            print("No videos with ERROR status found.")
+            logging.info("No videos with ERROR status found.")
             return
 
-        print(f"Found {len(error_contents)} videos to retry.\n")
+        logging.info(f"Found {len(error_contents)} videos to retry.")
 
         for content in error_contents:
-            print(f"\nRetrying content: {content.title} ({content.url})")
-            print(f"Previous Error: {content.error_info}")
+            logging.info(f"Retrying content: {content.title} ({content.url})")
+            logging.warning(f"Previous Error: {content.error_info}")
             
             # Update status to DOWNLOADING
             content.status = ContentStatus.DOWNLOADING
@@ -43,10 +46,10 @@ def main():
                 content.status = ContentStatus.DOWNLOADED
                 content.error_info = None
                 session.commit()
-                print(f"Successfully downloaded on retry: {content.title}")
+                logging.info(f"Successfully downloaded on retry: {content.title}")
             except Exception as e:
                 error_msg = str(e).lower()
-                print(f"Error downloading again {content.title}: {e}")
+                logging.error(f"Error downloading again {content.title}: {e}")
                 # Save error info
                 content.error_info = str(e)
                 # Check if it's a members-only error
@@ -55,6 +58,11 @@ def main():
                 else:
                     content.status = ContentStatus.ERROR
                 session.commit()
+                
+                # Check for YouTube bot detection
+                if "sign in to confirm you’re not a bot" in error_msg or "sign in to confirm you're not a bot" in error_msg:
+                    logging.critical("YouTube bot detection triggered! Stopping the system to prevent IP ban.")
+                    sys.exit(1)
 
 if __name__ == "__main__":
     main()
