@@ -12,16 +12,16 @@ class AddContentFromLinkUseCase:
         self.youtube_scraper = youtube_scraper
         self.logger = logger
 
-    def execute(self, url: str, origin: str) -> ContentEntity:
-        if self._is_youtube_link(url, origin):
-            return self._process_youtube_link(url, origin)
+    def execute(self, url: str) -> ContentEntity:
+        if self._is_youtube_link(url):
+            return self._process_youtube_link(url)
 
-        raise ValueError(f"Origin '{origin}' or URL '{url}' is not supported yet.")
+        raise ValueError(f"URL '{url}' is not supported yet.")
 
-    def _is_youtube_link(self, url: str, origin: str) -> bool:
-        return origin.lower() == "youtube" or "youtube.com" in url or "youtu.be" in url
+    def _is_youtube_link(self, url: str) -> bool:
+        return "youtube.com" in url or "youtu.be" in url
 
-    def _process_youtube_link(self, url: str, origin: str) -> ContentEntity:
+    def _process_youtube_link(self, url: str) -> ContentEntity:
         self.logger.info(f"Extracting YouTube video info from {url}")
         info = self.youtube_scraper.extract_video_info(url)
 

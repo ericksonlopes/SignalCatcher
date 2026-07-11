@@ -22,7 +22,7 @@ class YouTubeScraperService(IYouTubeScraper):
         }
 
     @staticmethod
-    def _parse_channel_entries(entries: Iterable[Any]) -> list[YouTubeVideoDTO]:
+    def _parse_channel_entries(entries: Iterable[Any], default_channel: str = "") -> list[YouTubeVideoDTO]:
         videos = []
         for entry in entries:
             if not entry:
@@ -37,6 +37,7 @@ class YouTubeScraperService(IYouTubeScraper):
                     id=video_id,
                     title=entry.get('title'),
                     url=entry.get('url') or f"https://www.youtube.com/watch?v={video_id}",
+                    channel=entry.get('channel') or entry.get('uploader') or default_channel
                 )
             )
         return videos
@@ -76,8 +77,8 @@ class YouTubeScraperService(IYouTubeScraper):
                     extracted_channel_name = channel_info.get("channel", "") if channel_info else ""
                     return [], extracted_channel_name
 
-                extracted_videos = self._parse_channel_entries(channel_info["entries"])
                 extracted_channel_name = channel_info.get("channel") or channel_info.get("uploader") or ""
+                extracted_videos = self._parse_channel_entries(channel_info["entries"], default_channel=extracted_channel_name)
                 return extracted_videos, extracted_channel_name
 
         try:
@@ -141,7 +142,8 @@ class YouTubeScraperService(IYouTubeScraper):
                 if not playlist_info or "entries" not in playlist_info:
                     return []
 
-                return self._parse_channel_entries(playlist_info["entries"])
+                playlist_channel = playlist_info.get("channel") or playlist_info.get("uploader") or ""
+                return self._parse_channel_entries(playlist_info["entries"], default_channel=playlist_channel)
 
         try:
             videos = self._run_with_retry(_extract)

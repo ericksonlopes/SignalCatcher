@@ -12,9 +12,9 @@ class AddContentFromPlaylistUseCase:
         self.youtube_scraper = youtube_scraper
         self.logger = logger
 
-    def execute(self, playlist_url: str, origin: str) -> list[ContentEntity]:
-        if not self._is_youtube_link(playlist_url, origin):
-            raise ValueError(f"Origin '{origin}' or URL '{playlist_url}' is not supported yet.")
+    def execute(self, playlist_url: str) -> list[ContentEntity]:
+        if not self._is_youtube_link(playlist_url):
+            raise ValueError(f"URL '{playlist_url}' is not a valid YouTube link.")
 
         self.logger.info(f"Extracting YouTube playlist videos from {playlist_url}")
         videos = self.youtube_scraper.extract_playlist_videos(playlist_url)
@@ -34,7 +34,7 @@ class AddContentFromPlaylistUseCase:
                 title=video.title or "Untitled",
                 url=video.url,
                 source_platform=SourcePlatform.YOUTUBE,
-                origin=video.channel or origin,
+                origin=video.channel or "Unknown Channel",
                 status=ContentStatus.PENDING_DOWNLOAD
             )
             saved_content = self.content_repository.create(content)
@@ -43,5 +43,5 @@ class AddContentFromPlaylistUseCase:
         self.logger.info(f"Successfully added {len(saved_contents)} new videos from playlist.")
         return saved_contents
 
-    def _is_youtube_link(self, url: str, origin: str) -> bool:
-        return origin.lower() == "youtube" or "youtube.com" in url or "youtu.be" in url
+    def _is_youtube_link(self, url: str) -> bool:
+        return "youtube.com" in url or "youtu.be" in url
