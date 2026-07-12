@@ -68,6 +68,8 @@ def main():
                     content.status = ContentStatus.PRIVATE_VIDEO
                 elif "removed following a copyright" in error_msg:
                     content.status = ContentStatus.COPYRIGHT_REMOVED
+                elif "account associated with this video has been terminated" in error_msg:
+                    content.status = ContentStatus.ACCOUNT_TERMINATED
                 else:
                     content.status = ContentStatus.ERROR
                 session.commit()
