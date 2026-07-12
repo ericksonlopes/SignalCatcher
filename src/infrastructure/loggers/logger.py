@@ -1,6 +1,6 @@
 from typing import Any, Dict
 
-from src.application.interfaces.ilogger import ILogger
+from src.domain.interfaces.logger import ILogger
 from src.infrastructure.loggers.std_logger import InterceptHandler, StdLogger
 
 LOG_FORMAT = "{asctime} | {levelname:<8} | {filepath}:{funcName}:{lineno} | {message} | {context}"

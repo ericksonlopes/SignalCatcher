@@ -1,4 +1,4 @@
-from src.application.interfaces.ilogger import ILogger
+from src.domain.interfaces.logger import ILogger
 from src.domain.interfaces.content_repository import IContentRepository
 from src.domain.models.content_entity import ContentEntity
 from src.infrastructure.repositories.connector import ConnectorPostgres

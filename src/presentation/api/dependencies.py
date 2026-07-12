@@ -1,6 +1,6 @@
 from fastapi import Depends
 
-from src.application.interfaces.ilogger import ILogger
+from src.domain.interfaces.logger import ILogger
 from src.application.use_cases.create_source_use_case import CreateSourceUseCase
 from src.infrastructure.loggers.logger import logger as global_logger
 from src.infrastructure.repositories.monitored_source_repository import MonitoredSourceRepository

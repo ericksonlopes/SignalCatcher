@@ -3,7 +3,7 @@ from typing import Iterable, Any
 
 from yt_dlp import YoutubeDL
 
-from src.application.interfaces.ilogger import ILogger
+from src.domain.interfaces.logger import ILogger
 from src.domain.interfaces.scraper import IYouTubeScraper
 from src.domain.models.youtube_video_dto import YouTubeVideoDTO
 

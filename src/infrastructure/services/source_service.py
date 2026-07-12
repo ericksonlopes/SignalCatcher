@@ -1,4 +1,4 @@
-from src.application.interfaces.ilogger import ILogger
+from src.domain.interfaces.logger import ILogger
 from src.domain.interfaces.monitored_source_repository import IMonitoredSourceRepository
 from src.domain.interfaces.source_service import ISourceService
 from src.domain.models.source_entity import SourceEntity

@@ -1,9 +1,8 @@
 from src.application.dtos.source_create_dto import SourceCreateDTO
 from src.application.dtos.source_response_dto import SourceResponseDTO
-from src.application.interfaces.ilogger import ILogger
+from src.domain.interfaces.logger import ILogger
 from src.application.mappers.source_dto_mapper import SourceDtoMapper
 from src.domain.interfaces.source_service import ISourceService
-from src.domain.models.source_entity import SourceEntity
 
 
 class CreateSourceUseCase:

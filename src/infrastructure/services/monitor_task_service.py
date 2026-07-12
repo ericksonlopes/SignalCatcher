@@ -1,7 +1,7 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from src.application.interfaces.ilogger import ILogger
+from src.domain.interfaces.logger import ILogger
 from src.domain.interfaces.content_repository import IContentRepository
 from src.domain.interfaces.monitor_service import IMonitorTaskService
 from src.domain.interfaces.monitored_source_repository import IMonitoredSourceRepository
