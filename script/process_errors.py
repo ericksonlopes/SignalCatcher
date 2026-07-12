@@ -59,6 +59,8 @@ def main():
                     content.status = ContentStatus.AGE_RESTRICTED
                 elif "private video" in error_msg and "sign in if you've been granted access" in error_msg:
                     content.status = ContentStatus.PRIVATE_VIDEO
+                elif "removed following a copyright" in error_msg:
+                    content.status = ContentStatus.COPYRIGHT_REMOVED
                 else:
                     content.status = ContentStatus.ERROR
                 session.commit()
