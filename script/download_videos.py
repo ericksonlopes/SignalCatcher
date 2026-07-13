@@ -1,7 +1,7 @@
-import os
-import sys
-import re
 import logging
+import os
+import re
+import sys
 
 import yt_dlp
 
@@ -20,7 +20,9 @@ def download_video(url: str, content_id: str, origin: str, output_path: str):
         'outtmpl': f'{final_output_path}/{content_id}_%(title)s.%(ext)s',
         'format': 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best[ext=mp4]/best',
         'ffmpeg_location': r'C:\Users\ofcer\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.1.2-full_build\bin',
-        'quiet': False
+        'quiet': False,
+        'js_runtimes': {'node': {}},
+        'remote_components': ['ejs:github']
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
@@ -73,7 +75,7 @@ def main():
                 else:
                     content.status = ContentStatus.ERROR
                 session.commit()
-                
+
                 # Check for YouTube bot detection
                 if "sign in to confirm you’re not a bot" in error_msg or "sign in to confirm you're not a bot" in error_msg:
                     logging.critical("YouTube bot detection triggered! Stopping the system to prevent IP ban.")

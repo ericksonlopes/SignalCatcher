@@ -1,7 +1,7 @@
 import argparse
+import logging
 import os
 import sys
-import logging
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -64,7 +64,8 @@ def process_non_mp4_files(directory):
                     logging.error(f" {content.title} -> Falha ao deletar arquivo: {e}")
 
             else:
-                logging.warning(f"ID {external_id} do arquivo {file_name} não foi encontrado no banco de dados. Ignorando.")
+                logging.warning(
+                    f"ID {external_id} do arquivo {file_name} não foi encontrado no banco de dados. Ignorando.")
 
             logging.info("-" * 50)
 
