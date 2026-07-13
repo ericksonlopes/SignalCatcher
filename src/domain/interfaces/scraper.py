@@ -28,7 +28,7 @@ class IYouTubeScraper(Protocol):
         """
         ...
 
-    def extract_playlist_videos(self, playlist_url: str) -> list[YouTubeVideoDTO]:
+    def extract_playlist_videos(self, playlist_url: str) -> tuple[list[YouTubeVideoDTO], str]:
         """
         Extracts videos from a YouTube playlist.
         
@@ -36,6 +36,6 @@ class IYouTubeScraper(Protocol):
             playlist_url: The YouTube playlist URL.
             
         Returns:
-            A list of YouTubeVideoDTO objects.
+            A tuple containing a list of YouTubeVideoDTO objects and the playlist title.
         """
         ...

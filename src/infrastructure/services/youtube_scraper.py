@@ -125,10 +125,10 @@ class YouTubeScraperService(IYouTubeScraper):
                               context={"video_url": video_url, "error": str(e)})
             raise
 
-    def extract_playlist_videos(self, playlist_url: str) -> list[YouTubeVideoDTO]:
+    def extract_playlist_videos(self, playlist_url: str) -> tuple[list[YouTubeVideoDTO], str]:
         """Extracts all videos from a YouTube playlist.
 
-        Returns a list of YouTubeVideoDTO objects.
+        Returns a tuple of (list of YouTubeVideoDTO objects, playlist title).
         Uses extract_flat to avoid downloading any video content.
         """
         self.logger.debug(f"Starting playlist video extraction for {playlist_url}", context={"playlist_url": playlist_url})
@@ -140,20 +140,21 @@ class YouTubeScraperService(IYouTubeScraper):
             with YoutubeDL(ydl_opts) as ydl:
                 playlist_info = ydl.extract_info(playlist_url, download=False)
                 if not playlist_info or "entries" not in playlist_info:
-                    return []
+                    return [], ""
 
+                playlist_title = playlist_info.get("title") or "Unknown Playlist"
                 playlist_channel = playlist_info.get("channel") or playlist_info.get("uploader") or ""
-                return self._parse_channel_entries(playlist_info["entries"], default_channel=playlist_channel)
+                return self._parse_channel_entries(playlist_info["entries"], default_channel=playlist_channel), playlist_title
 
         try:
-            videos = self._run_with_retry(_extract)
+            videos, playlist_title = self._run_with_retry(_extract)
 
             self.logger.debug(
                 f"Playlist videos extracted successfully. "
-                f"Count: {len(videos)}",
+                f"Count: {len(videos)} | Title: {playlist_title}",
                 context={"playlist_url": playlist_url, "video_count": len(videos)}
             )
-            return videos
+            return videos, playlist_title
         except Exception as e:
             self.logger.error(f"Playlist extraction failed for {playlist_url}",
                               context={"playlist_url": playlist_url, "error": str(e)})

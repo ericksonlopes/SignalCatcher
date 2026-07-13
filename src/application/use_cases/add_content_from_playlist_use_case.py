@@ -12,12 +12,12 @@ class AddContentFromPlaylistUseCase:
         self.youtube_scraper = youtube_scraper
         self.logger = logger
 
-    def execute(self, playlist_url: str) -> list[ContentEntity]:
+    def execute(self, playlist_url: str, save_in_playlist_folder: bool = False) -> list[ContentEntity]:
         if not self._is_youtube_link(playlist_url):
             raise ValueError(f"URL '{playlist_url}' is not a valid YouTube link.")
 
         self.logger.info(f"Extracting YouTube playlist videos from {playlist_url}")
-        videos = self.youtube_scraper.extract_playlist_videos(playlist_url)
+        videos, playlist_title = self.youtube_scraper.extract_playlist_videos(playlist_url)
 
         if not videos:
             self.logger.warning(f"No videos found in playlist or failed to extract: {playlist_url}")
@@ -28,13 +28,17 @@ class AddContentFromPlaylistUseCase:
             if self.content_repository.exists_by_external_id(video.id):
                 self.logger.info(f"Content with external_id {video.id} already exists. Skipping.")
                 continue
+                
+            origin = video.channel or "Unknown Channel"
+            if save_in_playlist_folder:
+                origin = f"{origin}/{playlist_title}"
 
             content = ContentEntity(
                 external_id=video.id,
                 title=video.title or "Untitled",
                 url=video.url,
                 source_platform=SourcePlatform.YOUTUBE,
-                origin=video.channel or "Unknown Channel",
+                origin=origin,
                 status=ContentStatus.PENDING_DOWNLOAD
             )
             saved_content = self.content_repository.create(content)

@@ -13,8 +13,8 @@ from src.infrastructure.repositories.models.content_model import ContentModel
 
 
 def download_video(url: str, content_id: str, origin: str, output_path: str):
-    safe_origin = re.sub(r'[\\/*?:"<>|]', "_", origin)
-    final_output_path = os.path.join(output_path, safe_origin)
+    parts = [re.sub(r'[\\*?:"<>|]', "_", p) for p in origin.split('/')]
+    final_output_path = os.path.join(output_path, *parts)
     os.makedirs(final_output_path, exist_ok=True)
     ydl_opts = {
         'outtmpl': f'{final_output_path}/{content_id}_%(title)s.%(ext)s',

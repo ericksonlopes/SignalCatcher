@@ -24,7 +24,7 @@ def add_youtube_content_from_playlist(request: YouTubePlaylistAddRequest,
     It extracts metadata from all videos in the playlist and creates content entities.
     """
     try:
-        contents = use_case.execute(request.url)
+        contents = use_case.execute(request.url, request.save_in_playlist_folder)
         return {"message": f"Successfully added {len(contents)} videos from playlist", "videos_added": len(contents)}
     except Exception as e:
         logger.error(f"Failed to add YouTube content from playlist: {e}")
