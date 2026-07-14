@@ -29,3 +29,16 @@ def add_youtube_content_from_link(request: YouTubeVideoAddRequest,
     except Exception as e:
         logger.error(f"Failed to add YouTube content from link: {e}")
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/content/status-count")
+def get_content_status_count(repo: Annotated[ContentRepository, Depends(lambda: ContentRepository(logger=logger))]):
+    """
+    Returns a count of contents grouped by their status.
+    """
+    try:
+        counts = repo.count_by_status()
+        return {"status_counts": counts}
+    except Exception as e:
+        logger.error(f"Failed to get content status count: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

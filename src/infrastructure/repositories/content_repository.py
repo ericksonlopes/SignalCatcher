@@ -6,6 +6,8 @@ from src.infrastructure.repositories.mappers.content_mapper import ContentMapper
 from src.infrastructure.repositories.models.content_model import ContentModel
 
 
+from sqlalchemy import func
+
 class ContentRepository(IContentRepository):
     def __init__(self, logger: ILogger):
         self.logger = logger
@@ -31,4 +33,15 @@ class ContentRepository(IContentRepository):
         except Exception as e:
             self.logger.error(f"Error creating content '{content_entity.external_id}': {e}",
                               context={"external_id": content_entity.external_id, "error": str(e)})
+            raise
+
+    def count_by_status(self) -> dict[str, int]:
+        try:
+            with ConnectorPostgres() as session:
+                counts = session.query(
+                    ContentModel.status, func.count(ContentModel.id)
+                ).group_by(ContentModel.status).all()
+                return {status.name: count for status, count in counts}
+        except Exception as e:
+            self.logger.error(f"Error counting by status: {e}", context={"error": str(e)})
             raise

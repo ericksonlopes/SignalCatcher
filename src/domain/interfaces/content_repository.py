@@ -11,3 +11,7 @@ class IContentRepository(Protocol):
     def create(self, content_entity: ContentEntity) -> ContentEntity:
         """Saves a new content to the database."""
         ...
+
+    def count_by_status(self) -> dict[str, int]:
+        """Returns the distinct count of contents grouped by their status."""
+        ...
