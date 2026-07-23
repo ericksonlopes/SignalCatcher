@@ -99,24 +99,32 @@ class YouTubeScraperService(IYouTubeScraper):
         """Extracts metadata from a single YouTube video.
 
         Returns a YouTubeVideoDTO containing video metadata.
-        Uses extract_flat to avoid downloading any video content.
+        Uses YouTube oEmbed API to avoid bot blocks and extract_flat issues.
         """
         self.logger.debug(f"Starting video extraction for {video_url}", context={"video_url": video_url})
 
         def _extract():
-            ydl_opts = self._get_common_ydl_opts()
+            import requests
+            import re
             
-            with YoutubeDL(ydl_opts) as ydl:
-                video_info = ydl.extract_info(video_url, download=False)
-                if not video_info:
-                    raise Exception("Failed to extract video information.")
+            oembed_url = f"https://www.youtube.com/oembed?url={video_url}&format=json"
+            response = requests.get(oembed_url, timeout=10)
+            
+            if response.status_code != 200:
+                raise Exception(f"Failed to extract video information via oEmbed (Status: {response.status_code}).")
 
-                return YouTubeVideoDTO(
-                    id=video_info.get("id"),
-                    title=video_info.get("title"),
-                    channel=video_info.get("channel") or video_info.get("uploader") or "YouTube",
-                    url=video_url,
-                )
+            data = response.json()
+            
+            # Extract 11-character video ID from URL
+            match = re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11})", video_url)
+            video_id = match.group(1) if match else "unknown_id"
+
+            return YouTubeVideoDTO(
+                id=video_id,
+                title=data.get("title"),
+                channel=data.get("author_name") or "YouTube",
+                url=video_url,
+            )
 
         try:
             return self._run_with_retry(_extract)
