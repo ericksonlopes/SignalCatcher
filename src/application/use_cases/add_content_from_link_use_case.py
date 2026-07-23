@@ -1,15 +1,17 @@
 from src.domain.interfaces.logger import ILogger
 from src.domain.interfaces.content_repository import IContentRepository
 from src.domain.interfaces.scraper import IYouTubeScraper
+from src.domain.interfaces.notification import INotification
 from src.domain.models.content_entity import ContentEntity
 from src.domain.models.enums.content_status import ContentStatus
 from src.domain.models.enums.source_platform import SourcePlatform
 
 
 class AddContentFromLinkUseCase:
-    def __init__(self, content_repository: IContentRepository, youtube_scraper: IYouTubeScraper, logger: ILogger):
+    def __init__(self, content_repository: IContentRepository, youtube_scraper: IYouTubeScraper, notification: INotification, logger: ILogger):
         self.content_repository = content_repository
         self.youtube_scraper = youtube_scraper
+        self.notification = notification
         self.logger = logger
 
     def execute(self, url: str) -> ContentEntity:
@@ -41,4 +43,6 @@ class AddContentFromLinkUseCase:
             status=ContentStatus.PENDING_DOWNLOAD
         )
 
-        return self.content_repository.create(content)
+        created_content = self.content_repository.create(content)
+        self.notification.send()
+        return created_content
