@@ -4,6 +4,8 @@ from src.infrastructure.repositories.content_repository import ContentRepository
 from src.infrastructure.repositories.monitored_source_repository import MonitoredSourceRepository
 from src.infrastructure.services.monitor_task_service import MonitorTaskService
 from src.infrastructure.services.youtube_scraper import YouTubeScraperService
+from src.infrastructure.notifications.voice_monkey_notification import VoiceMonkeyNotification
+from src.config.settings import settings
 
 
 def daily_youtube_capture_job():
@@ -20,4 +22,12 @@ def daily_youtube_capture_job():
 
     use_case = RunDailyCaptureUseCase(monitor_service=monitor_service)
 
-    use_case.execute()
+    total_new_videos = use_case.execute()
+    
+    if total_new_videos > 0:
+        notification = VoiceMonkeyNotification(
+            api_token=settings.VOICE_MONKEY_API_TOKEN,
+            monkey_id=settings.VOICE_MONKEY_NEW_VIDEO_FOR_DOWNLOAD_MONKEY_ID,
+            logger=global_logger
+        )
+        notification.send()

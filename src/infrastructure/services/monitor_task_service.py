@@ -71,8 +71,8 @@ class MonitorTaskService(IMonitorTaskService):
 
         return new_count
 
-    def daily_capture_routine(self):
-        """Checks ALL active channels sequentially, one at a time."""
+    def daily_capture_routine(self) -> int:
+        """Checks ALL active channels sequentially, one at a time and returns new items count."""
         self.logger.debug("🌙 Starting daily check of all channels...")
 
         try:
@@ -80,7 +80,7 @@ class MonitorTaskService(IMonitorTaskService):
 
             if not sources:
                 self.logger.warning("⚠️ No active source registered.")
-                return
+                return 0
 
             self.logger.debug(f"📋 {len(sources)} source(s) to check.", context={"source_count": len(sources)})
 
@@ -94,6 +94,8 @@ class MonitorTaskService(IMonitorTaskService):
                     self.logger.error(f"  ❌ [{i}/{len(sources)}] {source.name}: {e}", context={"source_name": source.name, "error": str(e)})
 
             self.logger.debug(f"🏁 Check completed! Total new contents: {total_new}", context={"total_new": total_new})
+            return total_new
         except Exception as e:
             self.logger.error(f"Unexpected error in daily routine: {e}", context={"error": str(e)})
+            return 0
 

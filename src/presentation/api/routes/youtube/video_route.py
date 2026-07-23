@@ -1,8 +1,11 @@
 from typing import Annotated
+
 from fastapi import APIRouter, HTTPException, Depends
 
 from src.application.use_cases.add_content_from_link_use_case import AddContentFromLinkUseCase
+from src.config.settings import settings
 from src.infrastructure.loggers.logger import logger
+from src.infrastructure.notifications.voice_monkey_notification import VoiceMonkeyNotification
 from src.infrastructure.repositories.content_repository import ContentRepository
 from src.infrastructure.services.youtube_scraper import YouTubeScraperService
 from src.presentation.api.models.requests.youtube_video_add_request import YouTubeVideoAddRequest
@@ -13,7 +16,12 @@ router = APIRouter()
 def get_add_content_use_case() -> AddContentFromLinkUseCase:
     content_repo = ContentRepository(logger=logger)
     scraper = YouTubeScraperService(logger=logger)
-    return AddContentFromLinkUseCase(content_repo, scraper, logger)
+    notification = VoiceMonkeyNotification(
+        api_token=settings.VOICE_MONKEY_API_TOKEN,
+        monkey_id=settings.VOICE_MONKEY_NEW_VIDEO_FOR_DOWNLOAD_MONKEY_ID,
+        logger=logger
+    )
+    return AddContentFromLinkUseCase(content_repo, scraper, notification, logger)
 
 
 @router.post("/content")
@@ -31,7 +39,7 @@ def add_youtube_content_from_link(request: YouTubeVideoAddRequest,
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/content/status-count")
+@router.get("/content/status-count", responses={500: {"description": "Internal Server Error"}})
 def get_content_status_count(repo: Annotated[ContentRepository, Depends(lambda: ContentRepository(logger=logger))]):
     """
     Returns a count of contents grouped by their status.

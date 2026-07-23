@@ -14,12 +14,12 @@ def start_scheduler() -> BackgroundScheduler:
     scheduler.add_job(
         daily_youtube_capture_job,
         trigger='interval',
-        minutes=10,
+        minutes=30,
         id='daily_youtube_capture_job',
         replace_existing=True
     )
 
-    logger.warning("🚀 Scheduler running in the background! Executing now, and then every 10 minutes.")
+    logger.info("🚀 Scheduler running in the background! Executing now, and then every 30 minutes.")
     scheduler.start()
 
     return scheduler
