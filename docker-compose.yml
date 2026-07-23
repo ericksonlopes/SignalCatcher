@@ -13,4 +13,7 @@ services:
       POSTGRES_HOST: ${POSTGRES_HOST-192.168.0.10}
       POSTGRES_DATABASE: ${POSTGRES_DATABASE-signalcatcher}
       LIST_LOG_LEVELS: ${LIST_LOG_LEVELS:-ERROR,WARNING,INFO}
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
 

@@ -19,6 +19,7 @@ class YouTubeScraperService(IYouTubeScraper):
             'no_warnings': True,
             'extract_flat': 'in_playlist',
             'ignoreerrors': True,
+            'source_address': '0.0.0.0',
         }
 
     @staticmethod
