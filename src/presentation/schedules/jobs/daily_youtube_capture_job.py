@@ -24,10 +24,21 @@ def daily_youtube_capture_job():
 
     total_new_videos = use_case.execute()
     
+    global_logger.info(
+        f"Daily YouTube capture job finished. Total new videos detected: {total_new_videos}",
+        context={"total_new_videos": total_new_videos}
+    )
+
     if total_new_videos > 0:
+        global_logger.info(
+            f"New videos detected ({total_new_videos}). Triggering VoiceMonkey notification...",
+            context={"total_new_videos": total_new_videos, "monkey_id": settings.VOICE_MONKEY_NEW_VIDEO_FOR_DOWNLOAD_MONKEY_ID}
+        )
         notification = VoiceMonkeyNotification(
             api_token=settings.VOICE_MONKEY_API_TOKEN,
             monkey_id=settings.VOICE_MONKEY_NEW_VIDEO_FOR_DOWNLOAD_MONKEY_ID,
             logger=global_logger
         )
         notification.send()
+    else:
+        global_logger.info("No new videos detected in daily capture. Skipping VoiceMonkey notification.")

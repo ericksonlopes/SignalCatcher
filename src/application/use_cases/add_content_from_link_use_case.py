@@ -44,5 +44,9 @@ class AddContentFromLinkUseCase:
         )
 
         created_content = self.content_repository.create(content)
+        self.logger.info(
+            f"Content created successfully (id={created_content.id}). Triggering VoiceMonkey notification...",
+            context={"content_id": created_content.id, "external_id": info.id, "title": info.title}
+        )
         self.notification.send()
         return created_content
