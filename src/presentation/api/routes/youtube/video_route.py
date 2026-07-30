@@ -24,7 +24,7 @@ def get_add_content_use_case() -> AddContentFromLinkUseCase:
     return AddContentFromLinkUseCase(content_repo, scraper, notification, logger)
 
 
-@router.post("/content")
+@router.post("/content", responses={400: {"description": "Bad Request"}})
 def add_youtube_content_from_link(request: YouTubeVideoAddRequest,
                                   use_case: Annotated[AddContentFromLinkUseCase, Depends(get_add_content_use_case)]):
     """

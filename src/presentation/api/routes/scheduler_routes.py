@@ -19,7 +19,7 @@ def execute_daily_youtube_capture(background_tasks: BackgroundTasks):
     return {"message": "daily_youtube_capture_job execution started in the background."}
 
 
-@router.post("/jobs/{job_id}/run", status_code=status.HTTP_200_OK)
+@router.post("/jobs/{job_id}/run", status_code=status.HTTP_200_OK, responses={status.HTTP_404_NOT_FOUND: {"description": "Job not found in the scheduler"}})
 def trigger_job(job_id: str, request: Request):
     """
     Manually triggers a scheduled job by its ID.

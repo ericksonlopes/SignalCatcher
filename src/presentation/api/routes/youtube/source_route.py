@@ -12,7 +12,7 @@ from src.presentation.api.dependencies import get_create_source_use_case
 router = APIRouter()
 
 
-@router.post("/sources", response_model=SourceResponseDTO, status_code=status.HTTP_201_CREATED)
+@router.post("/sources", response_model=SourceResponseDTO, status_code=status.HTTP_201_CREATED, responses={status.HTTP_400_BAD_REQUEST: {"description": "Bad Request"}})
 def create_youtube_source(source_data: YouTubeSourceCreateDTO,
                           use_case: Annotated[CreateSourceUseCase, Depends(get_create_source_use_case)]):
     """

@@ -16,7 +16,7 @@ def get_add_playlist_use_case() -> AddContentFromPlaylistUseCase:
     return AddContentFromPlaylistUseCase(content_repo, scraper, logger)
 
 
-@router.post("/playlist")
+@router.post("/playlist", responses={400: {"description": "Bad Request"}})
 def add_youtube_content_from_playlist(request: YouTubePlaylistAddRequest,
                                       use_case: Annotated[AddContentFromPlaylistUseCase, Depends(get_add_playlist_use_case)]):
     """
