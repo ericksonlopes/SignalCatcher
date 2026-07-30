@@ -1,11 +1,22 @@
 from datetime import datetime, timezone
 
 from apscheduler.schedulers.background import BackgroundScheduler
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Request, status, BackgroundTasks
 
 from src.infrastructure.loggers.logger import logger
+from src.presentation.schedules.jobs.daily_youtube_capture_job import daily_youtube_capture_job
 
 router = APIRouter()
+
+
+@router.post("/jobs/daily-youtube-capture/execute", status_code=status.HTTP_202_ACCEPTED)
+def execute_daily_youtube_capture(background_tasks: BackgroundTasks):
+    """
+    Executes the daily_youtube_capture_job directly in the background.
+    """
+    background_tasks.add_task(daily_youtube_capture_job)
+    logger.info("⚡ Background task for daily_youtube_capture_job triggered via API.")
+    return {"message": "daily_youtube_capture_job execution started in the background."}
 
 
 @router.post("/jobs/{job_id}/run", status_code=status.HTTP_200_OK)
