@@ -4,6 +4,7 @@ from src.domain.models.youtube_content_entity import YoutubeContentEntity
 from src.infrastructure.repositories.connector import ConnectorPostgres
 from src.infrastructure.repositories.mappers.youtube_content_mapper import YoutubeContentMapper
 from src.infrastructure.repositories.models.youtube_content_model import YoutubeContentModel
+from src.infrastructure.repositories.models.content_tracking_model import ContentTrackingModel
 
 
 from sqlalchemy import func
