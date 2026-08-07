@@ -11,6 +11,7 @@ class YoutubeVideoCardResponse(BaseModel):
     thumbnail: Optional[str]
     duration: Optional[str]
     tags: Optional[List[str]]
+    description: Optional[str] = None
     
     class Config:
         from_attributes = True

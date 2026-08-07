@@ -87,7 +87,8 @@ def get_youtube_contents(
                 step=item.step,
                 thumbnail=item.thumbnail,
                 duration=item.duration,
-                tags=item.tags
+                tags=item.tags,
+                description=getattr(item, 'description', None)
             ) for item in items
         ]
         
