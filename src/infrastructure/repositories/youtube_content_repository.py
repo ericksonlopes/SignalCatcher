@@ -17,6 +17,7 @@ class YoutubeContentRepository(IYoutubeContentRepository):
         try:
             with ConnectorPostgres() as session:
                 exists = session.query(YoutubeContentModel.id).filter_by(external_id=external_id).first()
+
                 return exists is not None
         except Exception as e:
             self.logger.error(f"Error checking if content exists by external_id '{external_id}': {e}",
@@ -34,6 +35,18 @@ class YoutubeContentRepository(IYoutubeContentRepository):
         except Exception as e:
             self.logger.error(f"Error creating content '{youtube_content_entity.external_id}': {e}",
                               context={"external_id": youtube_content_entity.external_id, "error": str(e)})
+            raise
+
+    def get_paginated(self, page: int, limit: int) -> tuple[list[YoutubeContentEntity], int]:
+        try:
+            with ConnectorPostgres() as session:
+                offset = (page - 1) * limit
+                query = session.query(YoutubeContentModel).order_by(YoutubeContentModel.created_at.desc())
+                total = query.count()
+                items = query.offset(offset).limit(limit).all()
+                return [YoutubeContentMapper.to_domain(item) for item in items], total
+        except Exception as e:
+            self.logger.error(f"Error fetching paginated contents: {e}", context={"error": str(e)})
             raise
 
     def count_by_step(self) -> dict[str, int]:
@@ -74,6 +87,7 @@ class YoutubeContentRepository(IYoutubeContentRepository):
                 model.categories = youtube_content_entity.categories
                 model.tags = youtube_content_entity.tags
                 model.error_info = getattr(youtube_content_entity, 'error_info', None) # if entity has it
+                model.published_at = getattr(youtube_content_entity, 'published_at', None)
 
                 session.commit()
                 session.refresh(model)

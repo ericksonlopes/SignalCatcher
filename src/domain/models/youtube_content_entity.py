@@ -19,7 +19,8 @@ class YoutubeContentEntity(BaseModel):
     thumbnail: Optional[str] = None
     duration: Optional[str] = None
     categories: Optional[list] = None
-    tags: Optional[list] = None
+    tags: Optional[list[str]] = None
     error_info: Optional[str] = None
+    published_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None

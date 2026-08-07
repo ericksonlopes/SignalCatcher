@@ -31,7 +31,8 @@ class YoutubeContentModel(Base):
     step = Column(
         Enum(ContentStep), nullable=False, default=ContentStep.PENDING_DOWNLOAD
     )
-    error_info = Column(String, nullable=True)  # Store specific error details
+    error_info = Column(String, nullable=True)
+    published_at = Column(DateTime, nullable=True)  # Store specific error details
     raw_metadata = Column(JSON, nullable=True)  # Store extracted metadata JSON
     thumbnail = Column(String, nullable=True)
     duration = Column(String, nullable=True)  # Format: HH:MM:SS

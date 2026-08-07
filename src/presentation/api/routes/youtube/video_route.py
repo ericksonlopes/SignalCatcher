@@ -11,6 +11,10 @@ from src.infrastructure.repositories.youtube_content_repository import (
 )
 from src.infrastructure.services.youtube_scraper import YouTubeScraperService
 from src.presentation.api.models.requests.youtube_video_add_request import YouTubeVideoAddRequest
+from src.presentation.api.models.responses.paginated_response import PaginatedResponse
+from src.presentation.api.models.responses.youtube_video_card_response import YoutubeVideoCardResponse
+import math
+from fastapi import Query
 
 router = APIRouter()
 
@@ -56,4 +60,45 @@ def get_content_status_count(
         return {"status_counts": counts}
     except Exception as e:
         logger.error(f"Failed to get content status count: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/content", response_model=PaginatedResponse[YoutubeVideoCardResponse])
+def get_youtube_contents(
+    repo: Annotated[
+        YoutubeContentRepository,
+        Depends(lambda: YoutubeContentRepository(logger=logger)),
+    ],
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(20, ge=1, le=100, description="Items per page")
+):
+    """
+    Returns a paginated list of YouTube contents.
+    """
+    try:
+        items, total = repo.get_paginated(page=page, limit=limit)
+        
+        # Mapping to Video Card Response
+        mapped_items = [
+            YoutubeVideoCardResponse(
+                id=item.external_id,
+                title=item.title,
+                url=item.url,
+                channel_name=item.origin,
+                thumbnail=item.thumbnail,
+                duration=item.duration,
+                tags=item.tags
+            ) for item in items
+        ]
+        
+        total_pages = math.ceil(total / limit)
+        
+        return PaginatedResponse[YoutubeVideoCardResponse](
+            items=mapped_items,
+            total=total,
+            page=page,
+            limit=limit,
+            total_pages=total_pages
+        )
+    except Exception as e:
+        logger.error(f"Failed to get paginated contents: {e}")
         raise HTTPException(status_code=500, detail=str(e))

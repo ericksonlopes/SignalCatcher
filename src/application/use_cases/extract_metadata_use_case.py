@@ -40,6 +40,10 @@ class ExtractMetadataUseCase:
             content.categories = metadata_dict.get('categories')
             content.tags = metadata_dict.get('tags')
 
+            timestamp = metadata_dict.get('timestamp')
+            if timestamp:
+                content.published_at = datetime.datetime.fromtimestamp(int(timestamp), tz=datetime.timezone.utc)
+
             # Complete step
             content.step = ContentStep.COMPLETED
             self.youtube_content_repository.update(content)
@@ -48,8 +52,13 @@ class ExtractMetadataUseCase:
         except Exception as e:
             error_msg = str(e)
             self.logger.error(f"Error extracting metadata for {content.title}: {error_msg}")
+            
             content.error_info = error_msg
-            content.step = ContentStep.ERROR
+            if "this video has been removed" in error_msg.lower():
+                content.step = ContentStep.VIDEO_REMOVED
+            else:
+                content.step = ContentStep.ERROR
+                
             self.youtube_content_repository.update(content)
             
             # If YouTube blocked our IP, we must abort the entire job loop to avoid hammering them.

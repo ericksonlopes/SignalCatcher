@@ -12,6 +12,10 @@ class IYoutubeContentRepository(Protocol):
         """Saves a new content to the database."""
         ...
 
+    def get_paginated(self, page: int, limit: int) -> tuple[list[YoutubeContentEntity], int]:
+        """Returns a paginated list of contents and the total count."""
+        ...
+
     def count_by_step(self) -> dict[str, int]:
         """Returns the distinct count of contents grouped by their step."""
         ...

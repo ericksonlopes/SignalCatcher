@@ -19,6 +19,7 @@ class YoutubeContentMapper:
             categories=model.categories,
             tags=model.tags,
             error_info=model.error_info,
+            published_at=model.published_at,
             created_at=model.created_at,
             updated_at=model.updated_at,
         )
