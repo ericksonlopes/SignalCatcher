@@ -24,11 +24,13 @@ def upgrade() -> None:
     op.alter_column('content_tracking', 'previous_step',
                existing_type=sa.VARCHAR(),
                type_=sa.Enum('PENDING_DOWNLOAD', 'DOWNLOADING', 'DOWNLOADED', 'PENDING_METADATA_EXTRACTION', 'EXTRACTING_METADATA', 'COMPLETED', 'ERROR', 'MEMBERS_ONLY', 'AGE_RESTRICTED', 'PRIVATE_VIDEO', 'COPYRIGHT_REMOVED', 'ACCOUNT_TERMINATED', name='contentstep'),
-               existing_nullable=True)
+               existing_nullable=True,
+               postgresql_using="previous_step::contentstep")
     op.alter_column('content_tracking', 'new_step',
                existing_type=sa.VARCHAR(),
                type_=sa.Enum('PENDING_DOWNLOAD', 'DOWNLOADING', 'DOWNLOADED', 'PENDING_METADATA_EXTRACTION', 'EXTRACTING_METADATA', 'COMPLETED', 'ERROR', 'MEMBERS_ONLY', 'AGE_RESTRICTED', 'PRIVATE_VIDEO', 'COPYRIGHT_REMOVED', 'ACCOUNT_TERMINATED', name='contentstep'),
-               existing_nullable=False)
+               existing_nullable=False,
+               postgresql_using="new_step::contentstep")
     op.add_column('youtube_contents', sa.Column('thumbnail', sa.String(), nullable=True))
     op.add_column('youtube_contents', sa.Column('duration', sa.String(), nullable=True))
     op.add_column('youtube_contents', sa.Column('categories', sa.JSON(), nullable=True))
@@ -46,9 +48,11 @@ def downgrade() -> None:
     op.alter_column('content_tracking', 'new_step',
                existing_type=sa.Enum('PENDING_DOWNLOAD', 'DOWNLOADING', 'DOWNLOADED', 'PENDING_METADATA_EXTRACTION', 'EXTRACTING_METADATA', 'COMPLETED', 'ERROR', 'MEMBERS_ONLY', 'AGE_RESTRICTED', 'PRIVATE_VIDEO', 'COPYRIGHT_REMOVED', 'ACCOUNT_TERMINATED', name='contentstep'),
                type_=sa.VARCHAR(),
-               existing_nullable=False)
+               existing_nullable=False,
+               postgresql_using="new_step::varchar")
     op.alter_column('content_tracking', 'previous_step',
                existing_type=sa.Enum('PENDING_DOWNLOAD', 'DOWNLOADING', 'DOWNLOADED', 'PENDING_METADATA_EXTRACTION', 'EXTRACTING_METADATA', 'COMPLETED', 'ERROR', 'MEMBERS_ONLY', 'AGE_RESTRICTED', 'PRIVATE_VIDEO', 'COPYRIGHT_REMOVED', 'ACCOUNT_TERMINATED', name='contentstep'),
                type_=sa.VARCHAR(),
-               existing_nullable=True)
+               existing_nullable=True,
+               postgresql_using="previous_step::varchar")
     # ### end Alembic commands ###
