@@ -7,7 +7,7 @@ from src.domain.interfaces.monitor_service import IMonitorTaskService
 from src.domain.interfaces.monitored_source_repository import IMonitoredSourceRepository
 from src.domain.interfaces.scraper import IYouTubeScraper
 from src.domain.models.youtube_content_entity import YoutubeContentEntity
-from src.domain.models.enums.content_status import ContentStatus
+from src.domain.models.enums.content_step import ContentStep
 from src.domain.models.enums.source_platform import SourcePlatform
 from src.domain.models.source_entity import SourceEntity
 
@@ -60,7 +60,7 @@ class MonitorTaskService(IMonitorTaskService):
                 url=item.url,
                 source_platform=source.source_platform,
                 origin=source.name,
-                status=ContentStatus.PENDING_DOWNLOAD,
+                step=ContentStep.PENDING_DOWNLOAD,
             )
             self.youtube_content_repository.create(new_item)
             new_count += 1

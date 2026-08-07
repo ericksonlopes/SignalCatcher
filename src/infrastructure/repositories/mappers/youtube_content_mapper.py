@@ -12,7 +12,8 @@ class YoutubeContentMapper:
             url=model.url,
             source_platform=model.source_platform,
             origin=model.origin,
-            status=model.status,
+            step=model.step,
+            raw_metadata=model.raw_metadata,
             created_at=model.created_at,
             updated_at=model.updated_at,
         )
@@ -26,7 +27,8 @@ class YoutubeContentMapper:
             url=entity.url,
             source_platform=entity.source_platform,
             origin=entity.origin,
-            status=entity.status,
+            step=entity.step,
+            raw_metadata=entity.raw_metadata,
             created_at=entity.created_at,
             updated_at=entity.updated_at,
         )

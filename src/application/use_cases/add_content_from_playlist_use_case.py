@@ -2,9 +2,9 @@ from src.domain.interfaces.logger import ILogger
 from src.domain.interfaces.youtube_content_repository import IYoutubeContentRepository
 from src.domain.interfaces.scraper import IYouTubeScraper
 from src.domain.models.youtube_content_entity import YoutubeContentEntity
-from src.domain.models.enums.content_status import ContentStatus
+from src.domain.models.enums.content_step import ContentStep
 from src.domain.models.enums.source_platform import SourcePlatform
-
+ø
 
 class AddContentFromPlaylistUseCase:
     def __init__(self, youtube_content_repository: IYoutubeContentRepository, youtube_scraper: IYouTubeScraper, logger: ILogger):
@@ -39,7 +39,7 @@ class AddContentFromPlaylistUseCase:
                 url=video.url,
                 source_platform=SourcePlatform.YOUTUBE,
                 origin=origin,
-                status=ContentStatus.PENDING_DOWNLOAD
+                step=ContentStep.PENDING_DOWNLOAD
             )
             saved_content = self.youtube_content_repository.create(content)
             saved_contents.append(saved_content)

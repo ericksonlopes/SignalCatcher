@@ -4,10 +4,10 @@ import re
 import sys
 
 import yt_dlp
-
+ø
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-from src.domain.models.enums.content_status import ContentStatus
+from src.domain.models.enums.content_step import ContentStep
 from src.infrastructure.repositories.connector import ConnectorPostgres
 from src.infrastructure.repositories.models.youtube_content_model import YoutubeContentModel
 
@@ -35,7 +35,7 @@ def main():
         with ConnectorPostgres() as session:
             # Find one pending download
             content = session.query(YoutubeContentModel).filter(
-                YoutubeContentModel.status == ContentStatus.PENDING_DOWNLOAD
+                YoutubeContentModel.step == ContentStep.PENDING_DOWNLOAD
             ).first()
 
             if not content:
@@ -44,16 +44,16 @@ def main():
 
             logging.info(f"Processing content: {content.title} ({content.url})")
 
-            # Update status to DOWNLOADING
-            content.status = ContentStatus.DOWNLOADING
+            # Update step to DOWNLOADING
+            content.step = ContentStep.DOWNLOADING
             session.commit()
 
             try:
                 download_video(url=content.url, content_id=content.external_id, origin=content.origin,
                                output_path=output_path)
 
-                # Update status to DOWNLOADED
-                content.status = ContentStatus.DOWNLOADED
+                # Update step to PENDING_METADATA_EXTRACTION
+                content.step = ContentStep.PENDING_METADATA_EXTRACTION
                 session.commit()
                 logging.info(f"Successfully downloaded: {content.title}")
             except Exception as e:
@@ -63,17 +63,17 @@ def main():
                 content.error_info = str(e)
                 # Check if it's a members-only error
                 if "members-only content like this video" in error_msg or "members on level" in error_msg:
-                    content.status = ContentStatus.MEMBERS_ONLY
+                    content.step = ContentStep.MEMBERS_ONLY
                 elif "sign in to confirm your age" in error_msg:
-                    content.status = ContentStatus.AGE_RESTRICTED
+                    content.step = ContentStep.AGE_RESTRICTED
                 elif "private video" in error_msg and "sign in if you've been granted access" in error_msg:
-                    content.status = ContentStatus.PRIVATE_VIDEO
+                    content.step = ContentStep.PRIVATE_VIDEO
                 elif "removed following a copyright" in error_msg:
-                    content.status = ContentStatus.COPYRIGHT_REMOVED
+                    content.step = ContentStep.COPYRIGHT_REMOVED
                 elif "account associated with this video has been terminated" in error_msg:
-                    content.status = ContentStatus.ACCOUNT_TERMINATED
+                    content.step = ContentStep.ACCOUNT_TERMINATED
                 else:
-                    content.status = ContentStatus.ERROR
+                    content.step = ContentStep.ERROR
                 session.commit()
 
                 # Check for YouTube bot detection

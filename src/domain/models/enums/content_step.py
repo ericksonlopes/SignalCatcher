@@ -1,11 +1,14 @@
 import enum
 
 
-class ContentStatus(str, enum.Enum):
-    """Content status in the download pipeline."""
+class ContentStep(str, enum.Enum):
+    """Content step in the processing pipeline."""
+
     PENDING_DOWNLOAD = "PENDING_DOWNLOAD"
     DOWNLOADING = "DOWNLOADING"
-    DOWNLOADED = "DOWNLOADED"
+    PENDING_METADATA_EXTRACTION = "PENDING_METADATA_EXTRACTION"
+    EXTRACTING_METADATA = "EXTRACTING_METADATA"
+    COMPLETED = "COMPLETED"
     ERROR = "ERROR"
     MEMBERS_ONLY = "MEMBERS_ONLY"
     AGE_RESTRICTED = "AGE_RESTRICTED"

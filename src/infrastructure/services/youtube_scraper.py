@@ -107,15 +107,15 @@ class YouTubeScraperService(IYouTubeScraper):
         def _extract():
             import requests
             import re
-            
+
             oembed_url = f"https://www.youtube.com/oembed?url={video_url}&format=json"
             response = requests.get(oembed_url, timeout=10)
-            
+
             if response.status_code != 200:
                 raise Exception(f"Failed to extract video information via oEmbed (Status: {response.status_code}).")
 
             data = response.json()
-            
+
             # Extract 11-character video ID from URL
             match = re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11})", video_url)
             video_id = match.group(1) if match else "unknown_id"
@@ -132,6 +132,38 @@ class YouTubeScraperService(IYouTubeScraper):
         except Exception as e:
             self.logger.error(f"Video extraction failed for {video_url}",
                               context={"video_url": video_url, "error": str(e)})
+            raise
+
+    def extract_metadata(self, video_url: str) -> dict:
+        """Extracts detailed metadata from a single YouTube video.
+
+        Returns a dict containing detailed metadata.
+        Uses yt-dlp to extract full video information without downloading.
+        """
+        self.logger.debug(
+            f"Starting metadata extraction for {video_url}",
+            context={"video_url": video_url},
+        )
+
+        def _extract():
+            ydl_opts = self._get_common_ydl_opts()
+            # For metadata extraction, we don't want extract_flat, we want full info
+            ydl_opts.update({"extract_flat": False, "skip_download": True})
+
+            with YoutubeDL(ydl_opts) as ydl:
+                info_dict = ydl.extract_info(video_url, download=False)
+                if not info_dict:
+                    raise Exception("Failed to extract video information.")
+
+                return info_dict
+
+        try:
+            return self._run_with_retry(_extract)
+        except Exception as e:
+            self.logger.error(
+                f"Metadata extraction failed for {video_url}",
+                context={"video_url": video_url, "error": str(e)},
+            )
             raise
 
     def extract_playlist_videos(self, playlist_url: str) -> tuple[list[YouTubeVideoDTO], str]:

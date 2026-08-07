@@ -11,7 +11,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from src.infrastructure.repositories.connector import ConnectorPostgres
 from src.infrastructure.repositories.models.youtube_content_model import YoutubeContentModel
-from src.domain.models.enums.content_status import ContentStatus
+from src.domain.models.enums.content_step import ContentStep
 from download_videos import download_video
 
 
@@ -22,11 +22,11 @@ def main():
     with ConnectorPostgres() as session:
         # Find all videos that failed previously
         error_contents = session.query(YoutubeContentModel).filter(
-            YoutubeContentModel.status == ContentStatus.ERROR
+            YoutubeContentModel.step == ContentStep.ERROR
         ).all()
 
         if not error_contents:
-            logging.info("No videos with ERROR status found.")
+            logging.info("No videos with ERROR step found.")
             return
 
         logging.info(f"Found {len(error_contents)} videos to retry.")
@@ -35,16 +35,16 @@ def main():
             logging.info(f"Retrying content: {content.title} ({content.url})")
             logging.warning(f"Previous Error: {content.error_info}")
 
-            # Update status to DOWNLOADING
-            content.status = ContentStatus.DOWNLOADING
+            # Update step to DOWNLOADING
+            content.step = ContentStep.DOWNLOADING
             session.commit()
 
             try:
                 download_video(url=content.url, content_id=content.external_id, origin=content.origin,
                                output_path=output_path)
 
-                # Update status to DOWNLOADED and clear error info
-                content.status = ContentStatus.DOWNLOADED
+                # Update step to PENDING_METADATA_EXTRACTION and clear error info
+                content.step = ContentStep.PENDING_METADATA_EXTRACTION
                 content.error_info = None
                 session.commit()
                 logging.info(f"Successfully downloaded on retry: {content.title}")
@@ -55,17 +55,17 @@ def main():
                 content.error_info = str(e)
                 # Check if it's a members-only error
                 if "members-only content like this video" in error_msg or "members on level" in error_msg:
-                    content.status = ContentStatus.MEMBERS_ONLY
+                    content.step = ContentStep.MEMBERS_ONLY
                 elif "sign in to confirm your age" in error_msg:
-                    content.status = ContentStatus.AGE_RESTRICTED
+                    content.step = ContentStep.AGE_RESTRICTED
                 elif "private video" in error_msg and "sign in if you've been granted access" in error_msg:
-                    content.status = ContentStatus.PRIVATE_VIDEO
+                    content.step = ContentStep.PRIVATE_VIDEO
                 elif "removed following a copyright" in error_msg:
-                    content.status = ContentStatus.COPYRIGHT_REMOVED
+                    content.step = ContentStep.COPYRIGHT_REMOVED
                 elif "account associated with this video has been terminated" in error_msg:
-                    content.status = ContentStatus.ACCOUNT_TERMINATED
+                    content.step = ContentStep.ACCOUNT_TERMINATED
                 else:
-                    content.status = ContentStatus.ERROR
+                    content.step = ContentStep.ERROR
                 session.commit()
 
                 # Check for YouTube bot detection

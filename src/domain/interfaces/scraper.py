@@ -4,6 +4,17 @@ from src.domain.models.youtube_video_dto import YouTubeVideoDTO
 
 
 class IYouTubeScraper(Protocol):
+    def extract_metadata(self, video_url: str) -> dict:
+        """
+        Extracts detailed metadata from a single YouTube video.
+        
+        Args:
+            video_url: The YouTube video URL.
+            
+        Returns:
+            A dict containing detailed metadata.
+        """
+        ...
     def extract_channel_videos(self, channel_url: str) -> list[YouTubeVideoDTO]:
         """
         Extracts videos from a YouTube channel.

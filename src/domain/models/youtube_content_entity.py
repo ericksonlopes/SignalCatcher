@@ -3,7 +3,7 @@ from typing import Optional
 
 from pydantic import BaseModel
 
-from src.domain.models.enums.content_status import ContentStatus
+from src.domain.models.enums.content_step import ContentStep
 from src.domain.models.enums.source_platform import SourcePlatform
 
 
@@ -14,6 +14,7 @@ class YoutubeContentEntity(BaseModel):
     url: str
     source_platform: SourcePlatform
     origin: str
-    status: ContentStatus
+    step: ContentStep
+    raw_metadata: Optional[dict] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None

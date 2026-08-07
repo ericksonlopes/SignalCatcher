@@ -3,10 +3,10 @@ from src.domain.interfaces.youtube_content_repository import IYoutubeContentRepo
 from src.domain.interfaces.scraper import IYouTubeScraper
 from src.domain.interfaces.notification import INotification
 from src.domain.models.youtube_content_entity import YoutubeContentEntity
-from src.domain.models.enums.content_status import ContentStatus
+from src.domain.models.enums.content_step import ContentStep
 from src.domain.models.enums.source_platform import SourcePlatform
 
-
+ø
 class AddContentFromLinkUseCase:
     def __init__(self, youtube_content_repository: IYoutubeContentRepository, youtube_scraper: IYouTubeScraper, notification: INotification, logger: ILogger):
         self.youtube_content_repository = youtube_content_repository
@@ -40,7 +40,7 @@ class AddContentFromLinkUseCase:
             url=info.url,
             source_platform=SourcePlatform.YOUTUBE,
             origin=info.channel,
-            status=ContentStatus.PENDING_DOWNLOAD
+            step=ContentStep.PENDING_DOWNLOAD
         )
 
         created_content = self.youtube_content_repository.create(content)

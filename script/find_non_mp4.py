@@ -7,10 +7,9 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # Add the root directory of the project to PYTHONPATH so that we can import from src
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from src.infrastructure.repositories.connector import ConnectorPostgres
 from src.infrastructure.repositories.models.youtube_content_model import YoutubeContentModel
-from src.domain.models.enums.content_status import ContentStatus
+from src.domain.models.enums.content_step import ContentStep
 
 
 def process_non_mp4_files(directory):
@@ -47,14 +46,14 @@ def process_non_mp4_files(directory):
             if content:
                 logging.info(f"ID {external_id} found in DB! (File: {file_name})")
 
-                # Reset status to PENDING_DOWNLOAD to restart download later
-                if content.status != ContentStatus.PENDING_DOWNLOAD:
-                    content.status = ContentStatus.PENDING_DOWNLOAD
+                # Reset step to PENDING_DOWNLOAD to restart download later
+                if content.step != ContentStep.PENDING_DOWNLOAD:
+                    content.step = ContentStep.PENDING_DOWNLOAD
                     content.error_info = f"Found incomplete/wrong format file: {file_name}"
                     session.commit()
-                    logging.info(f" {content.title} -> Status alterado para PENDING_DOWNLOAD")
+                    logging.info(f" {content.title} -> Step alterado para PENDING_DOWNLOAD")
                 else:
-                    logging.info(f" {content.title} -> Status já estava como PENDING_DOWNLOAD")
+                    logging.info(f" {content.title} -> Step já estava como PENDING_DOWNLOAD")
 
                 # We delete the broken/incomplete file so it downloads completely from scratch next time
                 try:
