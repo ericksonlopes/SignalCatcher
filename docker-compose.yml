@@ -10,12 +10,19 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER-eriberry}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD-1d0?3tP6J9Cj}
-      POSTGRES_HOST: ${POSTGRES_HOST-192.168.0.10}
+      # Aponta para o nome do container do Postgres na outra stack
+      POSTGRES_HOST: ${POSTGRES_HOST-postgresql}
       POSTGRES_DATABASE: ${POSTGRES_DATABASE-signalcatcher}
       LIST_LOG_LEVELS: ${LIST_LOG_LEVELS:-ERROR,WARNING,INFO}
       VOICE_MONKEY_API_TOKEN: ${VOICE_MONKEY_API_TOKEN:-}
       VOICE_MONKEY_NEW_VIDEO_FOR_DOWNLOAD_MONKEY_ID: ${VOICE_MONKEY_NEW_VIDEO_FOR_DOWNLOAD_MONKEY_ID:-}
+    networks:
+      - shared_postgres_network
     dns:
       - 8.8.8.8
       - 1.1.1.1
 
+networks:
+  shared_postgres_network:
+    external: true
+    name: signalcatcher_network
