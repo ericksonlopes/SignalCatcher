@@ -5,8 +5,18 @@ from fastapi import APIRouter, HTTPException, Request, status, BackgroundTasks
 
 from src.infrastructure.loggers.logger import logger
 from src.presentation.schedules.jobs.youtube_capture_job import daily_youtube_capture_job
+from src.presentation.schedules.jobs.youtube_extract_metadata_job import extract_metadata_job
 
 router = APIRouter()
+
+@router.post("/jobs/extract-metadata/execute", status_code=status.HTTP_202_ACCEPTED)
+def execute_extract_metadata(background_tasks: BackgroundTasks):
+    """
+    Executes the extract_metadata_job directly in the background.
+    """
+    background_tasks.add_task(extract_metadata_job)
+    logger.info("⚡ Background task for extract_metadata_job triggered via API.")
+    return {"message": "extract_metadata_job execution started in the background."}
 
 
 @router.post("/jobs/daily-youtube-capture/execute", status_code=status.HTTP_202_ACCEPTED)
