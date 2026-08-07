@@ -87,8 +87,8 @@ def get_youtube_contents(
                 step=item.step,
                 thumbnail=item.thumbnail,
                 duration=item.duration,
-                tags=item.tags,
-                description=getattr(item, 'description', None)
+                description=item.raw_metadata.get("description") if item.raw_metadata else None,
+                tags=item.tags
             ) for item in items
         ]
         

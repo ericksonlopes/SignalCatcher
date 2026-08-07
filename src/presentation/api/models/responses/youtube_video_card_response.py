@@ -10,8 +10,8 @@ class YoutubeVideoCardResponse(BaseModel):
     step: ContentStep
     thumbnail: Optional[str]
     duration: Optional[str]
-    tags: Optional[List[str]]
     description: Optional[str] = None
+    tags: Optional[List[str]]
     
     class Config:
         from_attributes = True
