@@ -46,9 +46,15 @@ class ExtractMetadataUseCase:
             self.logger.info(f"Successfully extracted metadata for: {content.title}")
 
         except Exception as e:
-            self.logger.error(f"Error extracting metadata for {content.title}: {e}")
-            content.error_info = str(e)
+            error_msg = str(e)
+            self.logger.error(f"Error extracting metadata for {content.title}: {error_msg}")
+            content.error_info = error_msg
             content.step = ContentStep.ERROR
             self.youtube_content_repository.update(content)
+            
+            # If YouTube blocked our IP, we must abort the entire job loop to avoid hammering them.
+            if "sign in to confirm you’re not a bot" in error_msg.lower() or "sign in to confirm" in error_msg.lower():
+                self.logger.critical("YouTube bot block detected! Pausing scheduler job.")
+                raise e
 
         return True

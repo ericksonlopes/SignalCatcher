@@ -182,7 +182,8 @@ class YouTubeScraperService(IYouTubeScraper):
         def _extract():
             ydl_opts = self._get_common_ydl_opts()
             # For metadata extraction, we don't want extract_flat, we want full info
-            ydl_opts.update({"extract_flat": False, "skip_download": True})
+            # We set ignoreerrors to False so yt-dlp raises the actual bot block error
+            ydl_opts.update({"extract_flat": False, "skip_download": True, "ignoreerrors": False})
 
             with YoutubeDL(ydl_opts) as ydl:
                 info_dict = ydl.extract_info(video_url, download=False)

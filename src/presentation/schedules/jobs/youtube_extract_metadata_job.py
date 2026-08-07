@@ -17,6 +17,16 @@ def extract_metadata_job():
     )
 
     try:
+        from src.domain.models.enums.content_step import ContentStep
+        
+        # Self-healing: Reset any items stuck in EXTRACTING_METADATA from a previous crashed run
+        stuck_count = repo.reset_stuck_steps(
+            stuck_step=ContentStep.EXTRACTING_METADATA, 
+            pending_step=ContentStep.PENDING_METADATA_EXTRACTION
+        )
+        if stuck_count > 0:
+            logger.info(f"Self-healing: Reverted {stuck_count} stuck items from EXTRACTING_METADATA to PENDING_METADATA_EXTRACTION.")
+
         while True:
             processed_something = use_case.execute()
             if not processed_something:

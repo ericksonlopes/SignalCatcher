@@ -81,3 +81,17 @@ class YoutubeContentRepository(IYoutubeContentRepository):
         except Exception as e:
             self.logger.error(f"Error updating content '{youtube_content_entity.id}': {e}", context={"error": str(e)})
             raise
+
+    def reset_stuck_steps(self, stuck_step: 'ContentStep', pending_step: 'ContentStep') -> int:
+        try:
+            with ConnectorPostgres() as session:
+                stuck_items = session.query(YoutubeContentModel).filter(YoutubeContentModel.step == stuck_step).all()
+                count = len(stuck_items)
+                if count > 0:
+                    for item in stuck_items:
+                        item.step = pending_step
+                    session.commit()
+                return count
+        except Exception as e:
+            self.logger.error(f"Error resetting stuck steps from {stuck_step.name} to {pending_step.name}: {e}")
+            raise

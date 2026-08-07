@@ -23,3 +23,7 @@ class IYoutubeContentRepository(Protocol):
     def update(self, youtube_content_entity: YoutubeContentEntity) -> YoutubeContentEntity:
         """Updates an existing content in the database."""
         ...
+
+    def reset_stuck_steps(self, stuck_step: 'ContentStep', pending_step: 'ContentStep') -> int:
+        """Resets contents stuck in a processing step back to a pending step, returning how many were updated."""
+        ...
