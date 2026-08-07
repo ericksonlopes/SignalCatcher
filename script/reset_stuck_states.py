@@ -16,7 +16,7 @@ def main():
     logging.info("Searching for zombie items stuck in processing states...")
 
     stuck_mapping = {
-        ContentStep.EXTRACTING_METADATA: ContentStep.COMPLETED,
+        ContentStep.PENDING_METADATA_EXTRACTION: ContentStep.COMPLETED,
     }
 
     with ConnectorPostgres() as session:

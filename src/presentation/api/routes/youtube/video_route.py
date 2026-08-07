@@ -84,6 +84,7 @@ def get_youtube_contents(
                 title=item.title,
                 url=item.url,
                 channel_name=item.origin,
+                step=item.step,
                 thumbnail=item.thumbnail,
                 duration=item.duration,
                 tags=item.tags
