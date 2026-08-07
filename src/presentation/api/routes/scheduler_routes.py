@@ -4,7 +4,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import APIRouter, HTTPException, Request, status, BackgroundTasks
 
 from src.infrastructure.loggers.logger import logger
-from src.presentation.schedules.jobs.daily_youtube_capture_job import daily_youtube_capture_job
+from src.presentation.schedules.jobs.youtube_capture_job import daily_youtube_capture_job
 
 router = APIRouter()
 

@@ -33,6 +33,10 @@ class YoutubeContentModel(Base):
     )
     error_info = Column(String, nullable=True)  # Store specific error details
     raw_metadata = Column(JSON, nullable=True)  # Store extracted metadata JSON
+    thumbnail = Column(String, nullable=True)
+    duration = Column(String, nullable=True)  # Format: HH:MM:SS
+    categories = Column(JSON, nullable=True)  # List of categories
+    tags = Column(JSON, nullable=True)  # List of tags
     created_at = Column(DateTime, default=get_brazil_time)
     updated_at = Column(DateTime, default=get_brazil_time, onupdate=get_brazil_time)
 

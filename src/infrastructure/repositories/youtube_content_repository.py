@@ -45,3 +45,38 @@ class YoutubeContentRepository(IYoutubeContentRepository):
         except Exception as e:
             self.logger.error(f"Error counting by step: {e}", context={"error": str(e)})
             raise
+
+    def get_first_by_step(self, step: 'ContentStep') -> 'YoutubeContentEntity | None':
+        try:
+            with ConnectorPostgres() as session:
+                model = session.query(YoutubeContentModel).filter(YoutubeContentModel.step == step).first()
+                if model:
+                    return YoutubeContentMapper.to_domain(model)
+                return None
+        except Exception as e:
+            self.logger.error(f"Error fetching first content by step '{step}': {e}", context={"error": str(e)})
+            raise
+
+    def update(self, youtube_content_entity: YoutubeContentEntity) -> YoutubeContentEntity:
+        try:
+            with ConnectorPostgres() as session:
+                # Find the existing model
+                model = session.query(YoutubeContentModel).filter(YoutubeContentModel.id == youtube_content_entity.id).first()
+                if not model:
+                    raise ValueError(f"Content with id {youtube_content_entity.id} not found.")
+
+                # Update the model fields
+                model.step = youtube_content_entity.step
+                model.raw_metadata = youtube_content_entity.raw_metadata
+                model.thumbnail = youtube_content_entity.thumbnail
+                model.duration = youtube_content_entity.duration
+                model.categories = youtube_content_entity.categories
+                model.tags = youtube_content_entity.tags
+                model.error_info = getattr(youtube_content_entity, 'error_info', None) # if entity has it
+
+                session.commit()
+                session.refresh(model)
+                return YoutubeContentMapper.to_domain(model)
+        except Exception as e:
+            self.logger.error(f"Error updating content '{youtube_content_entity.id}': {e}", context={"error": str(e)})
+            raise

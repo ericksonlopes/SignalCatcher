@@ -15,3 +15,11 @@ class IYoutubeContentRepository(Protocol):
     def count_by_step(self) -> dict[str, int]:
         """Returns the distinct count of contents grouped by their step."""
         ...
+
+    def get_first_by_step(self, step: 'ContentStep') -> 'YoutubeContentEntity | None':
+        """Returns the first content matching the given step."""
+        ...
+
+    def update(self, youtube_content_entity: YoutubeContentEntity) -> YoutubeContentEntity:
+        """Updates an existing content in the database."""
+        ...

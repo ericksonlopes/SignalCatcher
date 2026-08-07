@@ -14,6 +14,10 @@ class YoutubeContentMapper:
             origin=model.origin,
             step=model.step,
             raw_metadata=model.raw_metadata,
+            thumbnail=model.thumbnail,
+            duration=model.duration,
+            categories=model.categories,
+            tags=model.tags,
             created_at=model.created_at,
             updated_at=model.updated_at,
         )
@@ -28,7 +32,11 @@ class YoutubeContentMapper:
             source_platform=entity.source_platform,
             origin=entity.origin,
             step=entity.step,
-            raw_metadata=entity.raw_metadata,
-            created_at=entity.created_at,
-            updated_at=entity.updated_at,
+            raw_metadata=entity.raw_metadata,  # type: ignore
+            thumbnail=entity.thumbnail,        # type: ignore
+            duration=entity.duration,          # type: ignore
+            categories=entity.categories,      # type: ignore
+            tags=entity.tags,                  # type: ignore
+            created_at=entity.created_at,      # type: ignore
+            updated_at=entity.updated_at,      # type: ignore
         )

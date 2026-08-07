@@ -6,6 +6,7 @@ class ContentStep(str, enum.Enum):
 
     PENDING_DOWNLOAD = "PENDING_DOWNLOAD"
     DOWNLOADING = "DOWNLOADING"
+    DOWNLOADED = "DOWNLOADED"  # Deprecated: Mantido temporariamente para evitar falhas de parse em registros antigos
     PENDING_METADATA_EXTRACTION = "PENDING_METADATA_EXTRACTION"
     EXTRACTING_METADATA = "EXTRACTING_METADATA"
     COMPLETED = "COMPLETED"

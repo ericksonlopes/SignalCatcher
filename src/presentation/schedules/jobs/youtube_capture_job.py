@@ -1,11 +1,15 @@
 from src.application.use_cases.run_daily_capture_use_case import RunDailyCaptureUseCase
+from src.config.settings import settings
 from src.infrastructure.loggers.logger import logger as global_logger
-from src.infrastructure.repositories.youtube_content_repository import YoutubeContentRepository
+from src.infrastructure.notifications.voice_monkey_notification import (
+    VoiceMonkeyNotification,
+)
 from src.infrastructure.repositories.monitored_source_repository import MonitoredSourceRepository
+from src.infrastructure.repositories.youtube_content_repository import (
+    YoutubeContentRepository,
+)
 from src.infrastructure.services.monitor_task_service import MonitorTaskService
 from src.infrastructure.services.youtube_scraper import YouTubeScraperService
-from src.infrastructure.notifications.voice_monkey_notification import VoiceMonkeyNotification
-from src.config.settings import settings
 
 
 def daily_youtube_capture_job():

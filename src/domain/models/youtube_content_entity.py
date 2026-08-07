@@ -16,5 +16,9 @@ class YoutubeContentEntity(BaseModel):
     origin: str
     step: ContentStep
     raw_metadata: Optional[dict] = None
+    thumbnail: Optional[str] = None
+    duration: Optional[str] = None
+    categories: Optional[list] = None
+    tags: Optional[list] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
