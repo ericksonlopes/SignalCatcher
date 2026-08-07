@@ -4,7 +4,7 @@ from src.domain.interfaces.scraper import IYouTubeScraper
 from src.domain.models.youtube_content_entity import YoutubeContentEntity
 from src.domain.models.enums.content_step import ContentStep
 from src.domain.models.enums.source_platform import SourcePlatform
-ø
+
 
 class AddContentFromPlaylistUseCase:
     def __init__(self, youtube_content_repository: IYoutubeContentRepository, youtube_scraper: IYouTubeScraper, logger: ILogger):

@@ -4,7 +4,7 @@ import re
 import sys
 
 import yt_dlp
-ø
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 from src.domain.models.enums.content_step import ContentStep
