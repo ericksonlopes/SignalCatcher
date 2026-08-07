@@ -18,6 +18,7 @@ class YoutubeContentMapper:
             duration=model.duration,
             categories=model.categories,
             tags=model.tags,
+            error_info=model.error_info,
             created_at=model.created_at,
             updated_at=model.updated_at,
         )
@@ -37,6 +38,7 @@ class YoutubeContentMapper:
             duration=entity.duration,          # type: ignore
             categories=entity.categories,      # type: ignore
             tags=entity.tags,                  # type: ignore
+            error_info=entity.error_info,      # type: ignore
             created_at=entity.created_at,      # type: ignore
             updated_at=entity.updated_at,      # type: ignore
         )

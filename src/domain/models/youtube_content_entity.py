@@ -20,5 +20,6 @@ class YoutubeContentEntity(BaseModel):
     duration: Optional[str] = None
     categories: Optional[list] = None
     tags: Optional[list] = None
+    error_info: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None

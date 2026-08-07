@@ -14,13 +14,47 @@ class YouTubeScraperService(IYouTubeScraper):
 
     @staticmethod
     def _get_common_ydl_opts() -> dict:
-        return {
+        opts: dict = {
             'quiet': True,
             'no_warnings': True,
             'extract_flat': 'in_playlist',
             'ignoreerrors': True,
             'source_address': '0.0.0.0',
+            # Network Resilience
+            "nocheckcertificate": True,
+            "geo_bypass": True,
+            "socket_timeout": 30,
+            # Mimic a modern browser to avoid blocks
+            "http_headers": {
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/123.0.0.0 Safari/537.36"
+                ),
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.5",
+                "Referer": "https://www.google.com/",
+            },
+            # Internal yt-dlp retries
+            "retries": 10,
+            "fragment_retries": 10,
+            # Use multiple clients to avoid "Sign in to confirm you're not a bot"
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["mediaconnect", "android", "web", "mweb"],
+                    "player_skip": ["webpage", "configs"],
+                }
+            },
         }
+        
+        # Check if cookies.txt exists in the project root to bypass YouTube bot protection
+        import os
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        cookies_path = os.path.join(project_root, "cookies.txt")
+        if os.path.exists(cookies_path):
+            opts['cookiefile'] = cookies_path
+            
+        return opts
 
     @staticmethod
     def _parse_channel_entries(entries: Iterable[Any], default_channel: str = "") -> list[YouTubeVideoDTO]:
