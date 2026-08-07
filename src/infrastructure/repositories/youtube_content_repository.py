@@ -35,13 +35,13 @@ class YoutubeContentRepository(IYoutubeContentRepository):
                               context={"external_id": youtube_content_entity.external_id, "error": str(e)})
             raise
 
-    def count_by_status(self) -> dict[str, int]:
+    def count_by_step(self) -> dict[str, int]:
         try:
             with ConnectorPostgres() as session:
                 counts = session.query(
-                    YoutubeContentModel.status, func.count(YoutubeContentModel.id)
-                ).group_by(YoutubeContentModel.status).all()
-                return {status.name: count for status, count in counts}
+                    YoutubeContentModel.step, func.count(YoutubeContentModel.id)
+                ).group_by(YoutubeContentModel.step).all()
+                return {step.name: count for step, count in counts}
         except Exception as e:
-            self.logger.error(f"Error counting by status: {e}", context={"error": str(e)})
+            self.logger.error(f"Error counting by step: {e}", context={"error": str(e)})
             raise

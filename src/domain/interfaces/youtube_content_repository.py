@@ -12,6 +12,6 @@ class IYoutubeContentRepository(Protocol):
         """Saves a new content to the database."""
         ...
 
-    def count_by_status(self) -> dict[str, int]:
-        """Returns the distinct count of contents grouped by their status."""
+    def count_by_step(self) -> dict[str, int]:
+        """Returns the distinct count of contents grouped by their step."""
         ...

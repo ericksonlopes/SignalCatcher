@@ -52,7 +52,7 @@ def get_content_status_count(
     Returns a count of contents grouped by their status.
     """
     try:
-        counts = repo.count_by_status()
+        counts = repo.count_by_step()
         return {"status_counts": counts}
     except Exception as e:
         logger.error(f"Failed to get content status count: {e}")
