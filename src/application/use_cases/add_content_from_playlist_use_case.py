@@ -1,18 +1,18 @@
 from src.domain.interfaces.logger import ILogger
-from src.domain.interfaces.content_repository import IContentRepository
+from src.domain.interfaces.youtube_content_repository import IYoutubeContentRepository
 from src.domain.interfaces.scraper import IYouTubeScraper
-from src.domain.models.content_entity import ContentEntity
+from src.domain.models.youtube_content_entity import YoutubeContentEntity
 from src.domain.models.enums.content_status import ContentStatus
 from src.domain.models.enums.source_platform import SourcePlatform
 
 
 class AddContentFromPlaylistUseCase:
-    def __init__(self, content_repository: IContentRepository, youtube_scraper: IYouTubeScraper, logger: ILogger):
-        self.content_repository = content_repository
+    def __init__(self, youtube_content_repository: IYoutubeContentRepository, youtube_scraper: IYouTubeScraper, logger: ILogger):
+        self.youtube_content_repository = youtube_content_repository
         self.youtube_scraper = youtube_scraper
         self.logger = logger
 
-    def execute(self, playlist_url: str, save_in_playlist_folder: bool = False) -> list[ContentEntity]:
+    def execute(self, playlist_url: str, save_in_playlist_folder: bool = False) -> list[YoutubeContentEntity]:
         if not self._is_youtube_link(playlist_url):
             raise ValueError(f"URL '{playlist_url}' is not a valid YouTube link.")
 
@@ -25,7 +25,7 @@ class AddContentFromPlaylistUseCase:
 
         saved_contents = []
         for video in videos:
-            if self.content_repository.exists_by_external_id(video.id):
+            if self.youtube_content_repository.exists_by_external_id(video.id):
                 self.logger.info(f"Content with external_id {video.id} already exists. Skipping.")
                 continue
                 
@@ -33,7 +33,7 @@ class AddContentFromPlaylistUseCase:
             if save_in_playlist_folder:
                 origin = f"{origin}/{playlist_title}"
 
-            content = ContentEntity(
+            content = YoutubeContentEntity(
                 external_id=video.id,
                 title=video.title or "Untitled",
                 url=video.url,
@@ -41,7 +41,7 @@ class AddContentFromPlaylistUseCase:
                 origin=origin,
                 status=ContentStatus.PENDING_DOWNLOAD
             )
-            saved_content = self.content_repository.create(content)
+            saved_content = self.youtube_content_repository.create(content)
             saved_contents.append(saved_content)
 
         self.logger.info(f"Successfully added {len(saved_contents)} new videos from playlist.")

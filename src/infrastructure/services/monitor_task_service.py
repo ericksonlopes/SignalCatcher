@@ -2,11 +2,11 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from src.domain.interfaces.logger import ILogger
-from src.domain.interfaces.content_repository import IContentRepository
+from src.domain.interfaces.youtube_content_repository import IYoutubeContentRepository
 from src.domain.interfaces.monitor_service import IMonitorTaskService
 from src.domain.interfaces.monitored_source_repository import IMonitoredSourceRepository
 from src.domain.interfaces.scraper import IYouTubeScraper
-from src.domain.models.content_entity import ContentEntity
+from src.domain.models.youtube_content_entity import YoutubeContentEntity
 from src.domain.models.enums.content_status import ContentStatus
 from src.domain.models.enums.source_platform import SourcePlatform
 from src.domain.models.source_entity import SourceEntity
@@ -19,12 +19,12 @@ class MonitorTaskService(IMonitorTaskService):
             self,
             youtube_scraper: IYouTubeScraper,
             monitored_source_repository: IMonitoredSourceRepository,
-            content_repository: IContentRepository,
+            youtube_content_repository: IYoutubeContentRepository,
             logger: ILogger,
     ):
         self.youtube_scraper = youtube_scraper
         self.monitored_source_repository = monitored_source_repository
-        self.content_repository = content_repository
+        self.youtube_content_repository = youtube_content_repository
         self.logger = logger
         self.scrapers = {
             SourcePlatform.YOUTUBE: self.youtube_scraper.extract_channel_videos,
@@ -50,11 +50,11 @@ class MonitorTaskService(IMonitorTaskService):
 
         new_count = 0
         for item in items:
-            exists = self.content_repository.exists_by_external_id(item.id)
+            exists = self.youtube_content_repository.exists_by_external_id(item.id)
             if exists:
                 continue
 
-            new_item = ContentEntity(
+            new_item = YoutubeContentEntity(
                 external_id=item.id,
                 title=item.title or "Untitled",
                 url=item.url,
@@ -62,7 +62,7 @@ class MonitorTaskService(IMonitorTaskService):
                 origin=source.name,
                 status=ContentStatus.PENDING_DOWNLOAD,
             )
-            self.content_repository.create(new_item)
+            self.youtube_content_repository.create(new_item)
             new_count += 1
 
         # Update last_checked_at

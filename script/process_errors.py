@@ -10,7 +10,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from src.infrastructure.repositories.connector import ConnectorPostgres
-from src.infrastructure.repositories.models.content_model import ContentModel
+from src.infrastructure.repositories.models.youtube_content_model import YoutubeContentModel
 from src.domain.models.enums.content_status import ContentStatus
 from download_videos import download_video
 
@@ -21,8 +21,8 @@ def main():
 
     with ConnectorPostgres() as session:
         # Find all videos that failed previously
-        error_contents = session.query(ContentModel).filter(
-            ContentModel.status == ContentStatus.ERROR
+        error_contents = session.query(YoutubeContentModel).filter(
+            YoutubeContentModel.status == ContentStatus.ERROR
         ).all()
 
         if not error_contents:

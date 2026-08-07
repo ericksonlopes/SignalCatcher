@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 from src.domain.models.enums.content_status import ContentStatus
 from src.infrastructure.repositories.connector import ConnectorPostgres
-from src.infrastructure.repositories.models.content_model import ContentModel
+from src.infrastructure.repositories.models.youtube_content_model import YoutubeContentModel
 
 
 def download_video(url: str, content_id: str, origin: str, output_path: str):
@@ -34,8 +34,8 @@ def main():
     while True:
         with ConnectorPostgres() as session:
             # Find one pending download
-            content = session.query(ContentModel).filter(
-                ContentModel.status == ContentStatus.PENDING_DOWNLOAD
+            content = session.query(YoutubeContentModel).filter(
+                YoutubeContentModel.status == ContentStatus.PENDING_DOWNLOAD
             ).first()
 
             if not content:

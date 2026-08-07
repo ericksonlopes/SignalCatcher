@@ -1,14 +1,14 @@
 from typing import Protocol
 
-from src.domain.models.content_entity import ContentEntity
+from src.domain.models.youtube_content_entity import YoutubeContentEntity
 
 
-class IContentRepository(Protocol):
+class IYoutubeContentRepository(Protocol):
     def exists_by_external_id(self, external_id: str) -> bool:
         """Checks if a content already exists by its external ID."""
         ...
 
-    def create(self, content_entity: ContentEntity) -> ContentEntity:
+    def create(self, youtube_content_entity: YoutubeContentEntity) -> YoutubeContentEntity:
         """Saves a new content to the database."""
         ...
 

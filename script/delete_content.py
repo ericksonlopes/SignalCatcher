@@ -10,14 +10,14 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.infrastructure.repositories.connector import ConnectorPostgres
-from src.infrastructure.repositories.models.content_model import ContentModel
+from src.infrastructure.repositories.models.youtube_content_model import YoutubeContentModel
 
 
 def delete_content(external_id: str):
     output_path = r"D:\Youtube"
 
     with ConnectorPostgres() as session:
-        content = session.query(ContentModel).filter(ContentModel.external_id == external_id).first()
+        content = session.query(YoutubeContentModel).filter(YoutubeContentModel.external_id == external_id).first()
 
         if not content:
             logging.error(f"Content with external_id '{external_id}' not found in database.")

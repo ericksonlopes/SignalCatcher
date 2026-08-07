@@ -1,11 +1,11 @@
-from src.domain.models.content_entity import ContentEntity
-from src.infrastructure.repositories.models.content_model import ContentModel
+from src.domain.models.youtube_content_entity import YoutubeContentEntity
+from src.infrastructure.repositories.models.youtube_content_model import YoutubeContentModel
 
 
-class ContentMapper:
+class YoutubeContentMapper:
     @staticmethod
-    def to_domain(model: ContentModel) -> ContentEntity:
-        return ContentEntity(
+    def to_domain(model: YoutubeContentModel) -> YoutubeContentEntity:
+        return YoutubeContentEntity(
             id=model.id,
             external_id=model.external_id,
             title=model.title,
@@ -18,8 +18,8 @@ class ContentMapper:
         )
 
     @staticmethod
-    def to_model(entity: ContentEntity) -> ContentModel:
-        return ContentModel(
+    def to_model(entity: YoutubeContentEntity) -> YoutubeContentModel:
+        return YoutubeContentModel(
             id=entity.id,
             external_id=entity.external_id,
             title=entity.title,

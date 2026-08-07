@@ -7,7 +7,7 @@ from src.domain.models.enums.content_status import ContentStatus
 from src.domain.models.enums.source_platform import SourcePlatform
 
 
-class ContentEntity(BaseModel):
+class YoutubeContentEntity(BaseModel):
     id: Optional[int] = None
     external_id: str
     title: str

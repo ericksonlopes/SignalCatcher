@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.infrastructure.repositories.connector import ConnectorPostgres
-from src.infrastructure.repositories.models.content_model import ContentModel
+from src.infrastructure.repositories.models.youtube_content_model import YoutubeContentModel
 from src.domain.models.enums.content_status import ContentStatus
 
 
@@ -40,8 +40,8 @@ def process_non_mp4_files(directory):
             external_id = file_name.split('_')[0]
 
             # Search the database using the extracted ID
-            content = session.query(ContentModel).filter(
-                ContentModel.external_id == external_id
+            content = session.query(YoutubeContentModel).filter(
+                YoutubeContentModel.external_id == external_id
             ).first()
 
             if content:

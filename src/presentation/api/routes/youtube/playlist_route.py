@@ -1,9 +1,12 @@
 from typing import Annotated
+
 from fastapi import APIRouter, HTTPException, Depends
 
 from src.application.use_cases.add_content_from_playlist_use_case import AddContentFromPlaylistUseCase
 from src.infrastructure.loggers.logger import logger
-from src.infrastructure.repositories.content_repository import ContentRepository
+from src.infrastructure.repositories.youtube_content_repository import (
+    YoutubeContentRepository,
+)
 from src.infrastructure.services.youtube_scraper import YouTubeScraperService
 from src.presentation.api.models.requests.youtube_playlist_add_request import YouTubePlaylistAddRequest
 
@@ -11,7 +14,7 @@ router = APIRouter()
 
 
 def get_add_playlist_use_case() -> AddContentFromPlaylistUseCase:
-    content_repo = ContentRepository(logger=logger)
+    content_repo = YoutubeContentRepository(logger=logger)
     scraper = YouTubeScraperService(logger=logger)
     return AddContentFromPlaylistUseCase(content_repo, scraper, logger)
 
