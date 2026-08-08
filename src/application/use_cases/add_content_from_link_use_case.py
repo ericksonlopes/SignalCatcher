@@ -4,7 +4,6 @@ from src.domain.interfaces.scraper import IYouTubeScraper
 from src.domain.interfaces.notification import INotification
 from src.domain.models.youtube_content_entity import YoutubeContentEntity
 from src.domain.models.enums.content_step import ContentStep
-from src.domain.models.enums.source_platform import SourcePlatform
 
 
 class AddContentFromLinkUseCase:
@@ -38,7 +37,6 @@ class AddContentFromLinkUseCase:
             external_id=info.id,
             title=info.title or "Untitled",
             url=info.url,
-            source_platform=SourcePlatform.YOUTUBE,
             origin=info.channel,
             step=ContentStep.PENDING_DOWNLOAD
         )

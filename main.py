@@ -45,14 +45,14 @@ app.add_middleware(
 )
 
 # Register routes
-from src.presentation.api.routes.youtube import source_route as youtube_source_routes
+from src.presentation.api.routes.youtube import channel_route as youtube_channel_routes
 from src.presentation.api.routes.youtube import video_route as youtube_content_routes
 from src.presentation.api.routes.youtube import playlist_route as youtube_playlist_routes
 from src.presentation.api.routes import scheduler_routes
 
 YOUTUBE_API_PREFIX = "/api/youtube"
 
-app.include_router(youtube_source_routes.router, prefix=YOUTUBE_API_PREFIX, tags=["YouTube"])
+app.include_router(youtube_channel_routes.router, prefix=YOUTUBE_API_PREFIX, tags=["YouTube"])
 app.include_router(youtube_content_routes.router, prefix=YOUTUBE_API_PREFIX, tags=["YouTube"])
 app.include_router(youtube_playlist_routes.router, prefix=YOUTUBE_API_PREFIX, tags=["YouTube"])
 app.include_router(scheduler_routes.router, prefix="/api/scheduler", tags=["Scheduler"])

@@ -4,7 +4,7 @@ from src.infrastructure.loggers.logger import logger as global_logger
 from src.infrastructure.notifications.voice_monkey_notification import (
     VoiceMonkeyNotification,
 )
-from src.infrastructure.repositories.monitored_source_repository import MonitoredSourceRepository
+from src.infrastructure.repositories.youtube_monitored_channel_repository import YouTubeMonitoredChannelRepository
 from src.infrastructure.repositories.youtube_content_repository import (
     YoutubeContentRepository,
 )
@@ -14,12 +14,12 @@ from src.infrastructure.services.youtube_scraper import YouTubeScraperService
 
 def daily_youtube_capture_job():
     youtube_scraper = YouTubeScraperService(logger=global_logger)
-    monitored_source_repository = MonitoredSourceRepository(logger=global_logger)
+    youtube_monitored_channel_repository = YouTubeMonitoredChannelRepository(logger=global_logger)
     youtube_content_repository = YoutubeContentRepository(logger=global_logger)
 
     monitor_service = MonitorTaskService(
         youtube_scraper=youtube_scraper,
-        monitored_source_repository=monitored_source_repository,
+        youtube_monitored_channel_repository=youtube_monitored_channel_repository,
         youtube_content_repository=youtube_content_repository,
         logger=global_logger
     )

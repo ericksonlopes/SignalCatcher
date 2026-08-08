@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
 
-class YouTubeSourceCreateDTO(BaseModel):
+class YouTubeChannelCreateDTO(BaseModel):
     name: str
     url: str

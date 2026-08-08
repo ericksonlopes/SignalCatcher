@@ -4,7 +4,6 @@ from typing import Optional
 from pydantic import BaseModel
 
 from src.domain.models.enums.content_step import ContentStep
-from src.domain.models.enums.source_platform import SourcePlatform
 
 
 class YoutubeContentEntity(BaseModel):
@@ -12,7 +11,6 @@ class YoutubeContentEntity(BaseModel):
     external_id: str
     title: str
     url: str
-    source_platform: SourcePlatform
     origin: str
     step: ContentStep
     raw_metadata: Optional[dict] = None

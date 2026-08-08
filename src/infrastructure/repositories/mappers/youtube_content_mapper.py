@@ -10,7 +10,6 @@ class YoutubeContentMapper:
             external_id=model.external_id,
             title=model.title,
             url=model.url,
-            source_platform=model.source_platform,
             origin=model.origin,
             step=model.step,
             raw_metadata=model.raw_metadata,
@@ -31,7 +30,6 @@ class YoutubeContentMapper:
             external_id=entity.external_id,
             title=entity.title,
             url=entity.url,
-            source_platform=entity.source_platform,
             origin=entity.origin,
             step=entity.step,
             raw_metadata=entity.raw_metadata,  # type: ignore
