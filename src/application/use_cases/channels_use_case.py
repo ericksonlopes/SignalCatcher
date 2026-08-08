@@ -1,23 +1,49 @@
 from src.application.dtos.channel_create_dto import ChannelCreateDTO
 from src.application.dtos.youtube_channel_response_dto import YouTubeChannelResponseDTO
 from src.application.mappers.channel_dto_mapper import ChannelDtoMapper
-from src.domain.interfaces.logger import ILogger
 from src.domain.interfaces.channel_service import IChannelService
+from src.domain.interfaces.logger import ILogger
 from src.domain.interfaces.youtube_monitored_channel_repository import IYouTubeMonitoredChannelRepository
 
 
 class ChannelsUseCase:
-    def __init__(self, channel_service: IChannelService, repository: IYouTubeMonitoredChannelRepository, logger: ILogger):
+
+    def __init__(
+        self,
+        channel_service: IChannelService,
+        repository: IYouTubeMonitoredChannelRepository,
+        logger: ILogger,
+        scraper=None,
+        yt_channel_repo=None,
+    ):
         self.channel_service = channel_service
         self.repository = repository
         self.logger = logger
+        self.scraper = scraper
+        self.yt_channel_repo = yt_channel_repo
 
     def create_channel(self, data: ChannelCreateDTO) -> YouTubeChannelResponseDTO:
         self.logger.debug("Iniciando a criação de um novo canal.", context={"channel_url": data.url})
-        
+
+        # Verify and extract channel info
+        if self.scraper and self.yt_channel_repo:
+            try:
+                channel_info = self.scraper.extract_channel_info(data.url)
+                self.yt_channel_repo.upsert_channel(channel_info)
+
+                # Auto-fill name if not provided
+                if not data.name and channel_info.get("title"):
+                    data.name = channel_info.get("title")
+            except Exception as e:
+                self.logger.error(
+                    f"Falha ao extrair informações do canal {data.url}",
+                    context={"error": str(e)},
+                )
+                raise ValueError(f"Não foi possível validar o canal: {str(e)}")
+
         # Maps DTO to Entity
         channel_entity = ChannelDtoMapper.to_entity(data)
-        
+
         # Calls the infrastructure to persist
         try:
             created_channel = self.channel_service.create_channel(channel_entity)
@@ -25,7 +51,7 @@ class ChannelsUseCase:
         except Exception as e:
             self.logger.error("Erro ao criar canal.", context={"error": str(e)})
             raise
-            
+
         # Maps the Entity to the response DTO
         return ChannelDtoMapper.to_youtube_response_dto(created_channel)
 
@@ -43,7 +69,7 @@ class ChannelsUseCase:
         channel_entity = self.repository.get_by_id(channel_id)
         if not channel_entity:
             raise ValueError(f"Canal com ID {channel_id} não encontrado.")
-        
+
         channel_entity.active = not channel_entity.active
         updated_entity = self.repository.update(channel_entity)
         return ChannelDtoMapper.to_youtube_response_dto(updated_entity)

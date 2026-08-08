@@ -29,4 +29,16 @@ def get_channels_use_case(
     """
     Factory for the consolidated ChannelsUseCase.
     """
-    return ChannelsUseCase(channel_service=service, repository=repository, logger=logger)
+    from src.infrastructure.services.youtube_scraper import YouTubeScraperService
+    from src.infrastructure.repositories.youtube_channel_repository import YouTubeChannelRepository
+    
+    scraper = YouTubeScraperService(logger=logger)
+    yt_channel_repo = YouTubeChannelRepository(logger=logger)
+    
+    return ChannelsUseCase(
+        channel_service=service, 
+        repository=repository, 
+        logger=logger, 
+        scraper=scraper, 
+        yt_channel_repo=yt_channel_repo
+    )

@@ -27,6 +27,18 @@ class IYouTubeScraper(Protocol):
         """
         ...
 
+    def extract_channel_info(self, channel_url: str) -> dict:
+        """
+        Extracts metadata from a YouTube channel.
+        
+        Args:
+            channel_url: The YouTube channel URL.
+            
+        Returns:
+            A dict containing channel metadata.
+        """
+        ...
+
     def extract_video_info(self, video_url: str) -> YouTubeVideoDTO:
         """
         Extracts metadata from a single YouTube video.

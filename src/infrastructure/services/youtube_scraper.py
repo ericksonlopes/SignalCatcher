@@ -46,14 +46,14 @@ class YouTubeScraperService(IYouTubeScraper):
                 }
             },
         }
-        
+
         # Check if cookies.txt exists in the project root to bypass YouTube bot protection
         import os
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
         cookies_path = os.path.join(project_root, "cookies.txt")
         if os.path.exists(cookies_path):
             opts['cookiefile'] = cookies_path
-            
+
         return opts
 
     @staticmethod
@@ -128,6 +128,49 @@ class YouTubeScraperService(IYouTubeScraper):
         except Exception as e:
             self.logger.error(f"Channel extraction failed for {channel_url}",
                               context={"channel_url": channel_url, "error": str(e)})
+            raise
+
+    def extract_channel_info(self, channel_url: str) -> dict:
+        """Extracts metadata from a YouTube channel."""
+        self.logger.debug(
+            f"Starting channel info extraction for {channel_url}",
+            context={"channel_url": channel_url},
+        )
+
+        def _extract():
+            ydl_opts = self._get_common_ydl_opts()
+            # Use extract_flat to fetch channel metadata quickly
+            ydl_opts.update({"extract_flat": True, "ignoreerrors": False})
+
+            with YoutubeDL(ydl_opts) as ydl:
+                info_dict = ydl.extract_info(channel_url, download=False)
+                if not info_dict:
+                    raise Exception("Failed to extract channel information.")
+
+                thumbnails = info_dict.get("thumbnails", [])
+                avatar_url = (
+                    thumbnails[-1]["url"]
+                    if thumbnails and "url" in thumbnails[-1]
+                    else None
+                )
+
+                return {
+                    "id": info_dict.get("id"),
+                    "title": info_dict.get("title") or info_dict.get("channel"),
+                    "description": info_dict.get("description"),
+                    "url": channel_url,
+                    "channel_url": info_dict.get("channel_url"),
+                    "avatar_url": avatar_url,
+                    "thumbnails": thumbnails,
+                }
+
+        try:
+            return self._run_with_retry(_extract)
+        except Exception as e:
+            self.logger.error(
+                f"Channel info extraction failed for {channel_url}",
+                context={"channel_url": channel_url, "error": str(e)},
+            )
             raise
 
     def extract_video_info(self, video_url: str) -> YouTubeVideoDTO:

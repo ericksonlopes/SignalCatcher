@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware import Middleware
 
 from src.infrastructure.loggers.logger import logger
 from src.infrastructure.repositories.connector import Base, engine
@@ -29,19 +30,22 @@ async def lifespan(app: FastAPI):
     scheduler.shutdown()
 
 
+middleware = [
+    Middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+]
+
 app = FastAPI(
     title="SignalCatcher API",
     description="API to manage content capture and monitoring (YouTube/RSS)",
     version="1.0.0",
-    lifespan=lifespan
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    lifespan=lifespan,
+    middleware=middleware,
 )
 
 # Register routes
