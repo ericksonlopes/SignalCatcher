@@ -16,6 +16,8 @@ from src.presentation.api.models.responses.youtube_video_card_response import Yo
 import math
 from fastapi import Query
 
+from src.presentation.api.models.responses.content_tracking_response import ContentTrackingResponse
+
 router = APIRouter()
 
 
@@ -104,3 +106,36 @@ def get_youtube_contents(
     except Exception as e:
         logger.error(f"Failed to get paginated contents: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/content/{external_id}/tracking", response_model=list[ContentTrackingResponse])
+def get_content_tracking(
+    external_id: str,
+    repo: Annotated[
+        YoutubeContentRepository,
+        Depends(lambda: YoutubeContentRepository(logger=logger)),
+    ]
+):
+    """
+    Returns the tracking history of a specific YouTube content.
+    """
+    try:
+        if not repo.exists_by_external_id(external_id):
+            raise HTTPException(status_code=404, detail="Content not found")
+            
+        trackings = repo.get_tracking_by_external_id(external_id)
+        
+        return [
+            ContentTrackingResponse(
+                id=t.id,
+                previous_step=t.previous_step,
+                new_step=t.new_step,
+                changed_at=t.changed_at,
+                details=t.details
+            ) for t in trackings
+        ]
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get tracking for {external_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+

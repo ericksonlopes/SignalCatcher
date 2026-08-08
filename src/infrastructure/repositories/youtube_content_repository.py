@@ -109,3 +109,25 @@ class YoutubeContentRepository(IYoutubeContentRepository):
         except Exception as e:
             self.logger.error(f"Error resetting stuck steps from {stuck_step.name} to {pending_step.name}: {e}")
             raise
+
+    def get_tracking_by_external_id(self, external_id: str) -> list[ContentTrackingModel]:
+        try:
+            with ConnectorPostgres() as session:
+                query = (
+                    session.query(ContentTrackingModel)
+                    .join(
+                        YoutubeContentModel,
+                        ContentTrackingModel.entity_id == YoutubeContentModel.id,
+                    )
+                    .filter(YoutubeContentModel.external_id == external_id)
+                    .filter(ContentTrackingModel.entity_type == "youtube_contents")
+                    .order_by(ContentTrackingModel.changed_at.asc())
+                )
+                return query.all()
+        except Exception as e:
+            self.logger.error(
+                f"Error fetching tracking for external_id '{external_id}': {e}",
+                context={"external_id": external_id, "error": str(e)},
+            )
+            raise
+
