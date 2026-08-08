@@ -49,11 +49,13 @@ class YoutubeContentRepository(IYoutubeContentRepository):
                               context={"external_id": youtube_content_entity.external_id, "error": str(e)})
             raise
 
-    def get_paginated(self, page: int, limit: int) -> tuple[list[YoutubeContentEntity], int]:
+    def get_paginated(self, page: int, limit: int, step: str | None = None) -> tuple[list[YoutubeContentEntity], int]:
         try:
             with ConnectorPostgres() as session:
                 offset = (page - 1) * limit
                 query = session.query(YoutubeContentModel).order_by(YoutubeContentModel.created_at.desc())
+                if step:
+                    query = query.filter(YoutubeContentModel.step == step)
                 total = query.count()
                 items = query.offset(offset).limit(limit).all()
                 return [YoutubeContentMapper.to_domain(item) for item in items], total
