@@ -65,37 +65,26 @@ def retry_single_content(external_id: str,
                          ]):
     """
     Retries processing a single video by its external ID.
-    It resets the video's status to PENDING_METADATA_EXTRACTION and runs the pipeline.
+    It sets the video's status to REPROCESSING and runs a dedicated reprocessing pipeline.
     """
     from src.domain.models.enums.content_step import ContentStep
+    from src.presentation.schedules.jobs.youtube_process_errors_job import reprocess_single_video_job
     try:
         content = repo.get_by_external_id(external_id)
         if not content:
             raise HTTPException(status_code=404, detail="Content not found")
         
-        # Discover where it failed by looking at tracking history
-        trackings = repo.get_tracking_by_external_id(external_id)
-        last_step_before_error = ContentStep.PENDING_METADATA_EXTRACTION # Default fallback
-        
-        if trackings:
-            # Sort trackings by date descending to find the last valid step
-            trackings_sorted = sorted(trackings, key=lambda t: t.changed_at, reverse=True)
-            for tracking in trackings_sorted:
-                if tracking.new_step.name == 'ERROR' and tracking.previous_step:
-                    if tracking.previous_step.name in ['DOWNLOADING', 'PENDING_DOWNLOAD']:
-                        last_step_before_error = ContentStep.PENDING_DOWNLOAD
-                    elif tracking.previous_step.name == 'PENDING_METADATA_EXTRACTION':
-                        last_step_before_error = ContentStep.PENDING_METADATA_EXTRACTION
-                    break
-        
-        content.step = last_step_before_error
+        # Set to the new explicit REPROCESSING status
+        content.step = ContentStep.REPROCESSING
         content.error_info = None
         repo.update(content)
         
-        background_tasks.add_task(process_single_video_pipeline)
+        # Pass the ID to the dedicated reprocessing job
+        background_tasks.add_task(reprocess_single_video_job, external_id)
+        
         return {
             "message": f"Retry started for content {external_id}",
-            "new_step": last_step_before_error.name
+            "step": ContentStep.REPROCESSING.name
         }
     except HTTPException:
         raise
