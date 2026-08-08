@@ -34,6 +34,14 @@ def get_add_content_use_case() -> AddContentFromLinkUseCase:
 
 from fastapi import BackgroundTasks
 from src.presentation.schedules.jobs.youtube_extract_metadata_job import extract_metadata_job
+from src.presentation.schedules.jobs.youtube_download_job import download_videos_job
+
+def process_single_video_pipeline():
+    try:
+        extract_metadata_job()
+        download_videos_job()
+    except Exception as e:
+        logger.error(f"Error in manual video processing pipeline: {e}")
 
 @router.post("/content", responses={400: {"description": "Bad Request"}})
 def add_youtube_content_from_link(request: YouTubeVideoAddRequest,
@@ -45,7 +53,7 @@ def add_youtube_content_from_link(request: YouTubeVideoAddRequest,
     """
     try:
         content = use_case.execute(request.url)
-        background_tasks.add_task(extract_metadata_job)
+        background_tasks.add_task(process_single_video_pipeline)
         return {"message": "Content added successfully", "content": content}
     except Exception as e:
         logger.error(f"Failed to add YouTube content from link: {e}")
