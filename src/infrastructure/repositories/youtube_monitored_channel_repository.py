@@ -23,6 +23,17 @@ class YouTubeMonitoredChannelRepository(IYouTubeMonitoredChannelRepository):
             self.logger.error(f"Error getting channel by url '{url}': {e}", context={"url": url, "error": str(e)})
             raise
 
+    def get_by_id(self, channel_id: int) -> Optional[ChannelEntity]:
+        try:
+            with ConnectorPostgres() as session:
+                channel = session.query(YouTubeMonitoredChannelModel).filter_by(id=channel_id).first()
+                if channel:
+                    return ChannelMapper.to_domain(channel)
+                return None
+        except Exception as e:
+            self.logger.error(f"Error getting channel by id '{channel_id}': {e}", context={"channel_id": channel_id, "error": str(e)})
+            raise
+
     def create(self, channel_data: ChannelEntity) -> ChannelEntity:
         try:
             with ConnectorPostgres() as session:

@@ -6,6 +6,10 @@ class IYouTubeMonitoredChannelRepository(Protocol):
         """Fetches a channel by its URL."""
         ...
 
+    def get_by_id(self, channel_id: int) -> Optional[ChannelEntity]:
+        """Fetches a channel by its ID."""
+        ...
+
     def create(self, channel_data: ChannelEntity) -> ChannelEntity:
         """Saves a new channel to the database."""
         ...

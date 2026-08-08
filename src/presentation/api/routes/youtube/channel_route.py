@@ -37,3 +37,18 @@ def get_channels(
         return use_case.get_all_channels()
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@router.patch("/channels/{channel_id}/status", response_model=YouTubeChannelResponseDTO)
+def toggle_channel_status(
+    channel_id: int,
+    use_case: Annotated[ChannelsUseCase, Depends(get_channels_use_case)]
+):
+    """
+    Toggles the active status of a channel.
+    """
+    try:
+        return use_case.toggle_channel_status(channel_id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))

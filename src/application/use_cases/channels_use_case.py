@@ -37,3 +37,13 @@ class ChannelsUseCase:
         except Exception as e:
             self.logger.error("Erro ao buscar canais.", context={"error": str(e)})
             raise
+
+    def toggle_channel_status(self, channel_id: int) -> YouTubeChannelResponseDTO:
+        self.logger.debug(f"Alternando status do canal {channel_id}.")
+        channel_entity = self.repository.get_by_id(channel_id)
+        if not channel_entity:
+            raise ValueError(f"Canal com ID {channel_id} não encontrado.")
+        
+        channel_entity.active = not channel_entity.active
+        updated_entity = self.repository.update(channel_entity)
+        return ChannelDtoMapper.to_youtube_response_dto(updated_entity)
