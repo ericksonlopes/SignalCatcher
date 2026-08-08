@@ -25,7 +25,7 @@ class YoutubeContentModel(Base):
         String, nullable=False
     )  # Where the content came from (e.g., channel/profile name)
     step = Column(
-        Enum(ContentStep), nullable=False, default=ContentStep.PENDING_DOWNLOAD
+        Enum(ContentStep), nullable=False, default=ContentStep.STARTED
     )
     error_info = Column(String, nullable=True)
     published_at = Column(DateTime, nullable=True)  # Store specific error details

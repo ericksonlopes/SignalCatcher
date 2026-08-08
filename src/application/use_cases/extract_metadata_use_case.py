@@ -45,7 +45,10 @@ class ExtractMetadataUseCase:
                 content.published_at = datetime.datetime.fromtimestamp(int(timestamp), tz=datetime.timezone.utc)
 
             # Complete step
-            content.step = ContentStep.COMPLETED
+            content.step = ContentStep.METADATA_EXTRACTED
+            self.youtube_content_repository.update(content)
+
+            content.step = ContentStep.PENDING_DOWNLOAD
             self.youtube_content_repository.update(content)
             self.logger.info(f"Successfully extracted metadata for: {content.title}")
 

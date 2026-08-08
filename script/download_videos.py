@@ -52,8 +52,12 @@ def main():
                 download_video(url=content.url, content_id=content.external_id, origin=content.origin,
                                output_path=output_path)
 
-                # Update step to PENDING_METADATA_EXTRACTION
-                content.step = ContentStep.PENDING_METADATA_EXTRACTION
+                # Update step to DOWNLOADED
+                content.step = ContentStep.DOWNLOADED
+                session.commit()
+
+                # Update step to COMPLETED
+                content.step = ContentStep.COMPLETED
                 session.commit()
                 logging.info(f"Successfully downloaded: {content.title}")
             except Exception as e:

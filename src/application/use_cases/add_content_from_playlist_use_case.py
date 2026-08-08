@@ -37,9 +37,13 @@ class AddContentFromPlaylistUseCase:
                 title=video.title or "Untitled",
                 url=video.url,
                 origin=origin,
-                step=ContentStep.PENDING_DOWNLOAD
+                step=ContentStep.STARTED
             )
             saved_content = self.youtube_content_repository.create(content)
+            
+            saved_content.step = ContentStep.PENDING_METADATA_EXTRACTION
+            self.youtube_content_repository.update(saved_content)
+            
             saved_contents.append(saved_content)
 
         self.logger.info(f"Successfully added {len(saved_contents)} new videos from playlist.")

@@ -32,8 +32,12 @@ def get_add_content_use_case() -> AddContentFromLinkUseCase:
     return AddContentFromLinkUseCase(content_repo, scraper, notification, logger)
 
 
+from fastapi import BackgroundTasks
+from src.presentation.schedules.jobs.youtube_extract_metadata_job import extract_metadata_job
+
 @router.post("/content", responses={400: {"description": "Bad Request"}})
 def add_youtube_content_from_link(request: YouTubeVideoAddRequest,
+                                  background_tasks: BackgroundTasks,
                                   use_case: Annotated[AddContentFromLinkUseCase, Depends(get_add_content_use_case)]):
     """
     Adds a new content from a given YouTube link.
@@ -41,6 +45,7 @@ def add_youtube_content_from_link(request: YouTubeVideoAddRequest,
     """
     try:
         content = use_case.execute(request.url)
+        background_tasks.add_task(extract_metadata_job)
         return {"message": "Content added successfully", "content": content}
     except Exception as e:
         logger.error(f"Failed to add YouTube content from link: {e}")

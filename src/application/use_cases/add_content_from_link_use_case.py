@@ -38,10 +38,14 @@ class AddContentFromLinkUseCase:
             title=info.title or "Untitled",
             url=info.url,
             origin=info.channel,
-            step=ContentStep.PENDING_DOWNLOAD
+            step=ContentStep.STARTED
         )
 
         created_content = self.youtube_content_repository.create(content)
+        
+        created_content.step = ContentStep.PENDING_METADATA_EXTRACTION
+        self.youtube_content_repository.update(created_content)
+        
         self.logger.info(
             f"Content created successfully (id={created_content.id}). Triggering VoiceMonkey notification...",
             context={"content_id": created_content.id, "external_id": info.id, "title": info.title}

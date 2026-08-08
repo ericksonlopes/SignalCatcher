@@ -23,14 +23,6 @@ def start_scheduler() -> BackgroundScheduler:
         replace_existing=True
     )
 
-    scheduler.add_job(
-        extract_metadata_job,
-        trigger="interval",
-        minutes=15,  # Runs every 15 minutes to process pending extractions
-        id="extract_metadata_job",
-        replace_existing=True,
-    )
-
     logger.info("🚀 Scheduler running in the background! Executing jobs periodically.")
     scheduler.start()
 
