@@ -6,9 +6,7 @@ from src.infrastructure.repositories.connector import engine
 from src.presentation.schedules.jobs.youtube_capture_job import (
     daily_youtube_capture_job,
 )
-from src.presentation.schedules.jobs.youtube_extract_metadata_job import (
-    extract_metadata_job,
-)
+
 
 def start_scheduler() -> BackgroundScheduler:
     jobstores = {'default': SQLAlchemyJobStore(engine=engine)}

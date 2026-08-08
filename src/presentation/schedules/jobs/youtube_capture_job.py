@@ -1,13 +1,14 @@
+from src.presentation.schedules.jobs.youtube_extract_metadata_job import extract_metadata_job
 from src.application.use_cases.run_daily_capture_use_case import RunDailyCaptureUseCase
 from src.config.settings import settings
 from src.infrastructure.loggers.logger import logger as global_logger
 from src.infrastructure.notifications.voice_monkey_notification import (
     VoiceMonkeyNotification,
 )
-from src.infrastructure.repositories.youtube_monitored_channel_repository import YouTubeMonitoredChannelRepository
 from src.infrastructure.repositories.youtube_content_repository import (
     YoutubeContentRepository,
 )
+from src.infrastructure.repositories.youtube_monitored_channel_repository import YouTubeMonitoredChannelRepository
 from src.infrastructure.services.monitor_task_service import MonitorTaskService
 from src.infrastructure.services.youtube_scraper import YouTubeScraperService
 
@@ -27,11 +28,12 @@ def daily_youtube_capture_job():
     use_case = RunDailyCaptureUseCase(monitor_service=monitor_service)
 
     total_new_videos = use_case.execute()
-    
+
     global_logger.info(
         f"Daily YouTube capture job finished. Total new videos detected: {total_new_videos}",
         context={"total_new_videos": total_new_videos}
     )
+    extract_metadata_job()
 
     if total_new_videos > 0:
         global_logger.info(

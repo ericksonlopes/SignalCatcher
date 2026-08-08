@@ -52,9 +52,11 @@ class MonitorTaskService(IMonitorTaskService):
                 title=item.title or "Untitled",
                 url=item.url,
                 origin=channel.name,
-                step=ContentStep.PENDING_DOWNLOAD,
+                step=ContentStep.STARTED,
             )
-            self.youtube_content_repository.create(new_item)
+            created_item = self.youtube_content_repository.create(new_item)
+            created_item.step = ContentStep.PENDING_METADATA_EXTRACTION
+            self.youtube_content_repository.update(created_item)
             new_count += 1
 
         # Update last_checked_at
