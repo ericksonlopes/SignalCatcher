@@ -5,8 +5,8 @@ from src.infrastructure.repositories.connector import Base
 from src.infrastructure.repositories.models.youtube_content_model import get_brazil_time
 
 
-class ContentTrackingModel(Base):
-    __tablename__ = "content_tracking"
+class StepTrackingModel(Base):
+    __tablename__ = "step_tracking"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     entity_id = Column(Integer, index=True, nullable=False)
@@ -21,7 +21,7 @@ class ContentTrackingModel(Base):
     )  # Store any error messages or extra log context
 
     def __repr__(self):
-        return f"<ContentTrackingModel(entity_type='{self.entity_type}', entity_id={self.entity_id}, new_step='{self.new_step}')>"
+        return f"<StepTrackingModel(entity_type='{self.entity_type}', entity_id={self.entity_id}, new_step='{self.new_step}')>"
 
 
 from sqlalchemy import event
@@ -32,7 +32,7 @@ from src.infrastructure.repositories.models.youtube_content_model import (
 
 
 def create_tracking_entry(mapper, connection, target, previous_step, new_step):
-    tracking = ContentTrackingModel(
+    tracking = StepTrackingModel(
         entity_id=target.id,
         entity_type=target.__tablename__,
         previous_step=previous_step,
@@ -41,7 +41,7 @@ def create_tracking_entry(mapper, connection, target, previous_step, new_step):
     )
     # Using the connection to execute an insert directly to avoid session state conflicts during flush
     connection.execute(
-        ContentTrackingModel.__table__.insert().values(
+        StepTrackingModel.__table__.insert().values(
             entity_id=tracking.entity_id,
             entity_type=tracking.entity_type,
             previous_step=(

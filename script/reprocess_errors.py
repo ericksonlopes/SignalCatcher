@@ -11,7 +11,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.infrastructure.repositories.connector import ConnectorPostgres
 from src.infrastructure.repositories.models.youtube_content_model import YoutubeContentModel
-from src.infrastructure.repositories.models.content_tracking_model import ContentTrackingModel
+from src.infrastructure.repositories.models.step_tracking_model import StepTrackingModel
 from src.domain.models.enums.content_step import ContentStep
 from sqlalchemy import desc
 
@@ -39,11 +39,11 @@ def main():
 
         for item in errored_items:
             # Pega o último registro de tracking onde ele entrou em ERROR
-            last_error_track = session.query(ContentTrackingModel).filter(
-                ContentTrackingModel.entity_id == item.id,
-                ContentTrackingModel.entity_type == "youtube_contents",
-                ContentTrackingModel.new_step == ContentStep.ERROR
-            ).order_by(desc(ContentTrackingModel.changed_at)).first()
+            last_error_track = session.query(StepTrackingModel).filter(
+                StepTrackingModel.entity_id == item.id,
+                StepTrackingModel.entity_type == "youtube_contents",
+                StepTrackingModel.new_step == ContentStep.ERROR
+            ).order_by(desc(StepTrackingModel.changed_at)).first()
 
             if last_error_track and last_error_track.previous_step:
                 # Volta para o step anterior (ou para a fila de pendentes se estava no meio de um processamento)

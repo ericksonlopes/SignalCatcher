@@ -16,7 +16,7 @@ from src.presentation.api.models.responses.youtube_video_card_response import Yo
 import math
 from fastapi import Query
 
-from src.presentation.api.models.responses.content_tracking_response import ContentTrackingResponse
+from src.presentation.api.models.responses.step_tracking_response import StepTrackingResponse
 
 router = APIRouter()
 
@@ -112,7 +112,7 @@ def get_youtube_contents(
         logger.error(f"Failed to get paginated contents: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/content/{external_id}/tracking", response_model=list[ContentTrackingResponse])
+@router.get("/content/{external_id}/tracking", response_model=list[StepTrackingResponse])
 def get_content_tracking(
     external_id: str,
     repo: Annotated[
@@ -130,7 +130,7 @@ def get_content_tracking(
         trackings = repo.get_tracking_by_external_id(external_id)
         
         return [
-            ContentTrackingResponse(
+            StepTrackingResponse(
                 id=t.id,
                 previous_step=t.previous_step,
                 new_step=t.new_step,

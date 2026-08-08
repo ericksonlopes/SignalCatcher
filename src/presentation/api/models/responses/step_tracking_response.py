@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from typing import Optional
 from src.domain.models.enums.content_step import ContentStep
 
-class ContentTrackingResponse(BaseModel):
+class StepTrackingResponse(BaseModel):
     id: int
     previous_step: Optional[ContentStep]
     new_step: ContentStep

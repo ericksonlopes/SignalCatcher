@@ -4,7 +4,7 @@ from src.domain.models.youtube_content_entity import YoutubeContentEntity
 from src.infrastructure.repositories.connector import ConnectorPostgres
 from src.infrastructure.repositories.mappers.youtube_content_mapper import YoutubeContentMapper
 from src.infrastructure.repositories.models.youtube_content_model import YoutubeContentModel
-from src.infrastructure.repositories.models.content_tracking_model import ContentTrackingModel
+from src.infrastructure.repositories.models.step_tracking_model import StepTrackingModel
 
 
 from sqlalchemy import func
@@ -110,18 +110,18 @@ class YoutubeContentRepository(IYoutubeContentRepository):
             self.logger.error(f"Error resetting stuck steps from {stuck_step.name} to {pending_step.name}: {e}")
             raise
 
-    def get_tracking_by_external_id(self, external_id: str) -> list[ContentTrackingModel]:
+    def get_tracking_by_external_id(self, external_id: str) -> list[StepTrackingModel]:
         try:
             with ConnectorPostgres() as session:
                 query = (
-                    session.query(ContentTrackingModel)
+                    session.query(StepTrackingModel)
                     .join(
                         YoutubeContentModel,
-                        ContentTrackingModel.entity_id == YoutubeContentModel.id,
+                        StepTrackingModel.entity_id == YoutubeContentModel.id,
                     )
                     .filter(YoutubeContentModel.external_id == external_id)
-                    .filter(ContentTrackingModel.entity_type == "youtube_contents")
-                    .order_by(ContentTrackingModel.changed_at.asc())
+                    .filter(StepTrackingModel.entity_type == "youtube_contents")
+                    .order_by(StepTrackingModel.changed_at.asc())
                 )
                 return query.all()
         except Exception as e:

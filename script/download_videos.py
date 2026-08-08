@@ -10,6 +10,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 from src.domain.models.enums.content_step import ContentStep
 from src.infrastructure.repositories.connector import ConnectorPostgres
 from src.infrastructure.repositories.models.youtube_content_model import YoutubeContentModel
+import src.infrastructure.repositories.models.step_tracking_model  # Register SQLAlchemy events
 
 
 def download_video(url: str, content_id: str, origin: str, output_path: str):
