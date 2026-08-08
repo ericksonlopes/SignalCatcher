@@ -35,6 +35,7 @@ def get_add_content_use_case() -> AddContentFromLinkUseCase:
 from fastapi import BackgroundTasks
 from src.presentation.schedules.jobs.youtube_extract_metadata_job import extract_metadata_job
 from src.presentation.schedules.jobs.youtube_download_job import download_videos_job
+from src.presentation.schedules.jobs.youtube_process_errors_job import process_errors_job
 
 def process_single_video_pipeline():
     try:
@@ -42,6 +43,65 @@ def process_single_video_pipeline():
         download_videos_job()
     except Exception as e:
         logger.error(f"Error in manual video processing pipeline: {e}")
+
+@router.post("/content/retry-errors", responses={500: {"description": "Internal Server Error"}})
+def retry_error_contents(background_tasks: BackgroundTasks):
+    """
+    Triggers the background job to retry downloading all videos that are currently in the ERROR step.
+    """
+    try:
+        background_tasks.add_task(process_errors_job)
+        return {"message": "Error retry job started in the background."}
+    except Exception as e:
+        logger.error(f"Failed to trigger error retry job: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/content/{external_id}/retry", responses={404: {"description": "Content not found"}})
+def retry_single_content(external_id: str,
+                         background_tasks: BackgroundTasks,
+                         repo: Annotated[
+                             YoutubeContentRepository,
+                             Depends(lambda: YoutubeContentRepository(logger=logger)),
+                         ]):
+    """
+    Retries processing a single video by its external ID.
+    It resets the video's status to PENDING_METADATA_EXTRACTION and runs the pipeline.
+    """
+    from src.domain.models.enums.content_step import ContentStep
+    try:
+        content = repo.get_by_external_id(external_id)
+        if not content:
+            raise HTTPException(status_code=404, detail="Content not found")
+        
+        # Discover where it failed by looking at tracking history
+        trackings = repo.get_tracking_by_external_id(external_id)
+        last_step_before_error = ContentStep.PENDING_METADATA_EXTRACTION # Default fallback
+        
+        if trackings:
+            # Sort trackings by date descending to find the last valid step
+            trackings_sorted = sorted(trackings, key=lambda t: t.changed_at, reverse=True)
+            for tracking in trackings_sorted:
+                if tracking.new_step.name == 'ERROR' and tracking.previous_step:
+                    if tracking.previous_step.name in ['DOWNLOADING', 'PENDING_DOWNLOAD']:
+                        last_step_before_error = ContentStep.PENDING_DOWNLOAD
+                    elif tracking.previous_step.name == 'PENDING_METADATA_EXTRACTION':
+                        last_step_before_error = ContentStep.PENDING_METADATA_EXTRACTION
+                    break
+        
+        content.step = last_step_before_error
+        content.error_info = None
+        repo.update(content)
+        
+        background_tasks.add_task(process_single_video_pipeline)
+        return {
+            "message": f"Retry started for content {external_id}",
+            "new_step": last_step_before_error.name
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to retry single content {external_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/content", responses={400: {"description": "Bad Request"}})
 def add_youtube_content_from_link(request: YouTubeVideoAddRequest,

@@ -8,6 +8,10 @@ class IYoutubeContentRepository(Protocol):
         """Checks if a content already exists by its external ID."""
         ...
 
+    def get_by_external_id(self, external_id: str) -> 'YoutubeContentEntity | None':
+        """Returns the content matching the given external ID."""
+        ...
+
     def create(self, youtube_content_entity: YoutubeContentEntity) -> YoutubeContentEntity:
         """Saves a new content to the database."""
         ...

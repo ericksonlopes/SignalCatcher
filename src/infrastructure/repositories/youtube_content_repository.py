@@ -24,6 +24,18 @@ class YoutubeContentRepository(IYoutubeContentRepository):
                               context={"external_id": external_id, "error": str(e)})
             raise
 
+    def get_by_external_id(self, external_id: str) -> 'YoutubeContentEntity | None':
+        try:
+            with ConnectorPostgres() as session:
+                model = session.query(YoutubeContentModel).filter_by(external_id=external_id).first()
+                if model:
+                    return YoutubeContentMapper.to_domain(model)
+                return None
+        except Exception as e:
+            self.logger.error(f"Error fetching content by external_id '{external_id}': {e}",
+                              context={"external_id": external_id, "error": str(e)})
+            raise
+
     def create(self, youtube_content_entity: YoutubeContentEntity) -> YoutubeContentEntity:
         try:
             with ConnectorPostgres() as session:
