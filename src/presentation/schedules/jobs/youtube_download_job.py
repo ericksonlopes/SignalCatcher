@@ -13,25 +13,14 @@ from src.infrastructure.repositories.models.youtube_content_model import Youtube
 import src.infrastructure.repositories.models.step_tracking_model  # Register SQLAlchemy events
 from src.config.settings import settings
 
-def download_video(url: str, content_id: str, origin: str, output_path: str):
-    parts = [re.sub(r'[\\*?:"<>|]', "_", p) for p in origin.split('/')]
-    final_output_path = os.path.join(output_path, *parts)
-    os.makedirs(final_output_path, exist_ok=True)
-    ydl_opts = {
-        'outtmpl': f'{final_output_path}/{content_id}_%(title)s.%(ext)s',
-        'format': 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best[ext=mp4]/best',
-        'ffmpeg_location': r'C:\Users\ofcer\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.1.2-full_build\bin',
-        'quiet': False,
-        'js_runtimes': {'node': {}},
-        'remote_components': ['ejs:github']
-    }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
+from src.infrastructure.services.youtube_scraper import YouTubeScraperService
+from src.infrastructure.loggers.logger import logger as global_logger
 
 
 def download_videos_job():
     logging.info("Starting video download process...")
     output_path = settings.DOWNLOAD_YOUTUBE_PATH
+    scraper = YouTubeScraperService(logger=global_logger)
     while True:
         with ConnectorPostgres() as session:
             # Find one pending download
@@ -50,8 +39,8 @@ def download_videos_job():
             session.commit()
 
             try:
-                download_video(url=content.url, content_id=content.external_id, origin=content.origin,
-                               output_path=output_path)
+                scraper.download_video(url=content.url, content_id=content.external_id, origin=content.origin,
+                                       output_path=output_path)
 
                 # Update step to DOWNLOADED
                 content.step = ContentStep.DOWNLOADED

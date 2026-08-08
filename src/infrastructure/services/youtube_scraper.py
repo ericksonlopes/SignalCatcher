@@ -278,3 +278,28 @@ class YouTubeScraperService(IYouTubeScraper):
             self.logger.error(f"Playlist extraction failed for {playlist_url}",
                               context={"playlist_url": playlist_url, "error": str(e)})
             raise
+
+    def download_video(self, url: str, content_id: str, origin: str, output_path: str):
+        import re
+        import os
+        self.logger.debug(f"Starting download for {url} to {output_path}")
+        
+        parts = [re.sub(r'[\\*?:"<>|]', "_", p) for p in origin.split('/')]
+        final_output_path = os.path.join(output_path, *parts)
+        os.makedirs(final_output_path, exist_ok=True)
+        
+        ydl_opts = self._get_common_ydl_opts()
+        # Override specific opts for downloading
+        ydl_opts.update({
+            'outtmpl': f'{final_output_path}/{content_id}_%(title)s.%(ext)s',
+            'format': 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best[ext=mp4]/best',
+            'ffmpeg_location': r'C:\Users\ofcer\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.1.2-full_build\bin',
+            'extract_flat': False,
+            'skip_download': False,
+            'ignoreerrors': False,
+            'js_runtimes': {'node': {}},
+            'remote_components': ['ejs:github']
+        })
+        
+        with YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])

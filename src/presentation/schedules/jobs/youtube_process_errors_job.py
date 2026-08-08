@@ -4,21 +4,19 @@ import sys
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Add the root directory of the project to PYTHONPATH so that we can import from src
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-# Add the script directory to PYTHONPATH to import download_video
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from src.infrastructure.repositories.connector import ConnectorPostgres
 from src.infrastructure.repositories.models.youtube_content_model import YoutubeContentModel
 from src.domain.models.enums.content_step import ContentStep
-from src.presentation.schedules.jobs.youtube_download_job import download_video
+from src.infrastructure.services.youtube_scraper import YouTubeScraperService
+from src.infrastructure.loggers.logger import logger as global_logger
 from src.config.settings import settings
 
 
-def main():
+def process_errors_job():
     logging.info("Starting error retry process...")
     output_path = settings.DOWNLOAD_YOUTUBE_PATH
+    scraper = YouTubeScraperService(logger=global_logger)
 
     with ConnectorPostgres() as session:
         # Find all videos that failed previously
@@ -41,8 +39,8 @@ def main():
             session.commit()
 
             try:
-                download_video(url=content.url, content_id=content.external_id, origin=content.origin,
-                               output_path=output_path)
+                scraper.download_video(url=content.url, content_id=content.external_id, origin=content.origin,
+                                       output_path=output_path)
 
                 # Update step to PENDING_METADATA_EXTRACTION and clear error info
                 content.step = ContentStep.PENDING_METADATA_EXTRACTION
@@ -76,4 +74,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    process_errors_job()
