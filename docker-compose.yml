@@ -5,6 +5,7 @@ services:
     build: .
     container_name: signalcatcher_app
     restart: unless-stopped
+    user: "root"
     ports:
       - "5001:8000"
     environment:
