@@ -1,13 +1,13 @@
+from sqlalchemy import func
+
 from src.domain.interfaces.logger import ILogger
 from src.domain.interfaces.youtube_content_repository import IYoutubeContentRepository
 from src.domain.models.youtube_content_entity import YoutubeContentEntity
 from src.infrastructure.repositories.connector import ConnectorPostgres
 from src.infrastructure.repositories.mappers.youtube_content_mapper import YoutubeContentMapper
-from src.infrastructure.repositories.models.youtube_content_model import YoutubeContentModel
 from src.infrastructure.repositories.models.step_tracking_model import StepTrackingModel
+from src.infrastructure.repositories.models.youtube_content_model import YoutubeContentModel
 
-
-from sqlalchemy import func
 
 class YoutubeContentRepository(IYoutubeContentRepository):
     def __init__(self, logger: ILogger):

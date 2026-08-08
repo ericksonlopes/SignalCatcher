@@ -1,9 +1,8 @@
 from src.domain.interfaces.logger import ILogger
-from src.domain.interfaces.youtube_content_repository import IYoutubeContentRepository
 from src.domain.interfaces.scraper import IYouTubeScraper
-from src.domain.models.youtube_content_entity import YoutubeContentEntity
+from src.domain.interfaces.youtube_content_repository import IYoutubeContentRepository
 from src.domain.models.enums.content_step import ContentStep
-
+from src.domain.models.youtube_content_entity import YoutubeContentEntity
 
 class AddContentFromPlaylistUseCase:
     def __init__(self, youtube_content_repository: IYoutubeContentRepository, youtube_scraper: IYouTubeScraper, logger: ILogger):
@@ -27,7 +26,7 @@ class AddContentFromPlaylistUseCase:
             if self.youtube_content_repository.exists_by_external_id(video.id):
                 self.logger.info(f"Content with external_id {video.id} already exists. Skipping.")
                 continue
-                
+
             origin = video.channel or "Unknown Channel"
             if save_in_playlist_folder:
                 origin = f"{origin}/{playlist_title}"
@@ -40,10 +39,10 @@ class AddContentFromPlaylistUseCase:
                 step=ContentStep.STARTED
             )
             saved_content = self.youtube_content_repository.create(content)
-            
+
             saved_content.step = ContentStep.PENDING_METADATA_EXTRACTION
             self.youtube_content_repository.update(saved_content)
-            
+
             saved_contents.append(saved_content)
 
         self.logger.info(f"Successfully added {len(saved_contents)} new videos from playlist.")

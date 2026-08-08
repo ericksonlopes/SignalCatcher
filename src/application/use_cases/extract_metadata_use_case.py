@@ -1,8 +1,10 @@
-from src.domain.interfaces.logger import ILogger
-from src.domain.interfaces.youtube_content_repository import IYoutubeContentRepository
-from src.domain.interfaces.scraper import IYouTubeScraper
-from src.domain.models.enums.content_step import ContentStep
 import datetime
+
+from src.domain.interfaces.logger import ILogger
+from src.domain.interfaces.scraper import IYouTubeScraper
+from src.domain.interfaces.youtube_content_repository import IYoutubeContentRepository
+from src.domain.models.enums.content_step import ContentStep
+
 
 class ExtractMetadataUseCase:
     def __init__(self, youtube_content_repository: IYoutubeContentRepository, youtube_scraper: IYouTubeScraper, logger: ILogger):

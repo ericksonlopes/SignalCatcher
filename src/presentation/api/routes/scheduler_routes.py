@@ -4,7 +4,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import APIRouter, HTTPException, Request, status, BackgroundTasks
 
 from src.infrastructure.loggers.logger import logger
-from src.presentation.schedules.jobs.youtube_capture_job import daily_youtube_capture_job
+from src.presentation.schedules.jobs.youtube_monitor_channels_job import youtube_monitor_channels_job
 from src.presentation.schedules.jobs.youtube_extract_metadata_job import extract_metadata_job
 
 router = APIRouter()
@@ -24,7 +24,7 @@ def execute_daily_youtube_capture(background_tasks: BackgroundTasks):
     """
     Executes the daily_youtube_capture_job directly in the background.
     """
-    background_tasks.add_task(daily_youtube_capture_job)
+    background_tasks.add_task(youtube_monitor_channels_job)
     logger.info("⚡ Background task for daily_youtube_capture_job triggered via API.")
     return {"message": "daily_youtube_capture_job execution started in the background."}
 

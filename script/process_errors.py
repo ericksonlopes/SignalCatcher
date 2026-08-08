@@ -12,12 +12,13 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from src.infrastructure.repositories.connector import ConnectorPostgres
 from src.infrastructure.repositories.models.youtube_content_model import YoutubeContentModel
 from src.domain.models.enums.content_step import ContentStep
-from download_videos import download_video
+from src.presentation.schedules.jobs.youtube_download_job import download_video
+from src.config.settings import settings
 
 
 def main():
     logging.info("Starting error retry process...")
-    output_path = r"D:\Youtube"
+    output_path = settings.DOWNLOAD_YOUTUBE_PATH
 
     with ConnectorPostgres() as session:
         # Find all videos that failed previously

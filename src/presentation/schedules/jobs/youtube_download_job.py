@@ -11,7 +11,7 @@ from src.domain.models.enums.content_step import ContentStep
 from src.infrastructure.repositories.connector import ConnectorPostgres
 from src.infrastructure.repositories.models.youtube_content_model import YoutubeContentModel
 import src.infrastructure.repositories.models.step_tracking_model  # Register SQLAlchemy events
-
+from src.config.settings import settings
 
 def download_video(url: str, content_id: str, origin: str, output_path: str):
     parts = [re.sub(r'[\\*?:"<>|]', "_", p) for p in origin.split('/')]
@@ -29,9 +29,9 @@ def download_video(url: str, content_id: str, origin: str, output_path: str):
         ydl.download([url])
 
 
-def main():
+def download_videos_job():
     logging.info("Starting video download process...")
-    output_path = r"D:\Youtube"
+    output_path = settings.DOWNLOAD_YOUTUBE_PATH
     while True:
         with ConnectorPostgres() as session:
             # Find one pending download
@@ -88,4 +88,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    download_videos_job()

@@ -1,9 +1,9 @@
 from src.domain.interfaces.logger import ILogger
-from src.domain.interfaces.youtube_content_repository import IYoutubeContentRepository
-from src.domain.interfaces.scraper import IYouTubeScraper
 from src.domain.interfaces.notification import INotification
-from src.domain.models.youtube_content_entity import YoutubeContentEntity
+from src.domain.interfaces.scraper import IYouTubeScraper
+from src.domain.interfaces.youtube_content_repository import IYoutubeContentRepository
 from src.domain.models.enums.content_step import ContentStep
+from src.domain.models.youtube_content_entity import YoutubeContentEntity
 
 
 class AddContentFromLinkUseCase:

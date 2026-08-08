@@ -16,6 +16,9 @@ services:
       LIST_LOG_LEVELS: ${LIST_LOG_LEVELS:-ERROR,WARNING,INFO}
       VOICE_MONKEY_API_TOKEN: ${VOICE_MONKEY_API_TOKEN:-}
       VOICE_MONKEY_NEW_VIDEO_FOR_DOWNLOAD_MONKEY_ID: ${VOICE_MONKEY_NEW_VIDEO_FOR_DOWNLOAD_MONKEY_ID:-}
+      DOWNLOAD_YOUTUBE_PATH: /app/youtube_downloads
+    volumes:
+      - /media/eriberry/SSD_1/Youtube:/app/youtube_downloads
     networks:
       - shared_postgres_network
     dns:

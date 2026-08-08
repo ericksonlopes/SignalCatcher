@@ -1,4 +1,3 @@
-from src.presentation.schedules.jobs.youtube_extract_metadata_job import extract_metadata_job
 from src.application.use_cases.run_daily_capture_use_case import RunDailyCaptureUseCase
 from src.config.settings import settings
 from src.infrastructure.loggers.logger import logger as global_logger
@@ -11,9 +10,13 @@ from src.infrastructure.repositories.youtube_content_repository import (
 from src.infrastructure.repositories.youtube_monitored_channel_repository import YouTubeMonitoredChannelRepository
 from src.infrastructure.services.monitor_task_service import MonitorTaskService
 from src.infrastructure.services.youtube_scraper import YouTubeScraperService
+from src.presentation.schedules.jobs.youtube_download_job import download_videos_job
+from src.presentation.schedules.jobs.youtube_extract_metadata_job import (
+    extract_metadata_job,
+)
 
 
-def daily_youtube_capture_job():
+def youtube_monitor_channels_job():
     youtube_scraper = YouTubeScraperService(logger=global_logger)
     youtube_monitored_channel_repository = YouTubeMonitoredChannelRepository(logger=global_logger)
     youtube_content_repository = YoutubeContentRepository(logger=global_logger)
@@ -34,6 +37,12 @@ def daily_youtube_capture_job():
         context={"total_new_videos": total_new_videos}
     )
     extract_metadata_job()
+
+    global_logger.info("Triggering automatic download process...")
+    try:
+        download_videos_job()
+    except Exception as e:
+        global_logger.error(f"Error during automatic download process: {e}")
 
     if total_new_videos > 0:
         global_logger.info(

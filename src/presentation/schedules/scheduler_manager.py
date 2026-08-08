@@ -3,8 +3,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from src.infrastructure.loggers.logger import logger
 from src.infrastructure.repositories.connector import engine
-from src.presentation.schedules.jobs.youtube_capture_job import (
-    daily_youtube_capture_job,
+from src.presentation.schedules.jobs.youtube_monitor_channels_job import (
+    youtube_monitor_channels_job,
 )
 
 
@@ -14,7 +14,7 @@ def start_scheduler() -> BackgroundScheduler:
     scheduler = BackgroundScheduler(jobstores=jobstores)
 
     scheduler.add_job(
-        daily_youtube_capture_job,
+        youtube_monitor_channels_job,
         trigger='interval',
         minutes=30,
         id='daily_youtube_capture_job',
