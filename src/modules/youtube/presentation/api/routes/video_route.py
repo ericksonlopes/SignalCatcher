@@ -1,35 +1,32 @@
+import math
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Depends
-
-from src.modules.youtube.application.use_cases.add_content_from_link_use_case import AddContentFromLinkUseCase
-from src.core.config.settings import settings
-from src.core.logger.logger import logger
-from src.modules.youtube.infrastructure.notifications.voice_monkey_notification import VoiceMonkeyNotification
-from src.modules.youtube.infrastructure.repositories.youtube_content_repository import (
-    YoutubeContentRepository,
-)
-from src.modules.youtube.infrastructure.services.youtube_scraper import YouTubeScraperService
-from src.modules.youtube.presentation.api.models.requests.youtube_video_add_request import YouTubeVideoAddRequest
-from src.modules.youtube.presentation.api.models.responses.paginated_response import PaginatedResponse
-from src.modules.youtube.presentation.api.models.responses.youtube_video_card_response import YoutubeVideoCardResponse
-import math
 from fastapi import Query
 
-from src.modules.youtube.presentation.api.models.responses.step_tracking_response import StepTrackingResponse
+from src.core.logger.logger import logger
+from src.modules.youtube.application.use_cases.content.add_content_from_link_use_case import (
+    AddContentFromLinkUseCase,
+)
+from src.modules.youtube.application.use_cases.content.content_commands import (
+    ContentCommands,
+)
+from src.modules.youtube.application.use_cases.content.content_queries import (
+    ContentQueries,
+)
+from src.modules.youtube.presentation.api.dependencies import (
+    get_content_commands,
+    get_content_queries,
+    get_add_content_from_link_use_case,
+)
+from src.modules.youtube.presentation.api.models.requests.youtube_video_add_request import YouTubeVideoAddRequest
+from src.modules.youtube.presentation.api.models.responses.paginated_response import PaginatedResponse
+from src.modules.youtube.presentation.api.models.responses.step_tracking_response import (
+    StepTrackingResponse,
+)
+from src.modules.youtube.presentation.api.models.responses.youtube_video_card_response import YoutubeVideoCardResponse
 
 router = APIRouter()
-
-
-def get_add_content_use_case() -> AddContentFromLinkUseCase:
-    content_repo = YoutubeContentRepository(logger=logger)
-    scraper = YouTubeScraperService(logger=logger)
-    notification = VoiceMonkeyNotification(
-        api_token=settings.VOICE_MONKEY_API_TOKEN,
-        monkey_id=settings.VOICE_MONKEY_NEW_VIDEO_FOR_DOWNLOAD_MONKEY_ID,
-        logger=logger
-    )
-    return AddContentFromLinkUseCase(content_repo, scraper, notification, logger)
 
 
 from fastapi import BackgroundTasks
@@ -56,13 +53,13 @@ def retry_error_contents(background_tasks: BackgroundTasks):
         logger.error(f"Failed to trigger error retry job: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.post("/content/{external_id}/retry", responses={404: {"description": "Content not found"}})
-def retry_single_content(external_id: str,
-                         background_tasks: BackgroundTasks,
-                         repo: Annotated[
-                             YoutubeContentRepository,
-                             Depends(lambda: YoutubeContentRepository(logger=logger)),
-                         ]):
+def retry_single_content(
+    external_id: str,
+    background_tasks: BackgroundTasks,
+    use_case: Annotated[ContentCommands, Depends(get_content_commands)],
+):
     """
     Retries processing a single video by its external ID.
     It sets the video's status to REPROCESSING and runs a dedicated reprocessing pipeline.
@@ -70,18 +67,13 @@ def retry_single_content(external_id: str,
     from src.modules.youtube.domain.enums.content_step import ContentStep
     from src.modules.youtube.presentation.schedules.jobs.youtube_process_errors_job import reprocess_single_video_job
     try:
-        content = repo.get_by_external_id(external_id)
-        if not content:
+        success = use_case.set_reprocessing(external_id)
+        if not success:
             raise HTTPException(status_code=404, detail="Content not found")
-        
-        # Set to the new explicit REPROCESSING status
-        content.step = ContentStep.REPROCESSING
-        content.error_info = None
-        repo.update(content)
-        
+
         # Pass the ID to the dedicated reprocessing job
         background_tasks.add_task(reprocess_single_video_job, external_id)
-        
+
         return {
             "message": f"Retry started for content {external_id}",
             "step": ContentStep.REPROCESSING.name
@@ -92,41 +84,21 @@ def retry_single_content(external_id: str,
         logger.error(f"Failed to retry single content {external_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.delete("/content/{external_id}", responses={404: {"description": "Content not found"}})
-def delete_single_content(external_id: str,
-                         repo: Annotated[
-                             YoutubeContentRepository,
-                             Depends(lambda: YoutubeContentRepository(logger=logger)),
-                         ]):
+def delete_single_content(
+    external_id: str,
+    use_case: Annotated[ContentCommands, Depends(get_content_commands)],
+):
     """
     Sets a video step to DELETED and removes its physical file from the SSD.
     """
     from src.modules.youtube.domain.enums.content_step import ContentStep
-    import glob
-    import os
-    import re
     try:
-        content = repo.get_by_external_id(external_id)
-        if not content:
+        success = use_case.delete_content(external_id)
+        if not success:
             raise HTTPException(status_code=404, detail="Content not found")
-        
-        # Set to DELETED status
-        content.step = ContentStep.DELETED
-        repo.update(content)
-        
-        # Remove file from SSD
-        output_path = settings.DOWNLOAD_YOUTUBE_PATH
-        if output_path and content.origin:
-            parts = [re.sub(r'[\\*?:"<>|]', "_", p) for p in content.origin.split('/')]
-            final_output_path = os.path.join(output_path, *parts)
-            pattern = os.path.join(final_output_path, f"{content.external_id}_*.*")
-            for file_path in glob.glob(pattern):
-                try:
-                    os.remove(file_path)
-                    logger.info(f"Deleted file: {file_path}")
-                except Exception as e:
-                    logger.error(f"Failed to delete file {file_path}: {e}")
-        
+
         return {
             "message": f"Content {external_id} deleted successfully",
             "step": ContentStep.DELETED.name
@@ -137,10 +109,15 @@ def delete_single_content(external_id: str,
         logger.error(f"Failed to delete single content {external_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.post("/content", responses={400: {"description": "Bad Request"}})
-def add_youtube_content_from_link(request: YouTubeVideoAddRequest,
-                                  background_tasks: BackgroundTasks,
-                                  use_case: Annotated[AddContentFromLinkUseCase, Depends(get_add_content_use_case)]):
+def add_youtube_content_from_link(
+    request: YouTubeVideoAddRequest,
+    background_tasks: BackgroundTasks,
+    use_case: Annotated[
+        AddContentFromLinkUseCase, Depends(get_add_content_from_link_use_case)
+    ],
+):
     """
     Adds a new content from a given YouTube link.
     It extracts the video metadata (title, channel) and creates a content entity.
@@ -156,38 +133,35 @@ def add_youtube_content_from_link(request: YouTubeVideoAddRequest,
 
 @router.get("/content/status-count", responses={500: {"description": "Internal Server Error"}})
 def get_content_status_count(
-    repo: Annotated[
-        YoutubeContentRepository,
-        Depends(lambda: YoutubeContentRepository(logger=logger)),
-    ],
+    use_case: Annotated[ContentQueries, Depends(get_content_queries)],
 ):
     """
     Returns a count of contents grouped by their status.
     """
     try:
-        counts = repo.count_by_step()
+        counts = use_case.get_status_count()
         return {"status_counts": counts}
     except Exception as e:
         logger.error(f"Failed to get content status count: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.get("/content", response_model=PaginatedResponse[YoutubeVideoCardResponse])
 def get_youtube_contents(
-    repo: Annotated[
-        YoutubeContentRepository,
-        Depends(lambda: YoutubeContentRepository(logger=logger)),
-    ],
+    use_case: Annotated[ContentQueries, Depends(get_content_queries)],
     page: int = Query(1, ge=1, description="Page number"),
     limit: int = Query(20, ge=1, le=100, description="Items per page"),
     step: str | None = Query(None, description="Filter by step status"),
-    search: str | None = Query(None, description="Search by title")
+    search: str | None = Query(None, description="Search by title"),
 ):
     """
     Returns a paginated list of YouTube contents.
     """
     try:
-        items, total = repo.get_paginated(page=page, limit=limit, step=step, search=search)
-        
+        items, total = use_case.get_contents(
+            page=page, limit=limit, step=step, search=search
+        )
+
         # Mapping to Video Card Response
         mapped_items = [
             YoutubeVideoCardResponse(
@@ -202,9 +176,9 @@ def get_youtube_contents(
                 tags=item.tags
             ) for item in items
         ]
-        
+
         total_pages = math.ceil(total / limit)
-        
+
         return PaginatedResponse[YoutubeVideoCardResponse](
             items=mapped_items,
             total=total,
@@ -216,23 +190,20 @@ def get_youtube_contents(
         logger.error(f"Failed to get paginated contents: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.get("/content/{external_id}/tracking", response_model=list[StepTrackingResponse])
 def get_content_tracking(
     external_id: str,
-    repo: Annotated[
-        YoutubeContentRepository,
-        Depends(lambda: YoutubeContentRepository(logger=logger)),
-    ]
+    use_case: Annotated[ContentQueries, Depends(get_content_queries)],
 ):
     """
     Returns the tracking history of a specific YouTube content.
     """
     try:
-        if not repo.exists_by_external_id(external_id):
+        trackings = use_case.get_tracking(external_id)
+        if trackings is None:
             raise HTTPException(status_code=404, detail="Content not found")
-            
-        trackings = repo.get_tracking_by_external_id(external_id)
-        
+
         return [
             StepTrackingResponse(
                 id=t.id,
@@ -247,4 +218,3 @@ def get_content_tracking(
     except Exception as e:
         logger.error(f"Failed to get tracking for {external_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-

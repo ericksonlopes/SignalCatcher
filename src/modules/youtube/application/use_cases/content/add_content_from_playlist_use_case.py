@@ -1,12 +1,11 @@
 from src.core.logger.interfaces import ILogger
 from src.modules.youtube.domain.interfaces.scraper import IYouTubeScraper
-from src.modules.youtube.domain.interfaces.youtube_content_repository import IYoutubeContentRepository
-from src.modules.youtube.domain.enums.content_step import ContentStep
+from src.modules.youtube.domain.interfaces.youtube_content_service import IYoutubeContentService
 from src.modules.youtube.domain.entities.youtube_content_entity import YoutubeContentEntity
 
 class AddContentFromPlaylistUseCase:
-    def __init__(self, youtube_content_repository: IYoutubeContentRepository, youtube_scraper: IYouTubeScraper, logger: ILogger):
-        self.youtube_content_repository = youtube_content_repository
+    def __init__(self, youtube_content_service: IYoutubeContentService, youtube_scraper: IYouTubeScraper, logger: ILogger):
+        self.youtube_content_service = youtube_content_service
         self.youtube_scraper = youtube_scraper
         self.logger = logger
 
@@ -23,7 +22,7 @@ class AddContentFromPlaylistUseCase:
 
         saved_contents = []
         for video in videos:
-            if self.youtube_content_repository.exists_by_external_id(video.id):
+            if self.youtube_content_service.exists_by_external_id(video.id):
                 self.logger.info(f"Content with external_id {video.id} already exists. Skipping.")
                 continue
 
@@ -31,17 +30,12 @@ class AddContentFromPlaylistUseCase:
             if save_in_playlist_folder:
                 origin = f"{origin}/{playlist_title}"
 
-            content = YoutubeContentEntity(
+            saved_content = self.youtube_content_service.add_new_content(
                 external_id=video.id,
                 title=video.title or "Untitled",
                 url=video.url,
-                origin=origin,
-                step=ContentStep.STARTED
+                origin=origin
             )
-            saved_content = self.youtube_content_repository.create(content)
-
-            saved_content.step = ContentStep.PENDING_METADATA_EXTRACTION
-            self.youtube_content_repository.update(saved_content)
 
             saved_contents.append(saved_content)
 

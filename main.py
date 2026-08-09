@@ -49,23 +49,10 @@ app = FastAPI(
 )
 
 # Register routes
-from src.modules.youtube.presentation.api.routes import (
-    channel_route as youtube_channel_routes,
-)
-from src.modules.youtube.presentation.api.routes import (
-    video_route as youtube_content_routes,
-)
-from src.modules.youtube.presentation.api.routes import (
-    playlist_route as youtube_playlist_routes,
-)
-from src.modules.youtube.presentation.schedules import scheduler_routes
+from src.modules.youtube.presentation.api.routes import youtube_router
 
 YOUTUBE_API_PREFIX = "/api/youtube"
-
-app.include_router(youtube_channel_routes.router, prefix=YOUTUBE_API_PREFIX, tags=["YouTube"])
-app.include_router(youtube_content_routes.router, prefix=YOUTUBE_API_PREFIX, tags=["YouTube"])
-app.include_router(youtube_playlist_routes.router, prefix=YOUTUBE_API_PREFIX, tags=["YouTube"])
-app.include_router(scheduler_routes.router, prefix="/api/scheduler", tags=["Scheduler"])
+app.include_router(youtube_router, prefix=YOUTUBE_API_PREFIX)
 
 
 @app.get("/status", tags=["Health"])

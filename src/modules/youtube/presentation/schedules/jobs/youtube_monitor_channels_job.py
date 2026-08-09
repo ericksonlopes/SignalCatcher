@@ -1,13 +1,18 @@
-from src.modules.youtube.application.use_cases.run_daily_capture_use_case import RunDailyCaptureUseCase
 from src.core.config.settings import settings
 from src.core.logger.logger import logger as global_logger
+from src.modules.youtube.application.use_cases.jobs.run_daily_capture_use_case import (
+    RunDailyCaptureUseCase,
+)
 from src.modules.youtube.infrastructure.notifications.voice_monkey_notification import (
     VoiceMonkeyNotification,
 )
 from src.modules.youtube.infrastructure.repositories.youtube_content_repository import (
     YoutubeContentRepository,
 )
-from src.modules.youtube.infrastructure.repositories.youtube_monitored_channel_repository import YouTubeMonitoredChannelRepository
+from src.modules.youtube.infrastructure.repositories.youtube_monitored_channel_repository import (
+    YouTubeMonitoredChannelRepository,
+)
+from src.modules.youtube.infrastructure.services.youtube_content_service import YoutubeContentService
 from src.modules.youtube.infrastructure.services.monitor_task_service import MonitorTaskService
 from src.modules.youtube.infrastructure.services.youtube_scraper import YouTubeScraperService
 from src.modules.youtube.presentation.schedules.jobs.youtube_download_job import download_videos_job
@@ -20,11 +25,12 @@ def youtube_monitor_channels_job():
     youtube_scraper = YouTubeScraperService(logger=global_logger)
     youtube_monitored_channel_repository = YouTubeMonitoredChannelRepository(logger=global_logger)
     youtube_content_repository = YoutubeContentRepository(logger=global_logger)
+    youtube_content_service = YoutubeContentService(repository=youtube_content_repository, logger=global_logger)
 
     monitor_service = MonitorTaskService(
         youtube_scraper=youtube_scraper,
         youtube_monitored_channel_repository=youtube_monitored_channel_repository,
-        youtube_content_repository=youtube_content_repository,
+        youtube_content_service=youtube_content_service,
         logger=global_logger
     )
 

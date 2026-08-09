@@ -62,3 +62,16 @@ class IYouTubeScraper(Protocol):
             A tuple containing a list of YouTubeVideoDTO objects and the playlist title.
         """
         ...
+
+    def download_video(
+        self, url: str, content_id: str, origin: str, output_path: str
+    ) -> None:
+        """Downloads a YouTube video to the specified output path.
+
+        Args:
+            url: The YouTube video URL.
+            content_id: The external ID of the content.
+            origin: The origin/channel name for directory organization.
+            output_path: The base output path for downloaded files.
+        """
+        ...

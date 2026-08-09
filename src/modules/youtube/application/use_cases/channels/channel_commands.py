@@ -1,21 +1,20 @@
+from src.core.logger.interfaces import ILogger
 from src.modules.youtube.application.dtos.channel_create_dto import ChannelCreateDTO
 from src.modules.youtube.application.dtos.youtube_channel_response_dto import YouTubeChannelResponseDTO
-from src.modules.youtube.application.dtos.saved_youtube_channel_response_dto import SavedYouTubeChannelResponseDTO
 from src.modules.youtube.application.mappers.channel_dto_mapper import ChannelDtoMapper
 from src.modules.youtube.domain.interfaces.channel_service import IChannelService
-from src.core.logger.interfaces import ILogger
+from src.modules.youtube.domain.interfaces.scraper import IYouTubeScraper
+from src.modules.youtube.domain.interfaces.youtube_channel_repository import IYouTubeChannelRepository
 from src.modules.youtube.domain.interfaces.youtube_monitored_channel_repository import IYouTubeMonitoredChannelRepository
 
-
-class ChannelsUseCase:
-
+class ChannelCommands:
     def __init__(
         self,
         channel_service: IChannelService,
         repository: IYouTubeMonitoredChannelRepository,
         logger: ILogger,
-        scraper=None,
-        yt_channel_repo=None,
+        scraper: IYouTubeScraper | None = None,
+        yt_channel_repo: IYouTubeChannelRepository | None = None,
     ):
         self.channel_service = channel_service
         self.repository = repository
@@ -57,26 +56,6 @@ class ChannelsUseCase:
 
         # Maps the Entity to the response DTO
         return ChannelDtoMapper.to_youtube_response_dto(created_channel)
-
-    def get_all_channels(self) -> list[YouTubeChannelResponseDTO]:
-        self.logger.debug("Iniciando a busca de todos os canais.")
-        try:
-            channels = self.repository.get_all()
-            return [ChannelDtoMapper.to_youtube_response_dto(s) for s in channels]
-        except Exception as e:
-            self.logger.error("Erro ao buscar canais.", context={"error": str(e)})
-            raise
-
-    def get_saved_channels(self) -> list[SavedYouTubeChannelResponseDTO]:
-        self.logger.debug("Iniciando a busca de todos os canais salvos (youtube_channels).")
-        try:
-            if not self.yt_channel_repo:
-                raise ValueError("YouTube Channel Repository não configurado.")
-            saved_channels = self.yt_channel_repo.get_all()
-            return [ChannelDtoMapper.to_saved_youtube_channel_response_dto(s) for s in saved_channels]
-        except Exception as e:
-            self.logger.error("Erro ao buscar canais salvos.", context={"error": str(e)})
-            raise
 
     def toggle_channel_status(self, channel_id: int) -> YouTubeChannelResponseDTO:
         self.logger.debug(f"Alternando status do canal {channel_id}.")

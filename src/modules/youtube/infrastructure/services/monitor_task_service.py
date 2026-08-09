@@ -2,7 +2,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from src.core.logger.interfaces import ILogger
-from src.modules.youtube.domain.interfaces.youtube_content_repository import IYoutubeContentRepository
+from src.modules.youtube.domain.interfaces.youtube_content_service import IYoutubeContentService
 from src.modules.youtube.domain.interfaces.monitor_service import IMonitorTaskService
 from src.modules.youtube.domain.interfaces.youtube_monitored_channel_repository import IYouTubeMonitoredChannelRepository
 from src.modules.youtube.domain.interfaces.scraper import IYouTubeScraper
@@ -18,12 +18,12 @@ class MonitorTaskService(IMonitorTaskService):
             self,
             youtube_scraper: IYouTubeScraper,
             youtube_monitored_channel_repository: IYouTubeMonitoredChannelRepository,
-            youtube_content_repository: IYoutubeContentRepository,
+            youtube_content_service: IYoutubeContentService,
             logger: ILogger,
     ):
         self.youtube_scraper = youtube_scraper
         self.youtube_monitored_channel_repository = youtube_monitored_channel_repository
-        self.youtube_content_repository = youtube_content_repository
+        self.youtube_content_service = youtube_content_service
         self.logger = logger
         # Only YouTube is supported now, so we always use the youtube scraper
         self.scraper_func = self.youtube_scraper.extract_channel_videos
@@ -43,20 +43,16 @@ class MonitorTaskService(IMonitorTaskService):
 
         new_count = 0
         for item in items:
-            exists = self.youtube_content_repository.exists_by_external_id(item.id)
+            exists = self.youtube_content_service.exists_by_external_id(item.id)
             if exists:
                 continue
 
-            new_item = YoutubeContentEntity(
+            self.youtube_content_service.add_new_content(
                 external_id=item.id,
                 title=item.title or "Untitled",
                 url=item.url,
-                origin=channel.name,
-                step=ContentStep.STARTED,
+                origin=channel.name
             )
-            created_item = self.youtube_content_repository.create(new_item)
-            created_item.step = ContentStep.PENDING_METADATA_EXTRACTION
-            self.youtube_content_repository.update(created_item)
             new_count += 1
 
         # Update last_checked_at
@@ -92,4 +88,3 @@ class MonitorTaskService(IMonitorTaskService):
         except Exception as e:
             self.logger.error(f"Unexpected error in daily routine: {e}", context={"error": str(e)})
             return 0
-

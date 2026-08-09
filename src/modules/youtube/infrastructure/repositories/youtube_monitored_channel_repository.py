@@ -1,11 +1,15 @@
 from typing import Optional
 
-from src.core.logger.interfaces import ILogger
-from src.modules.youtube.domain.interfaces.youtube_monitored_channel_repository import IYouTubeMonitoredChannelRepository
-from src.modules.youtube.domain.entities.channel_entity import ChannelEntity
 from src.core.database.connector import ConnectorPostgres
+from src.core.logger.interfaces import ILogger
+from src.modules.youtube.domain.entities.channel_entity import ChannelEntity
+from src.modules.youtube.domain.interfaces.youtube_monitored_channel_repository import (
+    IYouTubeMonitoredChannelRepository,
+)
 from src.modules.youtube.infrastructure.repositories.mappers.channel_mapper import ChannelMapper
-from src.modules.youtube.infrastructure.repositories.models.youtube_monitored_channel_model import YouTubeMonitoredChannelModel
+from src.modules.youtube.infrastructure.repositories.models.youtube_monitored_channel_model import (
+    YouTubeMonitoredChannelModel,
+)
 
 
 class YouTubeMonitoredChannelRepository(IYouTubeMonitoredChannelRepository):

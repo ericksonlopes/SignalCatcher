@@ -35,3 +35,7 @@ class IYoutubeContentRepository(Protocol):
     def reset_stuck_steps(self, stuck_step: 'ContentStep', pending_step: 'ContentStep') -> int:
         """Resets contents stuck in a processing step back to a pending step, returning how many were updated."""
         ...
+
+    def get_tracking_by_external_id(self, external_id: str) -> list:
+        """Returns the tracking history of a specific content."""
+        ...
