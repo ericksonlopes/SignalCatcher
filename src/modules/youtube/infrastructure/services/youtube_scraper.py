@@ -1,0 +1,309 @@
+import time
+from typing import Iterable, Any
+
+from yt_dlp import YoutubeDL
+
+from src.core.logger.interfaces import ILogger
+from src.modules.youtube.domain.interfaces.scraper import IYouTubeScraper
+from src.modules.youtube.domain.entities.youtube_video_dto import YouTubeVideoDTO
+
+
+class YouTubeScraperService(IYouTubeScraper):
+    def __init__(self, logger: ILogger):
+        self.logger = logger
+
+    @staticmethod
+    def _get_common_ydl_opts() -> dict:
+        opts: dict = {
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': 'in_playlist',
+            'ignoreerrors': True,
+            'source_address': '0.0.0.0',
+            # Network Resilience
+            "nocheckcertificate": True,
+            "geo_bypass": True,
+            "socket_timeout": 30,
+            # Mimic a modern browser to avoid blocks
+            "http_headers": {
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/123.0.0.0 Safari/537.36"
+                ),
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.5",
+                "Referer": "https://www.google.com/",
+            },
+            # Internal yt-dlp retries
+            "retries": 10,
+            "fragment_retries": 10,
+            # Use multiple clients to avoid "Sign in to confirm you're not a bot"
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["mediaconnect", "android", "web", "mweb"],
+                    "player_skip": ["webpage", "configs"],
+                }
+            },
+        }
+
+        # Check if cookies.txt exists in the project root to bypass YouTube bot protection
+        import os
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        cookies_path = os.path.join(project_root, "cookies.txt")
+        if os.path.exists(cookies_path):
+            opts['cookiefile'] = cookies_path
+
+        return opts
+
+    @staticmethod
+    def _parse_channel_entries(entries: Iterable[Any], default_channel: str = "") -> list[YouTubeVideoDTO]:
+        videos = []
+        for entry in entries:
+            if not entry:
+                continue
+
+            video_id = entry.get('id')
+            if not video_id:
+                continue
+
+            videos.append(
+                YouTubeVideoDTO(
+                    id=video_id,
+                    title=entry.get('title'),
+                    url=entry.get('url') or f"https://www.youtube.com/watch?v={video_id}",
+                    channel=entry.get('channel') or entry.get('uploader') or default_channel
+                )
+            )
+        return videos
+
+    def _run_with_retry(self, func, retries=3, delay=2):
+        for attempt in range(retries):
+            try:
+                return func()
+            except Exception as e:
+                if attempt == retries - 1:
+                    raise
+                self.logger.warning(f"Attempt {attempt + 1} failed: {e}. Retrying in {delay} seconds...",
+                                    context={"attempt": attempt + 1, "error": str(e)})
+                time.sleep(delay)
+        return None
+
+    def extract_channel_videos(self, channel_url: str) -> list[YouTubeVideoDTO]:
+        """Extracts all videos from a YouTube channel with metadata.
+
+        Returns a list of YouTubeVideoDTO objects.
+        Uses extract_flat to avoid downloading any video content.
+        """
+        self.logger.debug(f"Starting channel video extraction for {channel_url}", context={"channel_url": channel_url})
+
+        # Normalize: ensure URL ends with /videos for complete listing
+        normalized_url = channel_url.rstrip("/")
+        if not normalized_url.endswith("/videos"):
+            normalized_url = f"{normalized_url}/videos"
+
+        def _extract():
+            ydl_opts = self._get_common_ydl_opts()
+            ydl_opts.update({"extract_flat": "in_playlist", "ignore_unavailable": True})
+
+            with YoutubeDL(ydl_opts) as ydl:
+                channel_info = ydl.extract_info(normalized_url, download=False)
+                if not channel_info or "entries" not in channel_info:
+                    extracted_channel_name = channel_info.get("channel", "") if channel_info else ""
+                    return [], extracted_channel_name
+
+                extracted_channel_name = channel_info.get("channel") or channel_info.get("uploader") or ""
+                extracted_videos = self._parse_channel_entries(channel_info["entries"], default_channel=extracted_channel_name)
+                return extracted_videos, extracted_channel_name
+
+        try:
+            videos, channel_name = self._run_with_retry(_extract)
+
+            self.logger.debug(
+                f"Channel videos extracted successfully. "
+                f"Channel: {channel_name} | Count: {len(videos)}",
+                context={"channel_name": channel_name, "video_count": len(videos)}
+            )
+            return videos
+        except Exception as e:
+            self.logger.error(f"Channel extraction failed for {channel_url}",
+                              context={"channel_url": channel_url, "error": str(e)})
+            raise
+
+    def extract_channel_info(self, channel_url: str) -> dict:
+        """Extracts metadata from a YouTube channel."""
+        self.logger.debug(
+            f"Starting channel info extraction for {channel_url}",
+            context={"channel_url": channel_url},
+        )
+
+        def _extract():
+            ydl_opts = self._get_common_ydl_opts()
+            # Use extract_flat to fetch channel metadata quickly
+            ydl_opts.update({"extract_flat": True, "ignoreerrors": False})
+
+            with YoutubeDL(ydl_opts) as ydl:
+                info_dict = ydl.extract_info(channel_url, download=False)
+                if not info_dict:
+                    raise Exception("Failed to extract channel information.")
+
+                thumbnails = info_dict.get("thumbnails", [])
+                avatar_url = (
+                    thumbnails[-1]["url"]
+                    if thumbnails and "url" in thumbnails[-1]
+                    else None
+                )
+
+                uploader_id = info_dict.get("uploader_id") or info_dict.get("id")
+                if uploader_id and uploader_id.startswith("@"):
+                    uploader_id = uploader_id[1:]
+
+                return {
+                    "id": uploader_id,
+                    "title": info_dict.get("title") or info_dict.get("channel"),
+                    "description": info_dict.get("description"),
+                    "url": channel_url,
+                    "channel_url": info_dict.get("channel_url"),
+                    "avatar_url": avatar_url,
+                    "thumbnails": thumbnails,
+                }
+
+        try:
+            return self._run_with_retry(_extract)
+        except Exception as e:
+            self.logger.error(
+                f"Channel info extraction failed for {channel_url}",
+                context={"channel_url": channel_url, "error": str(e)},
+            )
+            raise
+
+    def extract_video_info(self, video_url: str) -> YouTubeVideoDTO:
+        """Extracts metadata from a single YouTube video.
+
+        Returns a YouTubeVideoDTO containing video metadata.
+        Uses YouTube oEmbed API to avoid bot blocks and extract_flat issues.
+        """
+        self.logger.debug(f"Starting video extraction for {video_url}", context={"video_url": video_url})
+
+        def _extract():
+            import requests
+            import re
+
+            oembed_url = f"https://www.youtube.com/oembed?url={video_url}&format=json"
+            response = requests.get(oembed_url, timeout=10)
+
+            if response.status_code != 200:
+                raise Exception(f"Failed to extract video information via oEmbed (Status: {response.status_code}).")
+
+            data = response.json()
+
+            # Extract 11-character video ID from URL
+            match = re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11})", video_url)
+            video_id = match.group(1) if match else "unknown_id"
+
+            return YouTubeVideoDTO(
+                id=video_id,
+                title=data.get("title"),
+                channel=data.get("author_name") or "YouTube",
+                url=video_url,
+            )
+
+        try:
+            return self._run_with_retry(_extract)
+        except Exception as e:
+            self.logger.error(f"Video extraction failed for {video_url}",
+                              context={"video_url": video_url, "error": str(e)})
+            raise
+
+    def extract_metadata(self, video_url: str) -> dict:
+        """Extracts detailed metadata from a single YouTube video.
+
+        Returns a dict containing detailed metadata.
+        Uses yt-dlp to extract full video information without downloading.
+        """
+        self.logger.debug(
+            f"Starting metadata extraction for {video_url}",
+            context={"video_url": video_url},
+        )
+
+        def _extract():
+            ydl_opts = self._get_common_ydl_opts()
+            # For metadata extraction, we don't want extract_flat, we want full info
+            # We set ignoreerrors to False so yt-dlp raises the actual bot block error
+            ydl_opts.update({"extract_flat": False, "skip_download": True, "ignoreerrors": False})
+
+            with YoutubeDL(ydl_opts) as ydl:
+                info_dict = ydl.extract_info(video_url, download=False)
+                if not info_dict:
+                    raise Exception("Failed to extract video information.")
+
+                return info_dict
+
+        try:
+            return self._run_with_retry(_extract)
+        except Exception as e:
+            self.logger.error(
+                f"Metadata extraction failed for {video_url}",
+                context={"video_url": video_url, "error": str(e)},
+            )
+            raise
+
+    def extract_playlist_videos(self, playlist_url: str) -> tuple[list[YouTubeVideoDTO], str]:
+        """Extracts all videos from a YouTube playlist.
+
+        Returns a tuple of (list of YouTubeVideoDTO objects, playlist title).
+        Uses extract_flat to avoid downloading any video content.
+        """
+        self.logger.debug(f"Starting playlist video extraction for {playlist_url}", context={"playlist_url": playlist_url})
+
+        def _extract():
+            ydl_opts = self._get_common_ydl_opts()
+            ydl_opts.update({"extract_flat": "in_playlist", "ignore_unavailable": True})
+
+            with YoutubeDL(ydl_opts) as ydl:
+                playlist_info = ydl.extract_info(playlist_url, download=False)
+                if not playlist_info or "entries" not in playlist_info:
+                    return [], ""
+
+                playlist_title = playlist_info.get("title") or "Unknown Playlist"
+                playlist_channel = playlist_info.get("channel") or playlist_info.get("uploader") or ""
+                return self._parse_channel_entries(playlist_info["entries"], default_channel=playlist_channel), playlist_title
+
+        try:
+            videos, playlist_title = self._run_with_retry(_extract)
+
+            self.logger.debug(
+                f"Playlist videos extracted successfully. "
+                f"Count: {len(videos)} | Title: {playlist_title}",
+                context={"playlist_url": playlist_url, "video_count": len(videos)}
+            )
+            return videos, playlist_title
+        except Exception as e:
+            self.logger.error(f"Playlist extraction failed for {playlist_url}",
+                              context={"playlist_url": playlist_url, "error": str(e)})
+            raise
+
+    def download_video(self, url: str, content_id: str, origin: str, output_path: str):
+        import re
+        import os
+        self.logger.debug(f"Starting download for {url} to {output_path}")
+        
+        parts = [re.sub(r'[\\*?:"<>|]', "_", p) for p in origin.split('/')]
+        final_output_path = os.path.join(output_path, *parts)
+        os.makedirs(final_output_path, exist_ok=True)
+        
+        ydl_opts = self._get_common_ydl_opts()
+        # Override specific opts for downloading
+        ydl_opts.update({
+            'outtmpl': f'{final_output_path}/{content_id}_%(title)s.%(ext)s',
+            'format': 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best[ext=mp4]/best',
+            'ffmpeg_location': r'C:\Users\ofcer\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.1.2-full_build\bin',
+            'extract_flat': False,
+            'skip_download': False,
+            'ignoreerrors': False,
+            'js_runtimes': {'node': {}},
+            'remote_components': ['ejs:github']
+        })
+        
+        with YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])

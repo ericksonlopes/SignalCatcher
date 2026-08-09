@@ -5,9 +5,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware import Middleware
 
-from src.infrastructure.loggers.logger import logger
-from src.infrastructure.repositories.connector import Base, engine
-from src.presentation.schedules.scheduler_manager import start_scheduler
+from src.core.database.connector import Base, engine
+from src.core.logger.logger import logger
+from src.modules.youtube.presentation.schedules.scheduler_manager import start_scheduler
 
 # Intercept default python logging to our custom logger
 logging.basicConfig(handlers=[logger.get_intercept_handler()], level=logging.INFO, force=True)
@@ -49,10 +49,16 @@ app = FastAPI(
 )
 
 # Register routes
-from src.presentation.api.routes.youtube import channel_route as youtube_channel_routes
-from src.presentation.api.routes.youtube import video_route as youtube_content_routes
-from src.presentation.api.routes.youtube import playlist_route as youtube_playlist_routes
-from src.presentation.api.routes import scheduler_routes
+from src.modules.youtube.presentation.api.routes import (
+    channel_route as youtube_channel_routes,
+)
+from src.modules.youtube.presentation.api.routes import (
+    video_route as youtube_content_routes,
+)
+from src.modules.youtube.presentation.api.routes import (
+    playlist_route as youtube_playlist_routes,
+)
+from src.modules.youtube.presentation.schedules import scheduler_routes
 
 YOUTUBE_API_PREFIX = "/api/youtube"
 
