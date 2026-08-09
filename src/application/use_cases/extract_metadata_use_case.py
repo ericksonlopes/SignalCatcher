@@ -81,8 +81,19 @@ class ExtractMetadataUseCase:
             self.logger.error(f"Error extracting metadata for {content.title}: {error_msg}")
             
             content.error_info = error_msg
-            if "this video has been removed" in error_msg.lower():
+            error_msg_lower = error_msg.lower()
+            if "this video has been removed" in error_msg_lower:
                 content.step = ContentStep.VIDEO_REMOVED
+            elif "members-only content like this video" in error_msg_lower or "members on level" in error_msg_lower:
+                content.step = ContentStep.MEMBERS_ONLY
+            elif "sign in to confirm your age" in error_msg_lower:
+                content.step = ContentStep.AGE_RESTRICTED
+            elif "private video" in error_msg_lower and "sign in if you've been granted access" in error_msg_lower:
+                content.step = ContentStep.PRIVATE_VIDEO
+            elif "removed following a copyright" in error_msg_lower:
+                content.step = ContentStep.COPYRIGHT_REMOVED
+            elif "account associated with this video has been terminated" in error_msg_lower:
+                content.step = ContentStep.ACCOUNT_TERMINATED
             else:
                 content.step = ContentStep.ERROR
                 
