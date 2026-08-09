@@ -154,8 +154,12 @@ class YouTubeScraperService(IYouTubeScraper):
                     else None
                 )
 
+                uploader_id = info_dict.get("uploader_id") or info_dict.get("id")
+                if uploader_id and uploader_id.startswith("@"):
+                    uploader_id = uploader_id[1:]
+
                 return {
-                    "id": info_dict.get("id"),
+                    "id": uploader_id,
                     "title": info_dict.get("title") or info_dict.get("channel"),
                     "description": info_dict.get("description"),
                     "url": channel_url,

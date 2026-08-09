@@ -1,5 +1,6 @@
 from src.application.dtos.channel_create_dto import ChannelCreateDTO
 from src.application.dtos.youtube_channel_response_dto import YouTubeChannelResponseDTO
+from src.application.dtos.saved_youtube_channel_response_dto import SavedYouTubeChannelResponseDTO
 from src.application.mappers.channel_dto_mapper import ChannelDtoMapper
 from src.domain.interfaces.channel_service import IChannelService
 from src.domain.interfaces.logger import ILogger
@@ -30,6 +31,8 @@ class ChannelsUseCase:
             try:
                 channel_info = self.scraper.extract_channel_info(data.url)
                 self.yt_channel_repo.upsert_channel(channel_info)
+
+                data.external_id = channel_info.get("id")
 
                 # Auto-fill name if not provided
                 if not data.name and channel_info.get("title"):
@@ -62,6 +65,17 @@ class ChannelsUseCase:
             return [ChannelDtoMapper.to_youtube_response_dto(s) for s in channels]
         except Exception as e:
             self.logger.error("Erro ao buscar canais.", context={"error": str(e)})
+            raise
+
+    def get_saved_channels(self) -> list[SavedYouTubeChannelResponseDTO]:
+        self.logger.debug("Iniciando a busca de todos os canais salvos (youtube_channels).")
+        try:
+            if not self.yt_channel_repo:
+                raise ValueError("YouTube Channel Repository não configurado.")
+            saved_channels = self.yt_channel_repo.get_all()
+            return [ChannelDtoMapper.to_saved_youtube_channel_response_dto(s) for s in saved_channels]
+        except Exception as e:
+            self.logger.error("Erro ao buscar canais salvos.", context={"error": str(e)})
             raise
 
     def toggle_channel_status(self, channel_id: int) -> YouTubeChannelResponseDTO:

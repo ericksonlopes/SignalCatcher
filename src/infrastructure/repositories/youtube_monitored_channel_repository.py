@@ -15,7 +15,8 @@ class YouTubeMonitoredChannelRepository(IYouTubeMonitoredChannelRepository):
     def get_by_url(self, url: str) -> Optional[ChannelEntity]:
         try:
             with ConnectorPostgres() as session:
-                channel = session.query(YouTubeMonitoredChannelModel).filter_by(url=url).first()
+                from sqlalchemy.orm import joinedload
+                channel = session.query(YouTubeMonitoredChannelModel).options(joinedload(YouTubeMonitoredChannelModel.channel_info)).filter_by(url=url).first()
                 if channel:
                     return ChannelMapper.to_domain(channel)
                 return None
@@ -26,7 +27,8 @@ class YouTubeMonitoredChannelRepository(IYouTubeMonitoredChannelRepository):
     def get_by_id(self, channel_id: int) -> Optional[ChannelEntity]:
         try:
             with ConnectorPostgres() as session:
-                channel = session.query(YouTubeMonitoredChannelModel).filter_by(id=channel_id).first()
+                from sqlalchemy.orm import joinedload
+                channel = session.query(YouTubeMonitoredChannelModel).options(joinedload(YouTubeMonitoredChannelModel.channel_info)).filter_by(id=channel_id).first()
                 if channel:
                     return ChannelMapper.to_domain(channel)
                 return None
@@ -50,7 +52,8 @@ class YouTubeMonitoredChannelRepository(IYouTubeMonitoredChannelRepository):
     def get_all_active(self) -> list[ChannelEntity]:
         try:
             with ConnectorPostgres() as session:
-                channels = session.query(YouTubeMonitoredChannelModel).filter_by(active=True).all()
+                from sqlalchemy.orm import joinedload
+                channels = session.query(YouTubeMonitoredChannelModel).options(joinedload(YouTubeMonitoredChannelModel.channel_info)).filter_by(active=True).all()
                 return [ChannelMapper.to_domain(c) for c in channels]
         except Exception as e:
             self.logger.error(f"Error getting all active channels: {e}", context={"error": str(e)})
@@ -59,7 +62,8 @@ class YouTubeMonitoredChannelRepository(IYouTubeMonitoredChannelRepository):
     def get_all(self) -> list[ChannelEntity]:
         try:
             with ConnectorPostgres() as session:
-                channels = session.query(YouTubeMonitoredChannelModel).all()
+                from sqlalchemy.orm import joinedload
+                channels = session.query(YouTubeMonitoredChannelModel).options(joinedload(YouTubeMonitoredChannelModel.channel_info)).all()
                 return [ChannelMapper.to_domain(c) for c in channels]
         except Exception as e:
             self.logger.error(f"Error getting all channels: {e}", context={"error": str(e)})

@@ -11,7 +11,7 @@ from src.presentation.api.dependencies import get_channels_use_case
 router = APIRouter()
 
 
-@router.post("/channels", response_model=YouTubeChannelResponseDTO, status_code=status.HTTP_201_CREATED, responses={status.HTTP_400_BAD_REQUEST: {"description": "Bad Request"}})
+@router.post("/monitored_channels", response_model=YouTubeChannelResponseDTO, status_code=status.HTTP_201_CREATED, responses={status.HTTP_400_BAD_REQUEST: {"description": "Bad Request"}})
 def create_youtube_channel(channel_data: YouTubeChannelCreateDTO,
                           use_case: Annotated[ChannelsUseCase, Depends(get_channels_use_case)]):
     """
@@ -26,7 +26,7 @@ def create_youtube_channel(channel_data: YouTubeChannelCreateDTO,
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
-@router.get("/channels", response_model=list[YouTubeChannelResponseDTO])
+@router.get("/monitored_channels", response_model=list[YouTubeChannelResponseDTO])
 def get_channels(
     use_case: Annotated[ChannelsUseCase, Depends(get_channels_use_case)]
 ):
@@ -38,7 +38,21 @@ def get_channels(
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
-@router.patch("/channels/{channel_id}/status", response_model=YouTubeChannelResponseDTO)
+from src.application.dtos.saved_youtube_channel_response_dto import SavedYouTubeChannelResponseDTO
+
+@router.get("/channels", response_model=list[SavedYouTubeChannelResponseDTO])
+def get_saved_channels(
+    use_case: Annotated[ChannelsUseCase, Depends(get_channels_use_case)]
+):
+    """
+    Returns a list of all saved youtube channels.
+    """
+    try:
+        return use_case.get_saved_channels()
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@router.patch("/monitored_channels/{channel_id}/status", response_model=YouTubeChannelResponseDTO)
 def toggle_channel_status(
     channel_id: int,
     use_case: Annotated[ChannelsUseCase, Depends(get_channels_use_case)]

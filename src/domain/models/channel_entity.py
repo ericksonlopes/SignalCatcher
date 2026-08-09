@@ -5,7 +5,8 @@ from pydantic import BaseModel
 
 class ChannelEntity(BaseModel):
     id: Optional[int] = None
-    name: str
+    external_id: str
+    name: Optional[str] = None
     url: str
     active: bool = True
     created_at: Optional[datetime] = None
