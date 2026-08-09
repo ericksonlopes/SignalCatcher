@@ -179,13 +179,14 @@ def get_youtube_contents(
     ],
     page: int = Query(1, ge=1, description="Page number"),
     limit: int = Query(20, ge=1, le=100, description="Items per page"),
-    step: str | None = Query(None, description="Filter by step status")
+    step: str | None = Query(None, description="Filter by step status"),
+    search: str | None = Query(None, description="Search by title")
 ):
     """
     Returns a paginated list of YouTube contents.
     """
     try:
-        items, total = repo.get_paginated(page=page, limit=limit, step=step)
+        items, total = repo.get_paginated(page=page, limit=limit, step=step, search=search)
         
         # Mapping to Video Card Response
         mapped_items = [
