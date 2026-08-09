@@ -1,5 +1,6 @@
 from src.application.use_cases.extract_metadata_use_case import ExtractMetadataUseCase
 from src.infrastructure.loggers.logger import logger
+from src.infrastructure.repositories.youtube_channel_repository import YouTubeChannelRepository
 from src.infrastructure.repositories.youtube_content_repository import (
     YoutubeContentRepository,
 )
@@ -12,8 +13,9 @@ def extract_metadata_job():
 
     repo = YoutubeContentRepository(logger=logger)
     scraper = YouTubeScraperService(logger=logger)
+    channel_repo = YouTubeChannelRepository(logger=logger)
     use_case = ExtractMetadataUseCase(
-        youtube_content_repository=repo, youtube_scraper=scraper, logger=logger
+        youtube_content_repository=repo, youtube_scraper=scraper, youtube_channel_repository=channel_repo, logger=logger
     )
 
     try:

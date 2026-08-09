@@ -95,6 +95,9 @@ def reprocess_single_video_job(external_id: str):
         try:
             # We don't know where it failed, but since it's a full reprocess:
             # First extract metadata if missing or as a fresh start
+            content.step = ContentStep.EXTRACTING_METADATA
+            session.commit()
+            
             logging.info(f"Reprocessing {content.title}: Extracting metadata...")
             info_dict = scraper.extract_metadata(video_url=content.url)
             
@@ -119,6 +122,9 @@ def reprocess_single_video_job(external_id: str):
             session.commit()
             
             # Now download
+            content.step = ContentStep.DOWNLOADING
+            session.commit()
+            
             logging.info(f"Reprocessing {content.title}: Downloading...")
             scraper.download_video(url=content.url, content_id=content.external_id, origin=content.origin,
                                    output_path=output_path)

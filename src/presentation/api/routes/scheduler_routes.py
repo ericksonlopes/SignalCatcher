@@ -18,6 +18,26 @@ def execute_extract_metadata(background_tasks: BackgroundTasks):
     logger.info("⚡ Background task for extract_metadata_job triggered via API.")
     return {"message": "extract_metadata_job execution started in the background."}
 
+@router.post("/jobs/download-videos/execute", status_code=status.HTTP_202_ACCEPTED)
+def execute_download_videos(background_tasks: BackgroundTasks):
+    """
+    Executes the download_videos_job directly in the background.
+    """
+    from src.presentation.schedules.jobs.youtube_download_job import download_videos_job
+    background_tasks.add_task(download_videos_job)
+    logger.info("⚡ Background task for download_videos_job triggered via API.")
+    return {"message": "download_videos_job execution started in the background."}
+
+@router.post("/jobs/process-errors/execute", status_code=status.HTTP_202_ACCEPTED)
+def execute_process_errors(background_tasks: BackgroundTasks):
+    """
+    Executes the process_errors_job directly in the background.
+    """
+    from src.presentation.schedules.jobs.youtube_process_errors_job import process_errors_job
+    background_tasks.add_task(process_errors_job)
+    logger.info("⚡ Background task for process_errors_job triggered via API.")
+    return {"message": "process_errors_job execution started in the background."}
+
 
 @router.post("/jobs/daily-youtube-capture/execute", status_code=status.HTTP_202_ACCEPTED)
 def execute_daily_youtube_capture(background_tasks: BackgroundTasks):
