@@ -92,6 +92,51 @@ def retry_single_content(external_id: str,
         logger.error(f"Failed to retry single content {external_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.delete("/content/{external_id}", responses={404: {"description": "Content not found"}})
+def delete_single_content(external_id: str,
+                         repo: Annotated[
+                             YoutubeContentRepository,
+                             Depends(lambda: YoutubeContentRepository(logger=logger)),
+                         ]):
+    """
+    Sets a video step to DELETED and removes its physical file from the SSD.
+    """
+    from src.domain.models.enums.content_step import ContentStep
+    import glob
+    import os
+    import re
+    try:
+        content = repo.get_by_external_id(external_id)
+        if not content:
+            raise HTTPException(status_code=404, detail="Content not found")
+        
+        # Set to DELETED status
+        content.step = ContentStep.DELETED
+        repo.update(content)
+        
+        # Remove file from SSD
+        output_path = settings.DOWNLOAD_YOUTUBE_PATH
+        if output_path and content.origin:
+            parts = [re.sub(r'[\\*?:"<>|]', "_", p) for p in content.origin.split('/')]
+            final_output_path = os.path.join(output_path, *parts)
+            pattern = os.path.join(final_output_path, f"{content.external_id}_*.*")
+            for file_path in glob.glob(pattern):
+                try:
+                    os.remove(file_path)
+                    logger.info(f"Deleted file: {file_path}")
+                except Exception as e:
+                    logger.error(f"Failed to delete file {file_path}: {e}")
+        
+        return {
+            "message": f"Content {external_id} deleted successfully",
+            "step": ContentStep.DELETED.name
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete single content {external_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/content", responses={400: {"description": "Bad Request"}})
 def add_youtube_content_from_link(request: YouTubeVideoAddRequest,
                                   background_tasks: BackgroundTasks,
