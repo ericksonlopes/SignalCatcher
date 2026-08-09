@@ -102,6 +102,7 @@ class YoutubeContentRepository(IYoutubeContentRepository):
                 model.duration = youtube_content_entity.duration
                 model.categories = youtube_content_entity.categories
                 model.tags = youtube_content_entity.tags
+                model.origin = youtube_content_entity.origin
                 model.error_info = getattr(youtube_content_entity, 'error_info', None) # if entity has it
                 model.published_at = getattr(youtube_content_entity, 'published_at', None)
 

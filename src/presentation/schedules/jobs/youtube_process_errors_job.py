@@ -118,6 +118,11 @@ def reprocess_single_video_job(external_id: str):
                 if pub_date_str and len(pub_date_str) == 8:
                     from datetime import datetime
                     content.published_at = datetime.strptime(pub_date_str, '%Y%m%d')
+                
+                uploader_id = info_dict.get('uploader_id')
+                if uploader_id:
+                    content.origin = uploader_id.lstrip('@')
+            
             
             session.commit()
             
