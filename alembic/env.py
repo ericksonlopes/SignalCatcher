@@ -9,11 +9,10 @@ from alembic.autogenerate import rewriter
 from alembic.operations import ops
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
-from src.infrastructure.repositories.connector import Base
+from src.core.database.connector import Base
+from src.core.config.settings import settings
 
-from src.config.settings import settings
-
-_package_name = "src.infrastructure.repositories.models"
+_package_name = "src.modules.youtube.infrastructure.repositories.models"
 try:
     importlib.import_module(_package_name)
 except ModuleNotFoundError:
