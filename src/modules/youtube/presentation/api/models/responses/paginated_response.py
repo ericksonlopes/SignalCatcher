@@ -9,3 +9,5 @@ class PaginatedResponse(BaseModel, Generic[T]):
     page: int
     limit: int
     total_pages: int
+    status_counts: dict[str, int] | None = None
+    total_status_count: int | None = None

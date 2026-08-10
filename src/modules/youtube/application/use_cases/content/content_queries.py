@@ -1,4 +1,4 @@
-from src.modules.youtube.domain.interfaces.youtube_content_service import IYoutubeContentService
+from src.modules.youtube.domain.interfaces.services.youtube_content_service import IYoutubeContentService
 
 class ContentQueries:
     def __init__(self, service: IYoutubeContentService):

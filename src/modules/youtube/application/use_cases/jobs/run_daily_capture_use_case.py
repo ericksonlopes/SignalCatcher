@@ -1,4 +1,4 @@
-from src.modules.youtube.domain.interfaces.monitor_service import IMonitorTaskService
+from src.modules.youtube.domain.interfaces.services.monitor_service import IMonitorTaskService
 
 
 class RunDailyCaptureUseCase:

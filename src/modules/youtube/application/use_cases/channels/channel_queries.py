@@ -2,8 +2,8 @@ from src.core.logger.interfaces import ILogger
 from src.modules.youtube.application.dtos.saved_youtube_channel_response_dto import SavedYouTubeChannelResponseDTO
 from src.modules.youtube.application.dtos.youtube_channel_response_dto import YouTubeChannelResponseDTO
 from src.modules.youtube.application.mappers.channel_dto_mapper import ChannelDtoMapper
-from src.modules.youtube.domain.interfaces.youtube_channel_repository import IYouTubeChannelRepository
-from src.modules.youtube.domain.interfaces.youtube_monitored_channel_repository import IYouTubeMonitoredChannelRepository
+from src.modules.youtube.domain.interfaces.repositories.youtube_channel_repository import IYouTubeChannelRepository
+from src.modules.youtube.domain.interfaces.repositories.youtube_monitored_channel_repository import IYouTubeMonitoredChannelRepository
 
 class ChannelQueries:
     def __init__(

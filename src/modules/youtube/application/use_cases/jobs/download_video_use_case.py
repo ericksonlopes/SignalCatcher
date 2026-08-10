@@ -1,8 +1,8 @@
 from src.core.logger.interfaces import ILogger
 from src.modules.youtube.domain.enums.content_step import ContentStep
 from src.modules.youtube.domain.error_classifier import classify_youtube_error, is_bot_block
-from src.modules.youtube.domain.interfaces.scraper import IYouTubeScraper
-from src.modules.youtube.domain.interfaces.youtube_content_service import IYoutubeContentService
+from src.modules.youtube.domain.interfaces.services.scraper import IYouTubeScraper
+from src.modules.youtube.domain.interfaces.services.youtube_content_service import IYoutubeContentService
 
 
 class DownloadVideoUseCase:

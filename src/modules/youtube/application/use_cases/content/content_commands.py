@@ -5,7 +5,7 @@ from typing import Optional
 
 from src.core.logger.interfaces import ILogger
 from src.modules.youtube.domain.enums.content_step import ContentStep
-from src.modules.youtube.domain.interfaces.youtube_content_service import IYoutubeContentService
+from src.modules.youtube.domain.interfaces.services.youtube_content_service import IYoutubeContentService
 
 class ContentCommands:
     def __init__(self, service: IYoutubeContentService, output_path: Optional[str] = None, logger: Optional[ILogger] = None):

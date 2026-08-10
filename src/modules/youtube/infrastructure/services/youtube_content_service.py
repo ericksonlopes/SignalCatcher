@@ -2,8 +2,8 @@ from typing import Any
 from src.core.logger.interfaces import ILogger
 from src.modules.youtube.domain.entities.youtube_content_entity import YoutubeContentEntity
 from src.modules.youtube.domain.enums.content_step import ContentStep
-from src.modules.youtube.domain.interfaces.youtube_content_repository import IYoutubeContentRepository
-from src.modules.youtube.domain.interfaces.youtube_content_service import IYoutubeContentService
+from src.modules.youtube.domain.interfaces.repositories.youtube_content_repository import IYoutubeContentRepository
+from src.modules.youtube.domain.interfaces.services.youtube_content_service import IYoutubeContentService
 
 
 class YoutubeContentService(IYoutubeContentService):

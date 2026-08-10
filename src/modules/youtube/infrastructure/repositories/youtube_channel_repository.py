@@ -1,6 +1,6 @@
 from src.core.database.connector import ConnectorPostgres
 from src.core.logger.interfaces import ILogger
-from src.modules.youtube.domain.interfaces.youtube_channel_repository import (
+from src.modules.youtube.domain.interfaces.repositories.youtube_channel_repository import (
     IYouTubeChannelRepository,
 )
 from src.modules.youtube.infrastructure.repositories.models.youtube_channel_model import (

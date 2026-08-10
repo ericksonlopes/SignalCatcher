@@ -1,7 +1,7 @@
 from sqlalchemy import func
 
 from src.core.logger.interfaces import ILogger
-from src.modules.youtube.domain.interfaces.youtube_content_repository import IYoutubeContentRepository
+from src.modules.youtube.domain.interfaces.repositories.youtube_content_repository import IYoutubeContentRepository
 from src.modules.youtube.domain.entities.youtube_content_entity import YoutubeContentEntity
 from src.core.database.connector import ConnectorPostgres
 from src.modules.youtube.infrastructure.repositories.mappers.youtube_content_mapper import YoutubeContentMapper

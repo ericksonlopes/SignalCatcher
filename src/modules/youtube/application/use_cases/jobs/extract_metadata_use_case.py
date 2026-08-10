@@ -6,11 +6,11 @@ from src.modules.youtube.domain.error_classifier import (
     classify_youtube_error,
     is_bot_block,
 )
-from src.modules.youtube.domain.interfaces.scraper import IYouTubeScraper
-from src.modules.youtube.domain.interfaces.youtube_channel_repository import (
+from src.modules.youtube.domain.interfaces.services.scraper import IYouTubeScraper
+from src.modules.youtube.domain.interfaces.repositories.youtube_channel_repository import (
     IYouTubeChannelRepository,
 )
-from src.modules.youtube.domain.interfaces.youtube_content_service import (
+from src.modules.youtube.domain.interfaces.services.youtube_content_service import (
     IYoutubeContentService,
 )
 

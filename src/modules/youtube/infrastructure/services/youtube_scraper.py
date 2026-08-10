@@ -4,7 +4,7 @@ from typing import Iterable, Any
 from yt_dlp import YoutubeDL
 
 from src.core.logger.interfaces import ILogger
-from src.modules.youtube.domain.interfaces.scraper import IYouTubeScraper
+from src.modules.youtube.domain.interfaces.services.scraper import IYouTubeScraper
 from src.modules.youtube.domain.entities.youtube_video_dto import YouTubeVideoDTO
 
 

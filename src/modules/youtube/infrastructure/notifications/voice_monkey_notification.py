@@ -1,5 +1,5 @@
 import requests
-from src.modules.youtube.domain.interfaces.notification import INotification
+from src.modules.youtube.domain.interfaces.notifications.notification import INotification
 from src.core.logger.interfaces import ILogger
 
 class VoiceMonkeyNotification(INotification):
@@ -10,7 +10,7 @@ class VoiceMonkeyNotification(INotification):
         self.api_token = api_token
         self.monkey_id = monkey_id
         self.logger = logger
-        self.base_url = "https://api-v3.voicemonkey.io/trigger"
+        self.base_url = "https://api-v3.voicemonkey.io/announce"
 
     def send(self, message: str = None, **kwargs) -> bool:
         self.logger.debug(
@@ -32,7 +32,9 @@ class VoiceMonkeyNotification(INotification):
 
         payload = {
             "token": self.api_token,
-            "device": self.monkey_id
+            "device": self.monkey_id,
+            "voice": "Ricardo",
+            "language": "pt-BR"
         }
         if message:
             payload["text"] = message

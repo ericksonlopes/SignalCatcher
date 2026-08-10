@@ -3,7 +3,7 @@ from typing import Optional
 from src.core.database.connector import ConnectorPostgres
 from src.core.logger.interfaces import ILogger
 from src.modules.youtube.domain.entities.channel_entity import ChannelEntity
-from src.modules.youtube.domain.interfaces.youtube_monitored_channel_repository import (
+from src.modules.youtube.domain.interfaces.repositories.youtube_monitored_channel_repository import (
     IYouTubeMonitoredChannelRepository,
 )
 from src.modules.youtube.infrastructure.repositories.mappers.channel_mapper import ChannelMapper

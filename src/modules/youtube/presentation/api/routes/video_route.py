@@ -161,6 +161,9 @@ def get_youtube_contents(
         items, total = use_case.get_contents(
             page=page, limit=limit, step=step, search=search
         )
+        
+        status_counts = use_case.get_status_count()
+        total_status_count = sum(status_counts.values()) if status_counts else 0
 
         # Mapping to Video Card Response
         mapped_items = [
@@ -184,7 +187,9 @@ def get_youtube_contents(
             total=total,
             page=page,
             limit=limit,
-            total_pages=total_pages
+            total_pages=total_pages,
+            status_counts=status_counts,
+            total_status_count=total_status_count
         )
     except Exception as e:
         logger.error(f"Failed to get paginated contents: {e}")

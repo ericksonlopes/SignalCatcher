@@ -1,6 +1,6 @@
 from src.core.logger.interfaces import ILogger
-from src.modules.youtube.domain.interfaces.youtube_monitored_channel_repository import IYouTubeMonitoredChannelRepository
-from src.modules.youtube.domain.interfaces.channel_service import IChannelService
+from src.modules.youtube.domain.interfaces.repositories.youtube_monitored_channel_repository import IYouTubeMonitoredChannelRepository
+from src.modules.youtube.domain.interfaces.services.channel_service import IChannelService
 from src.modules.youtube.domain.entities.channel_entity import ChannelEntity
 
 

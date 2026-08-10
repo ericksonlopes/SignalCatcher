@@ -2,10 +2,10 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from src.core.logger.interfaces import ILogger
-from src.modules.youtube.domain.interfaces.youtube_content_service import IYoutubeContentService
-from src.modules.youtube.domain.interfaces.monitor_service import IMonitorTaskService
-from src.modules.youtube.domain.interfaces.youtube_monitored_channel_repository import IYouTubeMonitoredChannelRepository
-from src.modules.youtube.domain.interfaces.scraper import IYouTubeScraper
+from src.modules.youtube.domain.interfaces.services.youtube_content_service import IYoutubeContentService
+from src.modules.youtube.domain.interfaces.services.monitor_service import IMonitorTaskService
+from src.modules.youtube.domain.interfaces.repositories.youtube_monitored_channel_repository import IYouTubeMonitoredChannelRepository
+from src.modules.youtube.domain.interfaces.services.scraper import IYouTubeScraper
 from src.modules.youtube.domain.entities.youtube_content_entity import YoutubeContentEntity
 from src.modules.youtube.domain.enums.content_step import ContentStep
 from src.modules.youtube.domain.entities.channel_entity import ChannelEntity
