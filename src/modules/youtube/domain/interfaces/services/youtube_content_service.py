@@ -1,12 +1,17 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from src.modules.youtube.domain.entities.youtube_content_entity import YoutubeContentEntity
+from src.modules.youtube.domain.entities.youtube_content_entity import (
+    YoutubeContentEntity,
+)
 from src.modules.youtube.domain.enums.content_step import ContentStep
+
 
 class IYoutubeContentService(ABC):
     @abstractmethod
-    def add_new_content(self, external_id: str, title: str, url: str, origin: str) -> YoutubeContentEntity:
+    def add_new_content(
+        self, external_id: str, title: str, url: str, origin: str
+    ) -> YoutubeContentEntity:
         pass
 
     @abstractmethod
@@ -22,7 +27,9 @@ class IYoutubeContentService(ABC):
         pass
 
     @abstractmethod
-    def update_content_step(self, content: YoutubeContentEntity, step: ContentStep) -> YoutubeContentEntity:
+    def update_content_step(
+        self, content: YoutubeContentEntity, step: ContentStep
+    ) -> YoutubeContentEntity:
         pass
 
     @abstractmethod
@@ -34,7 +41,9 @@ class IYoutubeContentService(ABC):
         pass
 
     @abstractmethod
-    def reset_stuck_steps(self, stuck_step: ContentStep, pending_step: ContentStep) -> int:
+    def reset_stuck_steps(
+        self, stuck_step: ContentStep, pending_step: ContentStep
+    ) -> int:
         pass
 
     @abstractmethod
@@ -42,7 +51,9 @@ class IYoutubeContentService(ABC):
         pass
 
     @abstractmethod
-    def get_paginated(self, page: int, limit: int, step: str | None = None, search: str | None = None) -> tuple[list[YoutubeContentEntity], int]:
+    def get_paginated(
+        self, page: int, limit: int, step: str | None = None, search: str | None = None
+    ) -> tuple[list[YoutubeContentEntity], int]:
         pass
 
     @abstractmethod

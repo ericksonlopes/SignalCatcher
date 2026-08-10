@@ -1,5 +1,7 @@
 from src.modules.youtube.domain.entities.channel_entity import ChannelEntity
-from src.modules.youtube.infrastructure.repositories.models.youtube_monitored_channel_model import YouTubeMonitoredChannelModel
+from src.modules.youtube.infrastructure.repositories.models.youtube_monitored_channel_model import (
+    YouTubeMonitoredChannelModel,
+)
 
 
 class ChannelMapper:

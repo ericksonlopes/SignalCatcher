@@ -11,11 +11,17 @@ def classify_youtube_error(error_msg: str) -> ContentStep:
 
     if "this video has been removed" in error_lower:
         return ContentStep.VIDEO_REMOVED
-    elif "members-only content like this video" in error_lower or "members on level" in error_lower:
+    elif (
+        "members-only content like this video" in error_lower
+        or "members on level" in error_lower
+    ):
         return ContentStep.MEMBERS_ONLY
     elif "sign in to confirm your age" in error_lower:
         return ContentStep.AGE_RESTRICTED
-    elif "private video" in error_lower and "sign in if you've been granted access" in error_lower:
+    elif (
+        "private video" in error_lower
+        and "sign in if you've been granted access" in error_lower
+    ):
         return ContentStep.PRIVATE_VIDEO
     elif "removed following a copyright" in error_lower:
         return ContentStep.COPYRIGHT_REMOVED

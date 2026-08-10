@@ -1,8 +1,13 @@
 from src.core.logger.interfaces import ILogger
 from src.modules.youtube.domain.enums.content_step import ContentStep
-from src.modules.youtube.domain.error_classifier import classify_youtube_error, is_bot_block
+from src.modules.youtube.domain.error_classifier import (
+    classify_youtube_error,
+    is_bot_block,
+)
 from src.modules.youtube.domain.interfaces.services.scraper import IYouTubeScraper
-from src.modules.youtube.domain.interfaces.services.youtube_content_service import IYoutubeContentService
+from src.modules.youtube.domain.interfaces.services.youtube_content_service import (
+    IYoutubeContentService,
+)
 
 
 class DownloadVideoUseCase:
@@ -24,7 +29,9 @@ class DownloadVideoUseCase:
         Returns True if a video was processed, False if no pending videos remain.
         Raises Exception if YouTube bot detection is triggered.
         """
-        content = self.youtube_content_service.get_first_by_step(ContentStep.PENDING_DOWNLOAD)
+        content = self.youtube_content_service.get_first_by_step(
+            ContentStep.PENDING_DOWNLOAD
+        )
 
         if not content:
             return False
@@ -61,7 +68,9 @@ class DownloadVideoUseCase:
             self.youtube_content_service.update_content(content)
 
             if is_bot_block(error_msg):
-                self.logger.critical("YouTube bot block detected! Aborting download job.")
+                self.logger.critical(
+                    "YouTube bot block detected! Aborting download job."
+                )
                 raise
 
         return True

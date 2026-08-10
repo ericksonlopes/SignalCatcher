@@ -1,5 +1,7 @@
 from typing import Protocol, Optional
+
 from src.modules.youtube.domain.entities.channel_entity import ChannelEntity
+
 
 class IYouTubeMonitoredChannelRepository(Protocol):
     def get_by_url(self, url: str) -> Optional[ChannelEntity]:

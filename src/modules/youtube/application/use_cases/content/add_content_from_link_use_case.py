@@ -1,12 +1,22 @@
-from src.core.logger.interfaces import ILogger
 from src.core.interfaces.notifications.notification import INotification
+from src.core.logger.interfaces import ILogger
+from src.modules.youtube.domain.entities.youtube_content_entity import (
+    YoutubeContentEntity,
+)
 from src.modules.youtube.domain.interfaces.services.scraper import IYouTubeScraper
-from src.modules.youtube.domain.interfaces.services.youtube_content_service import IYoutubeContentService
-from src.modules.youtube.domain.entities.youtube_content_entity import YoutubeContentEntity
+from src.modules.youtube.domain.interfaces.services.youtube_content_service import (
+    IYoutubeContentService,
+)
 
 
 class AddContentFromLinkUseCase:
-    def __init__(self, youtube_content_service: IYoutubeContentService, youtube_scraper: IYouTubeScraper, notification: INotification, logger: ILogger):
+    def __init__(
+        self,
+        youtube_content_service: IYoutubeContentService,
+        youtube_scraper: IYouTubeScraper,
+        notification: INotification,
+        logger: ILogger,
+    ):
         self.youtube_content_service = youtube_content_service
         self.youtube_scraper = youtube_scraper
         self.notification = notification
@@ -32,12 +42,16 @@ class AddContentFromLinkUseCase:
             external_id=info.id,
             title=info.title or "Untitled",
             url=info.url,
-            origin=info.channel
+            origin=info.channel,
         )
-        
+
         self.logger.info(
             f"Content created successfully (id={created_content.id}). Triggering VoiceMonkey notification...",
-            context={"content_id": created_content.id, "external_id": info.id, "title": info.title}
+            context={
+                "content_id": created_content.id,
+                "external_id": info.id,
+                "title": info.title,
+            },
         )
         self.notification.send()
         return created_content

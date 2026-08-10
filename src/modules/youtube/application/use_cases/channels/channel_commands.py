@@ -1,11 +1,20 @@
 from src.core.logger.interfaces import ILogger
 from src.modules.youtube.application.dtos.channel_create_dto import ChannelCreateDTO
-from src.modules.youtube.application.dtos.youtube_channel_response_dto import YouTubeChannelResponseDTO
+from src.modules.youtube.application.dtos.youtube_channel_response_dto import (
+    YouTubeChannelResponseDTO,
+)
 from src.modules.youtube.application.mappers.channel_dto_mapper import ChannelDtoMapper
-from src.modules.youtube.domain.interfaces.services.channel_service import IChannelService
+from src.modules.youtube.domain.interfaces.repositories.youtube_channel_repository import (
+    IYouTubeChannelRepository,
+)
+from src.modules.youtube.domain.interfaces.repositories.youtube_monitored_channel_repository import (
+    IYouTubeMonitoredChannelRepository,
+)
+from src.modules.youtube.domain.interfaces.services.channel_service import (
+    IChannelService,
+)
 from src.modules.youtube.domain.interfaces.services.scraper import IYouTubeScraper
-from src.modules.youtube.domain.interfaces.repositories.youtube_channel_repository import IYouTubeChannelRepository
-from src.modules.youtube.domain.interfaces.repositories.youtube_monitored_channel_repository import IYouTubeMonitoredChannelRepository
+
 
 class ChannelCommands:
     def __init__(
@@ -23,7 +32,9 @@ class ChannelCommands:
         self.yt_channel_repo = yt_channel_repo
 
     def create_channel(self, data: ChannelCreateDTO) -> YouTubeChannelResponseDTO:
-        self.logger.debug("Iniciando a criação de um novo canal.", context={"channel_url": data.url})
+        self.logger.debug(
+            "Iniciando a criação de um novo canal.", context={"channel_url": data.url}
+        )
 
         # Verify and extract channel info
         if self.scraper and self.yt_channel_repo:
@@ -49,7 +60,9 @@ class ChannelCommands:
         # Calls the infrastructure to persist
         try:
             created_channel = self.channel_service.create_channel(channel_entity)
-            self.logger.debug("Canal criado com sucesso.", context={"channel_id": created_channel.id})
+            self.logger.debug(
+                "Canal criado com sucesso.", context={"channel_id": created_channel.id}
+            )
         except Exception as e:
             self.logger.error("Erro ao criar canal.", context={"error": str(e)})
             raise

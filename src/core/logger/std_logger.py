@@ -1,8 +1,10 @@
+import json
 import logging
 import sys
-import json
 from typing import Any, Dict, Union, Iterable, Set
+
 from src.core.config.settings import settings
+
 
 def _parse_allowed_levels(raw: Union[str, Iterable[str], None]) -> Set[int]:
     level_map = {

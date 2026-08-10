@@ -2,14 +2,18 @@ from src.core.logger.logger import logger
 from src.modules.youtube.application.use_cases.jobs.extract_metadata_use_case import (
     ExtractMetadataUseCase,
 )
-from src.modules.youtube.infrastructure.repositories.youtube_channel_repository import YouTubeChannelRepository
+from src.modules.youtube.infrastructure.repositories.youtube_channel_repository import (
+    YouTubeChannelRepository,
+)
 from src.modules.youtube.infrastructure.repositories.youtube_content_repository import (
     YoutubeContentRepository,
 )
 from src.modules.youtube.infrastructure.services.youtube_content_service import (
     YoutubeContentService,
 )
-from src.modules.youtube.infrastructure.services.youtube_scraper import YouTubeScraperService
+from src.modules.youtube.infrastructure.services.youtube_scraper import (
+    YouTubeScraperService,
+)
 
 
 def extract_metadata_job():

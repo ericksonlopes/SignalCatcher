@@ -1,5 +1,9 @@
-from src.modules.youtube.domain.entities.youtube_content_entity import YoutubeContentEntity
-from src.modules.youtube.infrastructure.repositories.models.youtube_content_model import YoutubeContentModel
+from src.modules.youtube.domain.entities.youtube_content_entity import (
+    YoutubeContentEntity,
+)
+from src.modules.youtube.infrastructure.repositories.models.youtube_content_model import (
+    YoutubeContentModel,
+)
 
 
 class YoutubeContentMapper:
@@ -33,11 +37,11 @@ class YoutubeContentMapper:
             origin=entity.origin,
             step=entity.step,
             raw_metadata=entity.raw_metadata,  # type: ignore
-            thumbnail=entity.thumbnail,        # type: ignore
-            duration=entity.duration,          # type: ignore
-            categories=entity.categories,      # type: ignore
-            tags=entity.tags,                  # type: ignore
-            error_info=entity.error_info,      # type: ignore
-            created_at=entity.created_at,      # type: ignore
-            updated_at=entity.updated_at,      # type: ignore
+            thumbnail=entity.thumbnail,  # type: ignore
+            duration=entity.duration,  # type: ignore
+            categories=entity.categories,  # type: ignore
+            tags=entity.tags,  # type: ignore
+            error_info=entity.error_info,  # type: ignore
+            created_at=entity.created_at,  # type: ignore
+            updated_at=entity.updated_at,  # type: ignore
         )

@@ -1,8 +1,10 @@
 from sqlalchemy import Column, Integer, String, DateTime, Enum
 
-from src.modules.youtube.domain.enums.content_step import ContentStep
 from src.core.database.connector import Base
-from src.modules.youtube.infrastructure.repositories.models.youtube_content_model import get_brazil_time
+from src.modules.youtube.domain.enums.content_step import ContentStep
+from src.modules.youtube.infrastructure.repositories.models.youtube_content_model import (
+    get_brazil_time,
+)
 
 
 class StepTrackingModel(Base):

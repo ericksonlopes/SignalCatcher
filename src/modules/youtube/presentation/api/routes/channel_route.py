@@ -3,7 +3,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from src.modules.youtube.application.dtos.channel_create_dto import ChannelCreateDTO
-from src.modules.youtube.application.dtos.youtube_channel_create_dto import YouTubeChannelCreateDTO
+from src.modules.youtube.application.dtos.youtube_channel_create_dto import (
+    YouTubeChannelCreateDTO,
+)
 from src.modules.youtube.application.dtos.youtube_channel_response_dto import (
     YouTubeChannelResponseDTO,
 )
@@ -21,7 +23,12 @@ from src.modules.youtube.presentation.api.dependencies import (
 router = APIRouter()
 
 
-@router.post("/monitored_channels", response_model=YouTubeChannelResponseDTO, status_code=status.HTTP_201_CREATED, responses={status.HTTP_400_BAD_REQUEST: {"description": "Bad Request"}})
+@router.post(
+    "/monitored_channels",
+    response_model=YouTubeChannelResponseDTO,
+    status_code=status.HTTP_201_CREATED,
+    responses={status.HTTP_400_BAD_REQUEST: {"description": "Bad Request"}},
+)
 def create_youtube_channel(
     channel_data: YouTubeChannelCreateDTO,
     use_case: Annotated[ChannelCommands, Depends(get_channel_commands)],
@@ -30,10 +37,7 @@ def create_youtube_channel(
     Registers a new YouTube Channel to be monitored.
     """
     try:
-        full_data = ChannelCreateDTO(
-            name=channel_data.name,
-            url=channel_data.url
-        )
+        full_data = ChannelCreateDTO(name=channel_data.name, url=channel_data.url)
         return use_case.create_channel(full_data)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
@@ -47,10 +51,14 @@ def get_all_channels(use_case: Annotated[ChannelQueries, Depends(get_channel_que
     try:
         return use_case.get_all_channels()
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+        )
 
 
-from src.modules.youtube.application.dtos.saved_youtube_channel_response_dto import SavedYouTubeChannelResponseDTO
+from src.modules.youtube.application.dtos.saved_youtube_channel_response_dto import (
+    SavedYouTubeChannelResponseDTO,
+)
 
 
 @router.get("/channels", response_model=list[SavedYouTubeChannelResponseDTO])
@@ -63,10 +71,14 @@ def get_saved_channels(
     try:
         return use_case.get_saved_channels()
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+        )
 
 
-@router.patch("/monitored_channels/{channel_id}/status", response_model=YouTubeChannelResponseDTO)
+@router.patch(
+    "/monitored_channels/{channel_id}/status", response_model=YouTubeChannelResponseDTO
+)
 def toggle_channel_status(
     channel_id: int, use_case: Annotated[ChannelCommands, Depends(get_channel_commands)]
 ):
@@ -78,4 +90,6 @@ def toggle_channel_status(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+        )

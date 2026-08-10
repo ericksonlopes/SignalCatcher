@@ -67,17 +67,23 @@ class YouTubeChannelRepository(IYouTubeChannelRepository):
         try:
             with ConnectorPostgres() as session:
                 from sqlalchemy import func
-                from src.modules.youtube.infrastructure.repositories.models.youtube_content_model import YoutubeContentModel
-
-                results = session.query(
-                    YouTubeChannelModel,
-                    func.count(YoutubeContentModel.id).label("video_count")
-                ).outerjoin(
+                from src.modules.youtube.infrastructure.repositories.models.youtube_content_model import (
                     YoutubeContentModel,
-                    YoutubeContentModel.origin == YouTubeChannelModel.external_id
-                ).group_by(YouTubeChannelModel.id).order_by(
-                    func.count(YoutubeContentModel.id).desc()
-                ).all()
+                )
+
+                results = (
+                    session.query(
+                        YouTubeChannelModel,
+                        func.count(YoutubeContentModel.id).label("video_count"),
+                    )
+                    .outerjoin(
+                        YoutubeContentModel,
+                        YoutubeContentModel.origin == YouTubeChannelModel.external_id,
+                    )
+                    .group_by(YouTubeChannelModel.id)
+                    .order_by(func.count(YoutubeContentModel.id).desc())
+                    .all()
+                )
 
                 # Add video_count dynamically to the object so the DTO mapper can pick it up
                 channels = []
@@ -86,5 +92,7 @@ class YouTubeChannelRepository(IYouTubeChannelRepository):
                     channels.append(channel)
                 return channels
         except Exception as e:
-            self.logger.error("Error retrieving saved youtube channels", context={"error": str(e)})
+            self.logger.error(
+                "Error retrieving saved youtube channels", context={"error": str(e)}
+            )
             raise

@@ -1,6 +1,8 @@
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel
 from datetime import datetime
+from typing import Optional, List, Dict, Any
+
+from pydantic import BaseModel
+
 
 class SavedYouTubeChannelResponseDTO(BaseModel):
     id: int

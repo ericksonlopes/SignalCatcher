@@ -16,6 +16,7 @@ from src.modules.youtube.infrastructure.services.youtube_scraper import (
     YouTubeScraperService,
 )
 
+
 def process_errors_job():
     global_logger.info("Starting error retry process...")
 

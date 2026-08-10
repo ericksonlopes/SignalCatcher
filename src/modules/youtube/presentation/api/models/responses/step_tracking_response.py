@@ -1,7 +1,10 @@
 from datetime import datetime
-from pydantic import BaseModel
 from typing import Optional
+
+from pydantic import BaseModel
+
 from src.modules.youtube.domain.enums.content_step import ContentStep
+
 
 class StepTrackingResponse(BaseModel):
     id: int

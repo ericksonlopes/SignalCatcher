@@ -16,13 +16,17 @@ def get_logger() -> ILogger:
     return global_logger
 
 
-def get_youtube_monitored_channel_repository(logger: ILogger = Depends(get_logger)) -> YouTubeMonitoredChannelRepository:
+def get_youtube_monitored_channel_repository(
+    logger: ILogger = Depends(get_logger),
+) -> YouTubeMonitoredChannelRepository:
     return YouTubeMonitoredChannelRepository(logger=logger)
 
 
 def get_channel_service(
-    repository: YouTubeMonitoredChannelRepository = Depends(get_youtube_monitored_channel_repository),
-    logger: ILogger = Depends(get_logger)
+    repository: YouTubeMonitoredChannelRepository = Depends(
+        get_youtube_monitored_channel_repository
+    ),
+    logger: ILogger = Depends(get_logger),
 ) -> ChannelService:
     return ChannelService(repository=repository, logger=logger)
 
@@ -34,8 +38,12 @@ def get_channel_commands(
     ),
     logger: ILogger = Depends(get_logger),
 ) -> "ChannelCommands":
-    from src.modules.youtube.infrastructure.services.youtube_scraper import YouTubeScraperService
-    from src.modules.youtube.infrastructure.repositories.youtube_channel_repository import YouTubeChannelRepository
+    from src.modules.youtube.infrastructure.services.youtube_scraper import (
+        YouTubeScraperService,
+    )
+    from src.modules.youtube.infrastructure.repositories.youtube_channel_repository import (
+        YouTubeChannelRepository,
+    )
     from src.modules.youtube.application.use_cases.channels.channel_commands import (
         ChannelCommands,
     )

@@ -1,12 +1,22 @@
 from sqlalchemy import func
 
-from src.core.logger.interfaces import ILogger
-from src.modules.youtube.domain.interfaces.repositories.youtube_content_repository import IYoutubeContentRepository
-from src.modules.youtube.domain.entities.youtube_content_entity import YoutubeContentEntity
 from src.core.database.connector import ConnectorPostgres
-from src.modules.youtube.infrastructure.repositories.mappers.youtube_content_mapper import YoutubeContentMapper
-from src.modules.youtube.infrastructure.repositories.models.step_tracking_model import StepTrackingModel
-from src.modules.youtube.infrastructure.repositories.models.youtube_content_model import YoutubeContentModel
+from src.core.logger.interfaces import ILogger
+from src.modules.youtube.domain.entities.youtube_content_entity import (
+    YoutubeContentEntity,
+)
+from src.modules.youtube.domain.interfaces.repositories.youtube_content_repository import (
+    IYoutubeContentRepository,
+)
+from src.modules.youtube.infrastructure.repositories.mappers.youtube_content_mapper import (
+    YoutubeContentMapper,
+)
+from src.modules.youtube.infrastructure.repositories.models.step_tracking_model import (
+    StepTrackingModel,
+)
+from src.modules.youtube.infrastructure.repositories.models.youtube_content_model import (
+    YoutubeContentModel,
+)
 
 
 class YoutubeContentRepository(IYoutubeContentRepository):
@@ -16,27 +26,41 @@ class YoutubeContentRepository(IYoutubeContentRepository):
     def exists_by_external_id(self, external_id: str) -> bool:
         try:
             with ConnectorPostgres() as session:
-                exists = session.query(YoutubeContentModel.id).filter_by(external_id=external_id).first()
+                exists = (
+                    session.query(YoutubeContentModel.id)
+                    .filter_by(external_id=external_id)
+                    .first()
+                )
 
                 return exists is not None
         except Exception as e:
-            self.logger.error(f"Error checking if content exists by external_id '{external_id}': {e}",
-                              context={"external_id": external_id, "error": str(e)})
+            self.logger.error(
+                f"Error checking if content exists by external_id '{external_id}': {e}",
+                context={"external_id": external_id, "error": str(e)},
+            )
             raise
 
-    def get_by_external_id(self, external_id: str) -> 'YoutubeContentEntity | None':
+    def get_by_external_id(self, external_id: str) -> "YoutubeContentEntity | None":
         try:
             with ConnectorPostgres() as session:
-                model = session.query(YoutubeContentModel).filter_by(external_id=external_id).first()
+                model = (
+                    session.query(YoutubeContentModel)
+                    .filter_by(external_id=external_id)
+                    .first()
+                )
                 if model:
                     return YoutubeContentMapper.to_domain(model)
                 return None
         except Exception as e:
-            self.logger.error(f"Error fetching content by external_id '{external_id}': {e}",
-                              context={"external_id": external_id, "error": str(e)})
+            self.logger.error(
+                f"Error fetching content by external_id '{external_id}': {e}",
+                context={"external_id": external_id, "error": str(e)},
+            )
             raise
 
-    def create(self, youtube_content_entity: YoutubeContentEntity) -> YoutubeContentEntity:
+    def create(
+        self, youtube_content_entity: YoutubeContentEntity
+    ) -> YoutubeContentEntity:
         try:
             with ConnectorPostgres() as session:
                 new_content = YoutubeContentMapper.to_model(youtube_content_entity)
@@ -45,15 +69,24 @@ class YoutubeContentRepository(IYoutubeContentRepository):
                 session.refresh(new_content)
                 return YoutubeContentMapper.to_domain(new_content)
         except Exception as e:
-            self.logger.error(f"Error creating content '{youtube_content_entity.external_id}': {e}",
-                              context={"external_id": youtube_content_entity.external_id, "error": str(e)})
+            self.logger.error(
+                f"Error creating content '{youtube_content_entity.external_id}': {e}",
+                context={
+                    "external_id": youtube_content_entity.external_id,
+                    "error": str(e),
+                },
+            )
             raise
 
-    def get_paginated(self, page: int, limit: int, step: str | None = None, search: str | None = None) -> tuple[list[YoutubeContentEntity], int]:
+    def get_paginated(
+        self, page: int, limit: int, step: str | None = None, search: str | None = None
+    ) -> tuple[list[YoutubeContentEntity], int]:
         try:
             with ConnectorPostgres() as session:
                 offset = (page - 1) * limit
-                query = session.query(YoutubeContentModel).order_by(YoutubeContentModel.created_at.desc())
+                query = session.query(YoutubeContentModel).order_by(
+                    YoutubeContentModel.created_at.desc()
+                )
                 if step:
                     query = query.filter(YoutubeContentModel.step == step)
                 if search:
@@ -62,38 +95,59 @@ class YoutubeContentRepository(IYoutubeContentRepository):
                 items = query.offset(offset).limit(limit).all()
                 return [YoutubeContentMapper.to_domain(item) for item in items], total
         except Exception as e:
-            self.logger.error(f"Error fetching paginated contents: {e}", context={"error": str(e)})
+            self.logger.error(
+                f"Error fetching paginated contents: {e}", context={"error": str(e)}
+            )
             raise
 
     def count_by_step(self) -> dict[str, int]:
         try:
             with ConnectorPostgres() as session:
-                counts = session.query(
-                    YoutubeContentModel.step, func.count(YoutubeContentModel.id)
-                ).group_by(YoutubeContentModel.step).all()
+                counts = (
+                    session.query(
+                        YoutubeContentModel.step, func.count(YoutubeContentModel.id)
+                    )
+                    .group_by(YoutubeContentModel.step)
+                    .all()
+                )
                 return {step.name: count for step, count in counts}
         except Exception as e:
             self.logger.error(f"Error counting by step: {e}", context={"error": str(e)})
             raise
 
-    def get_first_by_step(self, step: 'ContentStep') -> 'YoutubeContentEntity | None':
+    def get_first_by_step(self, step: "ContentStep") -> "YoutubeContentEntity | None":
         try:
             with ConnectorPostgres() as session:
-                model = session.query(YoutubeContentModel).filter(YoutubeContentModel.step == step).first()
+                model = (
+                    session.query(YoutubeContentModel)
+                    .filter(YoutubeContentModel.step == step)
+                    .first()
+                )
                 if model:
                     return YoutubeContentMapper.to_domain(model)
                 return None
         except Exception as e:
-            self.logger.error(f"Error fetching first content by step '{step}': {e}", context={"error": str(e)})
+            self.logger.error(
+                f"Error fetching first content by step '{step}': {e}",
+                context={"error": str(e)},
+            )
             raise
 
-    def update(self, youtube_content_entity: YoutubeContentEntity) -> YoutubeContentEntity:
+    def update(
+        self, youtube_content_entity: YoutubeContentEntity
+    ) -> YoutubeContentEntity:
         try:
             with ConnectorPostgres() as session:
                 # Find the existing model
-                model = session.query(YoutubeContentModel).filter(YoutubeContentModel.id == youtube_content_entity.id).first()
+                model = (
+                    session.query(YoutubeContentModel)
+                    .filter(YoutubeContentModel.id == youtube_content_entity.id)
+                    .first()
+                )
                 if not model:
-                    raise ValueError(f"Content with id {youtube_content_entity.id} not found.")
+                    raise ValueError(
+                        f"Content with id {youtube_content_entity.id} not found."
+                    )
 
                 # Update the model fields
                 model.step = youtube_content_entity.step
@@ -103,20 +157,33 @@ class YoutubeContentRepository(IYoutubeContentRepository):
                 model.categories = youtube_content_entity.categories
                 model.tags = youtube_content_entity.tags
                 model.origin = youtube_content_entity.origin
-                model.error_info = getattr(youtube_content_entity, 'error_info', None) # if entity has it
-                model.published_at = getattr(youtube_content_entity, 'published_at', None)
+                model.error_info = getattr(
+                    youtube_content_entity, "error_info", None
+                )  # if entity has it
+                model.published_at = getattr(
+                    youtube_content_entity, "published_at", None
+                )
 
                 session.commit()
                 session.refresh(model)
                 return YoutubeContentMapper.to_domain(model)
         except Exception as e:
-            self.logger.error(f"Error updating content '{youtube_content_entity.id}': {e}", context={"error": str(e)})
+            self.logger.error(
+                f"Error updating content '{youtube_content_entity.id}': {e}",
+                context={"error": str(e)},
+            )
             raise
 
-    def reset_stuck_steps(self, stuck_step: 'ContentStep', pending_step: 'ContentStep') -> int:
+    def reset_stuck_steps(
+        self, stuck_step: "ContentStep", pending_step: "ContentStep"
+    ) -> int:
         try:
             with ConnectorPostgres() as session:
-                stuck_items = session.query(YoutubeContentModel).filter(YoutubeContentModel.step == stuck_step).all()
+                stuck_items = (
+                    session.query(YoutubeContentModel)
+                    .filter(YoutubeContentModel.step == stuck_step)
+                    .all()
+                )
                 count = len(stuck_items)
                 if count > 0:
                     for item in stuck_items:
@@ -124,7 +191,9 @@ class YoutubeContentRepository(IYoutubeContentRepository):
                     session.commit()
                 return count
         except Exception as e:
-            self.logger.error(f"Error resetting stuck steps from {stuck_step.name} to {pending_step.name}: {e}")
+            self.logger.error(
+                f"Error resetting stuck steps from {stuck_step.name} to {pending_step.name}: {e}"
+            )
             raise
 
     def get_tracking_by_external_id(self, external_id: str) -> list[StepTrackingModel]:
@@ -147,4 +216,3 @@ class YoutubeContentRepository(IYoutubeContentRepository):
                 context={"external_id": external_id, "error": str(e)},
             )
             raise
-

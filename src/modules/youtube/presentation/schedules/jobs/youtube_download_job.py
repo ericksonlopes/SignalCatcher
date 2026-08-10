@@ -13,6 +13,7 @@ from src.modules.youtube.infrastructure.services.youtube_scraper import (
     YouTubeScraperService,
 )
 
+
 def download_videos_job():
     global_logger.info("Starting video download process...")
 

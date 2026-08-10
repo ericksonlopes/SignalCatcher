@@ -2,24 +2,28 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from src.core.logger.interfaces import ILogger
-from src.modules.youtube.domain.interfaces.services.youtube_content_service import IYoutubeContentService
-from src.modules.youtube.domain.interfaces.services.monitor_service import IMonitorTaskService
-from src.modules.youtube.domain.interfaces.repositories.youtube_monitored_channel_repository import IYouTubeMonitoredChannelRepository
-from src.modules.youtube.domain.interfaces.services.scraper import IYouTubeScraper
-from src.modules.youtube.domain.entities.youtube_content_entity import YoutubeContentEntity
-from src.modules.youtube.domain.enums.content_step import ContentStep
 from src.modules.youtube.domain.entities.channel_entity import ChannelEntity
+from src.modules.youtube.domain.interfaces.repositories.youtube_monitored_channel_repository import (
+    IYouTubeMonitoredChannelRepository,
+)
+from src.modules.youtube.domain.interfaces.services.monitor_service import (
+    IMonitorTaskService,
+)
+from src.modules.youtube.domain.interfaces.services.scraper import IYouTubeScraper
+from src.modules.youtube.domain.interfaces.services.youtube_content_service import (
+    IYoutubeContentService,
+)
 
 
 class MonitorTaskService(IMonitorTaskService):
     """Service responsible for running background monitoring routines."""
 
     def __init__(
-            self,
-            youtube_scraper: IYouTubeScraper,
-            youtube_monitored_channel_repository: IYouTubeMonitoredChannelRepository,
-            youtube_content_service: IYoutubeContentService,
-            logger: ILogger,
+        self,
+        youtube_scraper: IYouTubeScraper,
+        youtube_monitored_channel_repository: IYouTubeMonitoredChannelRepository,
+        youtube_content_service: IYoutubeContentService,
+        logger: ILogger,
     ):
         self.youtube_scraper = youtube_scraper
         self.youtube_monitored_channel_repository = youtube_monitored_channel_repository
@@ -30,16 +34,23 @@ class MonitorTaskService(IMonitorTaskService):
 
     def process_channel(self, channel: ChannelEntity) -> int:
         """Processes a single channel and returns the number of new contents."""
-        self.logger.debug(f"🔍 Checking: {channel.name}", context={"channel_name": channel.name})
+        self.logger.debug(
+            f"🔍 Checking: {channel.name}", context={"channel_name": channel.name}
+        )
 
         # Execute extraction using the scraper interface
         try:
             items = self.scraper_func(channel.url)
         except Exception as e:
-            self.logger.error(f"Error extracting {channel.url}: {e}", context={"url": channel.url, "error": str(e)})
+            self.logger.error(
+                f"Error extracting {channel.url}: {e}",
+                context={"url": channel.url, "error": str(e)},
+            )
             return 0
 
-        self.logger.debug(f"  Contents found: {len(items)}", context={"items_count": len(items)})
+        self.logger.debug(
+            f"  Contents found: {len(items)}", context={"items_count": len(items)}
+        )
 
         new_count = 0
         for item in items:
@@ -51,12 +62,14 @@ class MonitorTaskService(IMonitorTaskService):
                 external_id=item.id,
                 title=item.title or "Untitled",
                 url=item.url,
-                origin=channel.name
+                origin=channel.name,
             )
             new_count += 1
 
         # Update last_checked_at
-        channel.last_checked_at = datetime.now(ZoneInfo("America/Sao_Paulo")).replace(tzinfo=None)
+        channel.last_checked_at = datetime.now(ZoneInfo("America/Sao_Paulo")).replace(
+            tzinfo=None
+        )
         self.youtube_monitored_channel_repository.update(channel)
 
         return new_count
@@ -72,19 +85,33 @@ class MonitorTaskService(IMonitorTaskService):
                 self.logger.warning("⚠️ No active channel registered.")
                 return 0
 
-            self.logger.debug(f"📋 {len(channels)} channel(s) to check.", context={"channel_count": len(channels)})
+            self.logger.debug(
+                f"📋 {len(channels)} channel(s) to check.",
+                context={"channel_count": len(channels)},
+            )
 
             total_new = 0
             for i, channel in enumerate(channels, start=1):
                 try:
                     new_count = self.process_channel(channel)
                     total_new += new_count
-                    self.logger.debug(f"  ✅ [{i}/{len(channels)}] {channel.name}: {new_count} new", context={"channel_name": channel.name, "new_count": new_count})
+                    self.logger.debug(
+                        f"  ✅ [{i}/{len(channels)}] {channel.name}: {new_count} new",
+                        context={"channel_name": channel.name, "new_count": new_count},
+                    )
                 except Exception as e:
-                    self.logger.error(f"  ❌ [{i}/{len(channels)}] {channel.name}: {e}", context={"channel_name": channel.name, "error": str(e)})
+                    self.logger.error(
+                        f"  ❌ [{i}/{len(channels)}] {channel.name}: {e}",
+                        context={"channel_name": channel.name, "error": str(e)},
+                    )
 
-            self.logger.debug(f"🏁 Check completed! Total new contents: {total_new}", context={"total_new": total_new})
+            self.logger.debug(
+                f"🏁 Check completed! Total new contents: {total_new}",
+                context={"total_new": total_new},
+            )
             return total_new
         except Exception as e:
-            self.logger.error(f"Unexpected error in daily routine: {e}", context={"error": str(e)})
+            self.logger.error(
+                f"Unexpected error in daily routine: {e}", context={"error": str(e)}
+            )
             return 0

@@ -1,8 +1,13 @@
 from src.core.logger.interfaces import ILogger
 from src.modules.youtube.domain.enums.content_step import ContentStep
-from src.modules.youtube.domain.error_classifier import classify_youtube_error, is_bot_block
+from src.modules.youtube.domain.error_classifier import (
+    classify_youtube_error,
+    is_bot_block,
+)
 from src.modules.youtube.domain.interfaces.services.scraper import IYouTubeScraper
-from src.modules.youtube.domain.interfaces.services.youtube_content_service import IYoutubeContentService
+from src.modules.youtube.domain.interfaces.services.youtube_content_service import (
+    IYoutubeContentService,
+)
 
 
 class ProcessErrorsUseCase:
@@ -58,14 +63,18 @@ class ProcessErrorsUseCase:
 
             except Exception as e:
                 error_msg = str(e)
-                self.logger.error(f"Error downloading again {content.title}: {error_msg}")
+                self.logger.error(
+                    f"Error downloading again {content.title}: {error_msg}"
+                )
 
                 content.error_info = error_msg
                 content.step = classify_youtube_error(error_msg)
                 self.youtube_content_service.update_content(content)
 
                 if is_bot_block(error_msg):
-                    self.logger.critical("YouTube bot block detected! Aborting error retry.")
+                    self.logger.critical(
+                        "YouTube bot block detected! Aborting error retry."
+                    )
                     raise
 
         return retried_count

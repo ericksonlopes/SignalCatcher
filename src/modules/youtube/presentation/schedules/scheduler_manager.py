@@ -1,24 +1,24 @@
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from src.core.logger.logger import logger
 from src.core.database.connector import engine
+from src.core.logger.logger import logger
 from src.modules.youtube.presentation.schedules.jobs.youtube_monitor_channels_job import (
     youtube_monitor_channels_job,
 )
 
 
 def start_scheduler() -> BackgroundScheduler:
-    jobstores = {'default': SQLAlchemyJobStore(engine=engine)}
+    jobstores = {"default": SQLAlchemyJobStore(engine=engine)}
 
     scheduler = BackgroundScheduler(jobstores=jobstores)
 
     scheduler.add_job(
         youtube_monitor_channels_job,
-        trigger='interval',
+        trigger="interval",
         minutes=30,
-        id='daily_youtube_capture_job',
-        replace_existing=True
+        id="daily_youtube_capture_job",
+        replace_existing=True,
     )
 
     logger.info("🚀 Scheduler running in the background! Executing jobs periodically.")
