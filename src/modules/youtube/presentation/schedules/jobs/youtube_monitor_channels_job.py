@@ -3,7 +3,7 @@ from src.core.logger.logger import logger as global_logger
 from src.modules.youtube.application.use_cases.jobs.run_daily_capture_use_case import (
     RunDailyCaptureUseCase,
 )
-from src.modules.youtube.infrastructure.notifications.voice_monkey_notification import (
+from src.core.notifications.voice_monkey_notification import (
     VoiceMonkeyNotification,
 )
 from src.modules.youtube.infrastructure.repositories.youtube_content_repository import (

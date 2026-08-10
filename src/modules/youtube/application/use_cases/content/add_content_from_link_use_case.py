@@ -1,5 +1,5 @@
 from src.core.logger.interfaces import ILogger
-from src.modules.youtube.domain.interfaces.notifications.notification import INotification
+from src.core.interfaces.notifications.notification import INotification
 from src.modules.youtube.domain.interfaces.services.scraper import IYouTubeScraper
 from src.modules.youtube.domain.interfaces.services.youtube_content_service import IYoutubeContentService
 from src.modules.youtube.domain.entities.youtube_content_entity import YoutubeContentEntity

@@ -122,7 +122,7 @@ def get_add_content_from_link_use_case(
     from src.modules.youtube.infrastructure.services.youtube_scraper import (
         YouTubeScraperService,
     )
-    from src.modules.youtube.infrastructure.notifications.voice_monkey_notification import (
+    from src.core.notifications.voice_monkey_notification import (
         VoiceMonkeyNotification,
     )
 

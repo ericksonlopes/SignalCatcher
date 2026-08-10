@@ -1,5 +1,5 @@
 import requests
-from src.modules.youtube.domain.interfaces.notifications.notification import INotification
+from src.core.interfaces.notifications.notification import INotification
 from src.core.logger.interfaces import ILogger
 
 class VoiceMonkeyNotification(INotification):
