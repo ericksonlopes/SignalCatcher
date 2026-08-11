@@ -80,12 +80,13 @@ class StdLogger:
         
         # Encontra dinamicamente o frame real que chamou o log, fora dos nossos wrappers
         import inspect
+        import os
         frame = inspect.currentframe()
         depth = 1
         while frame:
             filename = frame.f_code.co_filename
             # Ignora os arquivos de logging do python e nossos wrappers
-            if "logging" not in filename and "loggers" not in filename.replace("\\", "/"):
+            if "logging" not in filename and os.path.basename(filename) not in ("std_logger.py", "logger.py"):
                 break
             frame = frame.f_back
             depth += 1

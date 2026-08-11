@@ -18,6 +18,10 @@ from src.modules.youtube.presentation.api.dependencies import (
     get_content_commands,
     get_content_queries,
     get_add_content_from_link_use_case,
+    get_channel_queries,
+)
+from src.modules.youtube.application.use_cases.channels.channel_queries import (
+    ChannelQueries,
 )
 from src.modules.youtube.presentation.api.models.requests.youtube_video_add_request import (
     YouTubeVideoAddRequest,
@@ -161,13 +165,24 @@ def add_youtube_content_from_link(
 )
 def get_content_status_count(
     use_case: Annotated[ContentQueries, Depends(get_content_queries)],
+    channel_use_case: Annotated[ChannelQueries, Depends(get_channel_queries)],
 ):
     """
-    Returns a count of contents grouped by their status.
+    Returns a count of contents grouped by their status, as well as total counts.
     """
     try:
         counts = use_case.get_status_count()
-        return {"status_counts": counts}
+        
+        total_videos = sum(counts.values()) if counts else 0
+        total_saved_channels = len(channel_use_case.get_saved_channels())
+        total_monitored_channels = len(channel_use_case.get_all_channels())
+        
+        return {
+            "status_counts": counts,
+            "total_videos": total_videos,
+            "total_saved_channels": total_saved_channels,
+            "total_monitored_channels": total_monitored_channels
+        }
     except Exception as e:
         logger.error(f"Failed to get content status count: {e}")
         raise HTTPException(status_code=500, detail=str(e))

@@ -62,7 +62,7 @@ class MonitorTaskService(IMonitorTaskService):
                 external_id=item.id,
                 title=item.title or "Untitled",
                 url=item.url,
-                origin=channel.name,
+                origin=channel.external_id,
             )
             new_count += 1
 

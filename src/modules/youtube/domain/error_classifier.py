@@ -9,7 +9,7 @@ def classify_youtube_error(error_msg: str) -> ContentStep:
     """
     error_lower = error_msg.lower()
 
-    if "this video has been removed" in error_lower:
+    if "this video has been removed" in error_lower or "this video is unavailable" in error_lower:
         return ContentStep.VIDEO_REMOVED
     elif (
         "members-only content like this video" in error_lower
