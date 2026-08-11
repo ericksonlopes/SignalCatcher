@@ -75,6 +75,36 @@ def retry_error_contents(background_tasks: BackgroundTasks):
 
 
 @router.post(
+    "/content/trigger-metadata-extraction", responses={500: {"description": "Internal Server Error"}}
+)
+def trigger_metadata_extraction(background_tasks: BackgroundTasks):
+    """
+    Triggers the background job to extract metadata for pending videos.
+    """
+    try:
+        background_tasks.add_task(extract_metadata_job)
+        return {"message": "Metadata extraction job started in the background."}
+    except Exception as e:
+        logger.error(f"Failed to trigger metadata extraction job: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post(
+    "/content/trigger-downloads", responses={500: {"description": "Internal Server Error"}}
+)
+def trigger_downloads(background_tasks: BackgroundTasks):
+    """
+    Triggers the background job to download pending videos.
+    """
+    try:
+        background_tasks.add_task(download_videos_job)
+        return {"message": "Video download job started in the background."}
+    except Exception as e:
+        logger.error(f"Failed to trigger video download job: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post(
     "/content/{external_id}/retry",
     responses={404: {"description": "Content not found"}},
 )
