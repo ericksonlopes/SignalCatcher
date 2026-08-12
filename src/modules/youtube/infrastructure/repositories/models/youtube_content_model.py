@@ -29,7 +29,7 @@ class YoutubeContentModel(Base):
     published_at = Column(DateTime, nullable=True)  # Store specific error details
     raw_metadata = Column(JSON, nullable=True)  # Store extracted metadata JSON
     thumbnail = Column(String, nullable=True)
-    duration = Column(String, nullable=True)  # Format: HH:MM:SS
+    duration = Column(Integer, nullable=True)  # Format: Seconds
     categories = Column(JSON, nullable=True)  # List of categories
     tags = Column(JSON, nullable=True)  # List of tags
     created_at = Column(DateTime, default=get_brazil_time)

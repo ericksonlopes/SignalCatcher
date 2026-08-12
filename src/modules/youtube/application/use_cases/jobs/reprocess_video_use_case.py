@@ -53,10 +53,8 @@ class ReprocessVideoUseCase:
                 content.thumbnail = info_dict.get("thumbnail")
 
                 duration_sec = info_dict.get("duration")
-                if duration_sec:
-                    content.duration = time.strftime(
-                        "%H:%M:%S", time.gmtime(duration_sec)
-                    )
+                if duration_sec is not None:
+                    content.duration = int(duration_sec)
 
                 content.categories = info_dict.get("categories", [])
                 content.tags = info_dict.get("tags", [])

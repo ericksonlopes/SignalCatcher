@@ -12,7 +12,7 @@ class YoutubeVideoCardResponse(BaseModel):
     channel_name: str  # Mapping origin
     step: ContentStep
     thumbnail: Optional[str]
-    duration: Optional[str]
+    duration: Optional[int]
     description: Optional[str] = None
     tags: Optional[List[str]]
 

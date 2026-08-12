@@ -67,10 +67,8 @@ class ExtractMetadataUseCase:
             content.thumbnail = metadata_dict.get("thumbnail")
 
             duration_seconds = metadata_dict.get("duration")
-            if duration_seconds:
-                content.duration = str(
-                    datetime.timedelta(seconds=int(duration_seconds))
-                )
+            if duration_seconds is not None:
+                content.duration = int(duration_seconds)
 
             content.categories = metadata_dict.get("categories")
             content.tags = metadata_dict.get("tags")
