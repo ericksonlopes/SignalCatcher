@@ -328,12 +328,12 @@ class YouTubeScraperService(IYouTubeScraper):
             raise
 
     def download_video(self, url: str, content_id: str, origin: str, output_path: str):
-        import re
         import os
+        from src.core.utils.file_utils import sanitize_path_parts
 
         self.logger.debug(f"Starting download for {url} to {output_path}")
 
-        parts = [re.sub(r'[\\*?:"<>|]', "_", p) for p in origin.split("/")]
+        parts = sanitize_path_parts(origin)
         final_output_path = os.path.join(output_path, *parts)
         os.makedirs(final_output_path, exist_ok=True)
 
@@ -353,4 +353,18 @@ class YouTubeScraperService(IYouTubeScraper):
         )
 
         with YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
+            # We use extract_info with download=True to get the final info_dict which contains the filename
+            info_dict = ydl.extract_info(url, download=True)
+            if not info_dict:
+                raise Exception("Failed to download video or extract info.")
+                
+            # yt-dlp stores the final filename in the 'requested_downloads' list or '_filename'
+            if 'requested_downloads' in info_dict and info_dict['requested_downloads']:
+                final_file_path = info_dict['requested_downloads'][0]['filepath']
+            elif '_filename' in info_dict:
+                final_file_path = info_dict['_filename']
+            else:
+                # Fallback to reconstructing the path
+                final_file_path = ydl.prepare_filename(info_dict)
+                
+            return os.path.abspath(final_file_path)

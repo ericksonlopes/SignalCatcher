@@ -19,3 +19,6 @@ class ContentQueries:
         self, page: int, limit: int, step: str | None = None, search: str | None = None
     ):
         return self.service.get_paginated(page, limit, step, search)
+
+    def get_content_by_external_id(self, external_id: str):
+        return self.service.get_by_external_id(external_id)

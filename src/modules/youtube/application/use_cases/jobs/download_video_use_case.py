@@ -43,12 +43,24 @@ class DownloadVideoUseCase:
         self.youtube_content_service.update_content(content)
 
         try:
-            self.scraper.download_video(
+            final_file_path = self.scraper.download_video(
                 url=content.url,
                 content_id=content.external_id,
                 origin=content.origin,
                 output_path=self.output_path,
             )
+            
+            import os
+            from src.core.utils.file_utils import format_storage_path
+            
+            # Extract just the filename from the downloaded path
+            filename = os.path.basename(final_file_path)
+            
+            # Create the storage path format (/youtube/canal/arquivo.ext)
+            origin = content.origin or ""
+            storage_path = format_storage_path(origin, filename)
+            
+            content.file_path = storage_path
 
             # Transition DOWNLOADED -> COMPLETED
             content.step = ContentStep.DOWNLOADED
@@ -57,7 +69,7 @@ class DownloadVideoUseCase:
             content.step = ContentStep.COMPLETED
             self.youtube_content_service.update_content(content)
 
-            self.logger.info(f"Successfully downloaded: {content.title}")
+            self.logger.info(f"Successfully downloaded: {content.title} to {storage_path}")
 
         except Exception as e:
             error_msg = str(e)

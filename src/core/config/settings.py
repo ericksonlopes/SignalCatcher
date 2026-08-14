@@ -1,4 +1,5 @@
 from typing import Optional
+
 from pydantic_settings import BaseSettings
 
 
@@ -11,6 +12,7 @@ class Settings(BaseSettings):
     VOICE_MONKEY_API_TOKEN: Optional[str] = None
     VOICE_MONKEY_NEW_VIDEO_FOR_DOWNLOAD_MONKEY_ID: Optional[str] = None
     DOWNLOAD_YOUTUBE_PATH: Optional[str] = None
+    DIARIZATION_API_URL: Optional[str] = "http://localhost:8001"
 
     @property
     def database_url(self) -> str:

@@ -50,9 +50,13 @@ app = FastAPI(
 
 # Register routes
 from src.modules.youtube.presentation.api.routes import youtube_router
+from src.modules.diarization.presentation.api.routes import diarization_router
 
 YOUTUBE_API_PREFIX = "/api/youtube"
 app.include_router(youtube_router, prefix=YOUTUBE_API_PREFIX)
+
+DIARIZATION_API_PREFIX = "/api/diarization"
+app.include_router(diarization_router, prefix=DIARIZATION_API_PREFIX)
 
 
 @app.get("/status", tags=["Health"])

@@ -11,7 +11,7 @@ class StepTrackingModel(Base):
     __tablename__ = "step_tracking"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    entity_id = Column(Integer, index=True, nullable=False)
+    entity_id = Column(String, index=True, nullable=False)
     entity_type = Column(String, index=True, nullable=False)  # e.g., 'youtube_contents'
 
     previous_step = Column(Enum(ContentStep), nullable=True)
@@ -35,7 +35,7 @@ from src.modules.youtube.infrastructure.repositories.models.youtube_content_mode
 
 def create_tracking_entry(mapper, connection, target, previous_step, new_step):
     tracking = StepTrackingModel(
-        entity_id=target.id,
+        entity_id=str(target.id),
         entity_type=target.__tablename__,
         previous_step=previous_step,
         new_step=new_step,

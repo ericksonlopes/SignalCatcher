@@ -12,25 +12,31 @@ from sqlalchemy import pool
 from src.core.database.connector import Base
 from src.core.config.settings import settings
 
-_package_name = "src.modules.youtube.infrastructure.repositories.models"
-try:
-    importlib.import_module(_package_name)
-except ModuleNotFoundError:
-    # env.py lives in <project_root>/alembic/env.py, so project root is two levels up  
-    project_root = Path(__file__).resolve().parents[1]
-    sys.path.insert(0, str(project_root))
-    importlib.invalidate_caches()
+_package_names = [
+    "src.modules.youtube.infrastructure.repositories.models",
+    "src.modules.diarization.infrastructure.repositories.models"
+]
 
-try:
-    _pkg = importlib.import_module(_package_name)
-    if hasattr(_pkg, "__path__"):
-        for _finder, _name, _ispkg in pkgutil.iter_modules(_pkg.__path__):
-            if _name.startswith("_"):
-                continue
-            importlib.import_module(f"{_package_name}.{_name}")
-except Exception:
-    # Let the error surface during alembic operations so it's visible  
-    raise RuntimeError(f"The package could not be imported {_package_name}.")
+for _package_name in _package_names:
+    try:
+        importlib.import_module(_package_name)
+    except ModuleNotFoundError:
+        # env.py lives in <project_root>/alembic/env.py, so project root is two levels up  
+        project_root = Path(__file__).resolve().parents[1]
+        if str(project_root) not in sys.path:
+            sys.path.insert(0, str(project_root))
+        importlib.invalidate_caches()
+    
+    try:
+        _pkg = importlib.import_module(_package_name)
+        if hasattr(_pkg, "__path__"):
+            for _finder, _name, _ispkg in pkgutil.iter_modules(_pkg.__path__):
+                if _name.startswith("_"):
+                    continue
+                importlib.import_module(f"{_package_name}.{_name}")
+    except Exception:
+        # Let the error surface during alembic operations so it's visible  
+        raise RuntimeError(f"The package could not be imported {_package_name}.")
 
 # this is the Alembic Config object, which provides  
 # access to the values within the .ini file in use.  

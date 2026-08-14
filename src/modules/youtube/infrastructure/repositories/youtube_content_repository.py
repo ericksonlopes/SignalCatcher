@@ -157,6 +157,7 @@ class YoutubeContentRepository(IYoutubeContentRepository):
                 model.categories = youtube_content_entity.categories
                 model.tags = youtube_content_entity.tags
                 model.origin = youtube_content_entity.origin
+                model.file_path = youtube_content_entity.file_path
                 model.error_info = getattr(
                     youtube_content_entity, "error_info", None
                 )  # if entity has it
@@ -197,13 +198,14 @@ class YoutubeContentRepository(IYoutubeContentRepository):
             raise
 
     def get_tracking_by_external_id(self, external_id: str) -> list[StepTrackingModel]:
+        from sqlalchemy import cast, String
         try:
             with ConnectorPostgres() as session:
                 query = (
                     session.query(StepTrackingModel)
                     .join(
                         YoutubeContentModel,
-                        StepTrackingModel.entity_id == YoutubeContentModel.id,
+                        StepTrackingModel.entity_id == cast(YoutubeContentModel.id, String),
                     )
                     .filter(YoutubeContentModel.external_id == external_id)
                     .filter(StepTrackingModel.entity_type == "youtube_contents")

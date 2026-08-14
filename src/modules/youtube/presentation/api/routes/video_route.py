@@ -169,6 +169,7 @@ def delete_single_content(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+
 @router.post("/content", responses={400: {"description": "Bad Request"}})
 def add_youtube_content_from_link(
     request: YouTubeVideoAddRequest,
@@ -185,9 +186,12 @@ def add_youtube_content_from_link(
         content = use_case.execute(request.url)
         background_tasks.add_task(process_single_video_pipeline)
         return {"message": "Content added successfully", "content": content}
+    except ValueError as e:
+        logger.warning(f"Failed to add YouTube content from link: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Failed to add YouTube content from link: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
 @router.get(
@@ -251,6 +255,8 @@ def get_youtube_contents(
                     item.raw_metadata.get("description") if item.raw_metadata else None
                 ),
                 tags=item.tags,
+                file_path=item.file_path,
+                language=item.language,
             )
             for item in items
         ]

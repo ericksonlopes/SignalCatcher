@@ -21,10 +21,12 @@ class YoutubeContentMapper:
             duration=model.duration,
             categories=model.categories,
             tags=model.tags,
+            file_path=model.file_path,
             error_info=model.error_info,
             published_at=model.published_at,
             created_at=model.created_at,
             updated_at=model.updated_at,
+            language=model.language,
         )
 
     @staticmethod
@@ -41,7 +43,9 @@ class YoutubeContentMapper:
             duration=entity.duration,  # type: ignore
             categories=entity.categories,  # type: ignore
             tags=entity.tags,  # type: ignore
+            file_path=entity.file_path,  # type: ignore
             error_info=entity.error_info,  # type: ignore
             created_at=entity.created_at,  # type: ignore
             updated_at=entity.updated_at,  # type: ignore
+            language=entity.language,  # type: ignore
         )

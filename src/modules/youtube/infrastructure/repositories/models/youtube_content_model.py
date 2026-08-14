@@ -29,9 +29,11 @@ class YoutubeContentModel(Base):
     published_at = Column(DateTime, nullable=True)  # Store specific error details
     raw_metadata = Column(JSON, nullable=True)  # Store extracted metadata JSON
     thumbnail = Column(String, nullable=True)
-    duration = Column(String, nullable=True)  # Format: HH:MM:SS
+    duration = Column(Integer, nullable=True)  # Format: Seconds
+    language = Column(String, nullable=True)  # Extracted language from raw_metadata
     categories = Column(JSON, nullable=True)  # List of categories
     tags = Column(JSON, nullable=True)  # List of tags
+    file_path = Column(String, nullable=True)  # Absolute path to the downloaded audio/video file
     created_at = Column(DateTime, default=get_brazil_time)
     updated_at = Column(DateTime, default=get_brazil_time, onupdate=get_brazil_time)
 
