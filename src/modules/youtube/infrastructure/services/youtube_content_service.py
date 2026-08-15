@@ -78,11 +78,12 @@ class YoutubeContentService(IYoutubeContentService):
         return self.repository.count_by_step()
 
     def get_paginated(
-        self, page: int, limit: int, step: str | None = None, search: str | None = None
+        self, page: int, limit: int, step: str | None = None, search: str | None = None, channel: str | None = None
     ) -> tuple[list[YoutubeContentEntity], int]:
         return self.repository.get_paginated(
-            page=page, limit=limit, step=step, search=search
+            page=page, limit=limit, step=step, search=search, channel=channel
         )
+
 
     def get_tracking_by_external_id(self, external_id: str) -> list[Any]:
         return self.repository.get_tracking_by_external_id(external_id)

@@ -16,9 +16,10 @@ class ContentQueries:
         return self.service.get_tracking_by_external_id(external_id)
 
     def get_contents(
-        self, page: int, limit: int, step: str | None = None, search: str | None = None
+        self, page: int, limit: int, step: str | None = None, search: str | None = None, channel: str | None = None
     ):
-        return self.service.get_paginated(page, limit, step, search)
+        return self.service.get_paginated(page, limit, step, search, channel)
+
 
     def get_content_by_external_id(self, external_id: str):
         return self.service.get_by_external_id(external_id)

@@ -229,14 +229,16 @@ def get_youtube_contents(
     limit: int = Query(20, ge=1, le=100, description="Items per page"),
     step: str | None = Query(None, description="Filter by step status"),
     search: str | None = Query(None, description="Search by title"),
+    channel: str | None = Query(None, description="Filter by channel/origin name"),
 ):
     """
     Returns a paginated list of YouTube contents.
     """
     try:
         items, total = use_case.get_contents(
-            page=page, limit=limit, step=step, search=search
+            page=page, limit=limit, step=step, search=search, channel=channel
         )
+
 
         status_counts = use_case.get_status_count()
         total_status_count = sum(status_counts.values()) if status_counts else 0

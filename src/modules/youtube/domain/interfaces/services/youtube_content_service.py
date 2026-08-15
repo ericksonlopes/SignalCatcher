@@ -52,9 +52,10 @@ class IYoutubeContentService(ABC):
 
     @abstractmethod
     def get_paginated(
-        self, page: int, limit: int, step: str | None = None, search: str | None = None
+        self, page: int, limit: int, step: str | None = None, search: str | None = None, channel: str | None = None
     ) -> tuple[list[YoutubeContentEntity], int]:
         pass
+
 
     @abstractmethod
     def get_tracking_by_external_id(self, external_id: str) -> list[Any]:

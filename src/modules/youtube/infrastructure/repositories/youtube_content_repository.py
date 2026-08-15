@@ -79,7 +79,7 @@ class YoutubeContentRepository(IYoutubeContentRepository):
             raise
 
     def get_paginated(
-        self, page: int, limit: int, step: str | None = None, search: str | None = None
+        self, page: int, limit: int, step: str | None = None, search: str | None = None, channel: str | None = None
     ) -> tuple[list[YoutubeContentEntity], int]:
         try:
             with ConnectorPostgres() as session:
@@ -91,9 +91,12 @@ class YoutubeContentRepository(IYoutubeContentRepository):
                     query = query.filter(YoutubeContentModel.step == step)
                 if search:
                     query = query.filter(YoutubeContentModel.title.ilike(f"%{search}%"))
+                if channel:
+                    query = query.filter(YoutubeContentModel.origin.ilike(f"%{channel}%"))
                 total = query.count()
                 items = query.offset(offset).limit(limit).all()
                 return [YoutubeContentMapper.to_domain(item) for item in items], total
+
         except Exception as e:
             self.logger.error(
                 f"Error fetching paginated contents: {e}", context={"error": str(e)}

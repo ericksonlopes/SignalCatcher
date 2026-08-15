@@ -21,8 +21,9 @@ class IYoutubeContentRepository(Protocol):
         ...
 
     def get_paginated(
-        self, page: int, limit: int, step: str | None = None, search: str | None = None
+        self, page: int, limit: int, step: str | None = None, search: str | None = None, channel: str | None = None
     ) -> tuple[list[YoutubeContentEntity], int]:
+
         """Returns a paginated list of contents and the total count."""
         ...
 
