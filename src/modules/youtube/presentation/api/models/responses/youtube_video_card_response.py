@@ -17,6 +17,9 @@ class YoutubeVideoCardResponse(BaseModel):
     tags: Optional[List[str]]
     file_path: Optional[str] = None
     language: Optional[str] = None
+    is_diarized: bool = False
+    diarization_status: Optional[str] = None
 
     class Config:
+
         from_attributes = True

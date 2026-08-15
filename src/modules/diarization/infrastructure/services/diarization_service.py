@@ -36,3 +36,7 @@ class DiarizationService:
 
     def get_diarizations_with_details(self) -> list[dict]:
         return self.repository.get_diarizations_with_details()
+
+    def get_diarization_statuses_by_entity_ids(self, entity_ids: list[str]) -> dict[str, str]:
+        return self.repository.get_diarization_statuses_by_entity_ids(entity_ids)
+

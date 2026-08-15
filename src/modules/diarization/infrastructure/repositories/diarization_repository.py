@@ -76,4 +76,18 @@ class DiarizationRepository:
                 })
             return diarizations
 
-
+    def get_diarization_statuses_by_entity_ids(self, entity_ids: list[str]) -> dict[str, str]:
+        if not entity_ids:
+            return {}
+        with ConnectorPostgres() as db:
+            records = (
+                db.query(DiarizationModel.entity_id, DiarizationModel.step)
+                .filter(DiarizationModel.entity_id.in_(entity_ids))
+                .order_by(DiarizationModel.created_at.desc())
+                .all()
+            )
+            result = {}
+            for entity_id, step in records:
+                if entity_id and entity_id not in result:
+                    result[entity_id] = step
+            return result

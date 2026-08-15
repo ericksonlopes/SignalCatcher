@@ -241,25 +241,43 @@ def get_youtube_contents(
         status_counts = use_case.get_status_count()
         total_status_count = sum(status_counts.values()) if status_counts else 0
 
+        # Fetch diarization statuses for returned items
+        external_ids = [item.external_id for item in items if item.external_id]
+        diarization_map = {}
+        if external_ids:
+            try:
+                from src.modules.diarization.infrastructure.services.diarization_service import (
+                    DiarizationService,
+                )
+                diar_service = DiarizationService()
+                diarization_map = diar_service.get_diarization_statuses_by_entity_ids(external_ids)
+            except Exception as ex:
+                logger.warning(f"Could not fetch diarization statuses: {ex}")
+
         # Mapping to Video Card Response
-        mapped_items = [
-            YoutubeVideoCardResponse(
-                id=item.external_id,
-                title=item.title,
-                url=item.url,
-                channel_name=item.origin,
-                step=item.step,
-                thumbnail=item.thumbnail,
-                duration=item.duration,
-                description=(
-                    item.raw_metadata.get("description") if item.raw_metadata else None
-                ),
-                tags=item.tags,
-                file_path=item.file_path,
-                language=item.language,
+        mapped_items = []
+        for item in items:
+            d_status = diarization_map.get(item.external_id)
+            mapped_items.append(
+                YoutubeVideoCardResponse(
+                    id=item.external_id,
+                    title=item.title,
+                    url=item.url,
+                    channel_name=item.origin,
+                    step=item.step,
+                    thumbnail=item.thumbnail,
+                    duration=item.duration,
+                    description=(
+                        item.raw_metadata.get("description") if item.raw_metadata else None
+                    ),
+                    tags=item.tags,
+                    file_path=item.file_path,
+                    language=item.language,
+                    is_diarized=(d_status == "COMPLETED"),
+                    diarization_status=d_status,
+                )
             )
-            for item in items
-        ]
+
 
         total_pages = math.ceil(total / limit)
 
