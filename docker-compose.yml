@@ -9,7 +9,7 @@ services:
     ports:
       - "5001:8000"
     environment:
-      POSTGRES_USER: ${POSTGRES_USER-eriberry}
+      POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       # Aponta para o nome do container do Postgres na outra stack
       POSTGRES_HOST: ${POSTGRES_HOST-postgresql}
@@ -19,7 +19,7 @@ services:
       VOICE_MONKEY_NEW_VIDEO_FOR_DOWNLOAD_MONKEY_ID: ${VOICE_MONKEY_NEW_VIDEO_FOR_DOWNLOAD_MONKEY_ID:-}
       DOWNLOAD_YOUTUBE_PATH: /app/youtube_downloads
     volumes:
-      - /media/eriberry/SSD_1/Youtube:/app/youtube_downloads
+      - /media/eriberry/SSD_1/youtube:/app/youtube_downloads
     networks:
       - shared_postgres_network
     dns:
