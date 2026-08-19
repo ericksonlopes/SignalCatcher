@@ -1,6 +1,8 @@
-from typing import Annotated
+import math
+from typing import Annotated, Optional, List, Any
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
+from pydantic import BaseModel
 
 from src.core.logger.logger import logger
 from src.modules.diarization.infrastructure.services.diarization_service import (
@@ -14,11 +16,33 @@ def get_diarization_service():
     return DiarizationService()
 
 
-from pydantic import BaseModel
-from typing import Optional
-
 class DiarizationRequest(BaseModel):
-    language: Optional[str] = None
+    language: Optional[str] = "en"
+
+
+class DiarizationCardResponse(BaseModel):
+    id: str
+    step: str
+    created_at: Optional[str] = None
+    entity_id: Optional[str] = None
+    entity_type: Optional[str] = None
+    title: str
+    channelName: str
+    thumbnail: str
+    duration: str
+    result_json: Optional[Any] = None
+
+
+class PaginatedDiarizationResponse(BaseModel):
+    items: List[DiarizationCardResponse]
+    diarizations: List[DiarizationCardResponse]
+    total: int
+    page: int
+    limit: int
+    total_pages: int
+    status_counts: Optional[dict[str, int]] = None
+    total_status_count: Optional[int] = None
+
 
 @router.post(
     "/youtube/{external_id}",
@@ -69,7 +93,7 @@ def trigger_youtube_diarization(
             file_path=content.file_path,
             entity_id=content.external_id,
             entity_type="YOUTUBE_VIDEO",
-            language=request.language,
+            language=request.language or "en",
         )
 
         return {
@@ -88,17 +112,42 @@ def trigger_youtube_diarization(
 
 @router.get(
     "/list",
+    response_model=PaginatedDiarizationResponse,
+    responses={500: {"description": "Internal server error"}},
+)
+@router.get(
+    "/",
+    response_model=PaginatedDiarizationResponse,
     responses={500: {"description": "Internal server error"}},
 )
 def get_diarizations(
     service: Annotated[DiarizationService, Depends(get_diarization_service)],
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(20, ge=1, le=100, description="Items per page"),
+    step: Optional[str] = Query(None, description="Filter by step status"),
+    search: Optional[str] = Query(None, description="Search by title or channel"),
 ):
     """
-    Returns all diarizations enriched with YouTube content details.
+    Returns a paginated list of diarizations enriched with YouTube content details.
     """
     try:
-        diarizations = service.get_diarizations_with_details()
-        return {"diarizations": diarizations}
+        items, total = service.get_diarizations_with_details(
+            page=page, limit=limit, step=step, search=search
+        )
+        status_counts = service.count_by_step()
+        total_status_count = sum(status_counts.values()) if status_counts else 0
+        total_pages = math.ceil(total / limit) if limit > 0 else 1
+
+        return {
+            "items": items,
+            "diarizations": items,
+            "total": total,
+            "page": page,
+            "limit": limit,
+            "total_pages": total_pages,
+            "status_counts": status_counts,
+            "total_status_count": total_status_count,
+        }
     except Exception as e:
         logger.error(f"Failed to fetch diarizations: {e}")
         raise HTTPException(status_code=500, detail=str(e))

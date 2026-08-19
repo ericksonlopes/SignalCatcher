@@ -50,16 +50,40 @@ class DiarizationRepository:
                 db.expunge(d)
             return diarizations
 
-    def get_diarizations_with_details(self) -> list[dict]:
+    def get_diarizations_with_details(
+        self,
+        page: int = 1,
+        limit: int = 20,
+        step: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> tuple[list[dict], int]:
         from src.modules.youtube.infrastructure.repositories.models.youtube_content_model import YoutubeContentModel
+        from sqlalchemy import or_
+
         with ConnectorPostgres() as db:
-            results = (
+            query = (
                 db.query(DiarizationModel, YoutubeContentModel)
                 .outerjoin(YoutubeContentModel, DiarizationModel.entity_id == YoutubeContentModel.external_id)
                 .order_by(DiarizationModel.created_at.desc())
-                .all()
             )
-            
+
+            if step and step.upper() != "ALL":
+                query = query.filter(DiarizationModel.step == step)
+
+            if search:
+                search_filter = f"%{search}%"
+                query = query.filter(
+                    or_(
+                        YoutubeContentModel.title.ilike(search_filter),
+                        YoutubeContentModel.origin.ilike(search_filter),
+                        DiarizationModel.entity_id.ilike(search_filter),
+                    )
+                )
+
+            total = query.count()
+            offset = (page - 1) * limit
+            results = query.offset(offset).limit(limit).all()
+
             diarizations = []
             for d_model, y_model in results:
                 diarizations.append({
@@ -74,7 +98,18 @@ class DiarizationRepository:
                     "duration": str(y_model.duration) if y_model else "00:00:00",
                     "result_json": d_model.result_json
                 })
-            return diarizations
+            return diarizations, total
+
+    def count_by_step(self) -> dict[str, int]:
+        from sqlalchemy import func
+
+        with ConnectorPostgres() as db:
+            counts = (
+                db.query(DiarizationModel.step, func.count(DiarizationModel.id))
+                .group_by(DiarizationModel.step)
+                .all()
+            )
+            return {step: count for step, count in counts if step}
 
     def get_diarization_statuses_by_entity_ids(self, entity_ids: list[str]) -> dict[str, str]:
         if not entity_ids:

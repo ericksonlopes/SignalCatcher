@@ -34,8 +34,19 @@ class DiarizationService:
     def get_all_diarizations(self) -> list[DiarizationModel]:
         return self.repository.get_all_diarizations()
 
-    def get_diarizations_with_details(self) -> list[dict]:
-        return self.repository.get_diarizations_with_details()
+    def get_diarizations_with_details(
+        self,
+        page: int = 1,
+        limit: int = 20,
+        step: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> tuple[list[dict], int]:
+        return self.repository.get_diarizations_with_details(
+            page=page, limit=limit, step=step, search=search
+        )
+
+    def count_by_step(self) -> dict[str, int]:
+        return self.repository.count_by_step()
 
     def get_diarization_statuses_by_entity_ids(self, entity_ids: list[str]) -> dict[str, str]:
         return self.repository.get_diarization_statuses_by_entity_ids(entity_ids)
