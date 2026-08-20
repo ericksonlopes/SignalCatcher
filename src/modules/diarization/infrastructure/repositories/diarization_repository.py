@@ -68,7 +68,21 @@ class DiarizationRepository:
             )
 
             if step and step.upper() != "ALL":
-                query = query.filter(DiarizationModel.step == step)
+                step_upper = step.upper()
+                if step_upper == "PENDING":
+                    query = query.filter(DiarizationModel.step == "PENDING")
+                elif step_upper == "PROCESSING":
+                    query = query.filter(
+                        DiarizationModel.step.in_(
+                            ["STARTED", "TRANSCRIPTION", "ALIGNMENT", "DIARIZATION", "PROCESSING"]
+                        )
+                    )
+                elif step_upper == "ERROR":
+                    query = query.filter(DiarizationModel.step == "ERROR")
+                elif step_upper == "COMPLETED":
+                    query = query.filter(DiarizationModel.step == "COMPLETED")
+                else:
+                    query = query.filter(DiarizationModel.step == step)
 
             if search:
                 search_filter = f"%{search}%"
