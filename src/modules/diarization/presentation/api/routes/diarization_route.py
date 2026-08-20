@@ -92,7 +92,7 @@ def trigger_youtube_diarization(
         task = service.create_task(
             file_path=content.file_path,
             entity_id=content.external_id,
-            entity_type="YOUTUBE_VIDEO",
+            entity_type="YOUTUBE",
             language=request.language or "en",
         )
 
