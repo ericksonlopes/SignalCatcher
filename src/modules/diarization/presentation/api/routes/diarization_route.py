@@ -151,3 +151,37 @@ def get_diarizations(
     except Exception as e:
         logger.error(f"Failed to fetch diarizations: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post(
+    "/{id}/reprocess",
+    responses={404: {"description": "Diarization task not found"}},
+)
+@router.post(
+    "/{id}/retry",
+    responses={404: {"description": "Diarization task not found"}},
+)
+def reprocess_diarization(
+    id: str,
+    service: Annotated[DiarizationService, Depends(get_diarization_service)],
+):
+    """
+    Resets a diarization task back to PENDING step for reprocessing.
+    Supports either the diarization task UUID or the entity_id (e.g. YouTube video external_id).
+    """
+    try:
+        task = service.reprocess_task(id)
+        if not task:
+            raise HTTPException(status_code=404, detail="Diarization task not found")
+
+        return {
+            "message": f"Diarization task {id} reprocess started (reset to PENDING)",
+            "task_id": task.id,
+            "entity_id": task.entity_id,
+            "step": task.step,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to reprocess diarization task {id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

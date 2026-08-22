@@ -140,3 +140,24 @@ class DiarizationRepository:
                 if entity_id and entity_id not in result:
                     result[entity_id] = step
             return result
+
+    def reprocess_task(self, task_id: str) -> Optional[DiarizationModel]:
+        with ConnectorPostgres() as db:
+            task = db.query(DiarizationModel).filter(DiarizationModel.id == task_id).first()
+            if not task:
+                task = (
+                    db.query(DiarizationModel)
+                    .filter(DiarizationModel.entity_id == task_id)
+                    .order_by(DiarizationModel.created_at.desc())
+                    .first()
+                )
+            if not task:
+                return None
+
+            task.step = "PENDING"
+            task.error_message = None
+            task.result_json = None
+            db.commit()
+            db.refresh(task)
+            db.expunge(task)
+            return task

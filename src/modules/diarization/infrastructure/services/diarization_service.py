@@ -51,3 +51,6 @@ class DiarizationService:
     def get_diarization_statuses_by_entity_ids(self, entity_ids: list[str]) -> dict[str, str]:
         return self.repository.get_diarization_statuses_by_entity_ids(entity_ids)
 
+    def reprocess_task(self, task_id: str) -> Optional[DiarizationModel]:
+        return self.repository.reprocess_task(task_id)
+
