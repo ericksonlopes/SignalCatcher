@@ -161,3 +161,34 @@ class DiarizationRepository:
             db.refresh(task)
             db.expunge(task)
             return task
+
+    def cancel_task(self, task_id: str) -> Optional[DiarizationModel]:
+        """
+        Cancels a diarization task that is currently in progress.
+        Only cancellable if step is in: PENDING, STARTED, TRANSCRIPTION, ALIGNMENT, DIARIZATION.
+        Returns None if task not found; returns the task with step='CANCELLED' otherwise.
+        Returns the task unchanged if it is already in a terminal state (COMPLETED, CANCELLED, ERROR).
+        """
+        cancellable_steps = {"PENDING", "STARTED", "TRANSCRIPTION", "ALIGNMENT", "DIARIZATION"}
+        with ConnectorPostgres() as db:
+            task = db.query(DiarizationModel).filter(DiarizationModel.id == task_id).first()
+            if not task:
+                task = (
+                    db.query(DiarizationModel)
+                    .filter(DiarizationModel.entity_id == task_id)
+                    .order_by(DiarizationModel.created_at.desc())
+                    .first()
+                )
+            if not task:
+                return None
+
+            if task.step not in cancellable_steps:
+                # Return the task as-is so the caller can detect it's not cancellable
+                db.expunge(task)
+                return task
+
+            task.step = "CANCELLED"
+            db.commit()
+            db.refresh(task)
+            db.expunge(task)
+            return task

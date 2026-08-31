@@ -185,3 +185,45 @@ def reprocess_diarization(
     except Exception as e:
         logger.error(f"Failed to reprocess diarization task {id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post(
+    "/{id}/cancel",
+    responses={
+        404: {"description": "Diarization task not found"},
+        409: {"description": "Diarization task is not in a cancellable state"},
+    },
+)
+def cancel_diarization(
+    id: str,
+    service: Annotated[DiarizationService, Depends(get_diarization_service)],
+):
+    """
+    Cancels a diarization task that is currently in progress.
+    Supports either the diarization task UUID or the entity_id (e.g. YouTube video external_id).
+    Only tasks with step in [PENDING, STARTED, TRANSCRIPTION, ALIGNMENT, DIARIZATION] can be cancelled.
+    After cancellation the step is set to CANCELLED, allowing a new diarization to be triggered.
+    """
+    try:
+        task = service.cancel_task(id)
+        if not task:
+            raise HTTPException(status_code=404, detail="Diarization task not found")
+
+        if task.step != "CANCELLED":
+            raise HTTPException(
+                status_code=409,
+                detail=f"Diarization task cannot be cancelled (current step: {task.step})",
+            )
+
+        return {
+            "message": f"Diarization task {id} cancelled successfully",
+            "task_id": task.id,
+            "entity_id": task.entity_id,
+            "step": task.step,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to cancel diarization task {id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+

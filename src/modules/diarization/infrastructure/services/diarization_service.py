@@ -54,3 +54,5 @@ class DiarizationService:
     def reprocess_task(self, task_id: str) -> Optional[DiarizationModel]:
         return self.repository.reprocess_task(task_id)
 
+    def cancel_task(self, task_id: str) -> Optional[DiarizationModel]:
+        return self.repository.cancel_task(task_id)
