@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  backend:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: signalcatcher_local_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER-eriberry}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD-1d0?3tP6J9Cj}
+      POSTGRES_HOST: ${POSTGRES_HOST-postgresql}
+      POSTGRES_DATABASE: ${POSTGRES_DATABASE-signalcatcher}
+      LIST_LOG_LEVELS: ${LIST_LOG_LEVELS:-DEBUG,INFO,WARNING,ERROR}
+      DOWNLOAD_YOUTUBE_PATH: /app/youtube_downloads
+    volumes:
+      - ./youtube_downloads:/app/youtube_downloads
+    networks:
+      - shared_postgres_network
+
+
+  frontend:
+    build: 
+      context: ../SignalCatcherFrontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=http://localhost:8000
+    container_name: signalcatcher_local_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - shared_postgres_network
+
+networks:
+  shared_postgres_network:
+    external: true
+    name: signalcatcher_network

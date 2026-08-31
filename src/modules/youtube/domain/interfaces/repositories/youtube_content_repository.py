@@ -3,6 +3,7 @@ from typing import Protocol
 from src.modules.youtube.domain.entities.youtube_content_entity import (
     YoutubeContentEntity,
 )
+from src.modules.youtube.domain.enums.content_step import ContentStep
 
 
 class IYoutubeContentRepository(Protocol):
@@ -10,7 +11,7 @@ class IYoutubeContentRepository(Protocol):
         """Checks if a content already exists by its external ID."""
         ...
 
-    def get_by_external_id(self, external_id: str) -> "YoutubeContentEntity | None":
+    def get_by_external_id(self, external_id: str) -> YoutubeContentEntity | None:
         """Returns the content matching the given external ID."""
         ...
 
@@ -31,8 +32,29 @@ class IYoutubeContentRepository(Protocol):
         """Returns the distinct count of contents grouped by their step."""
         ...
 
-    def get_first_by_step(self, step: "ContentStep") -> "YoutubeContentEntity | None":
+    def get_first_by_step(self, step: ContentStep) -> YoutubeContentEntity | None:
         """Returns the first content matching the given step."""
+        ...
+
+    def get_all_by_step(self, step: ContentStep) -> list[YoutubeContentEntity]:
+        """Returns every content matching the given step."""
+        ...
+
+    def get_many_by_external_ids(
+        self, external_ids: list[str]
+    ) -> dict[str, YoutubeContentEntity]:
+        """Returns the contents for the given external IDs, keyed by external ID.
+
+        Lets a caller enrich a page of results with one query instead of one per item.
+        """
+        ...
+
+    def find_external_ids_by_search(self, term: str) -> list[str]:
+        """Returns the external IDs whose title or origin match the term.
+
+        Exists so another module can filter by a YouTube attribute without joining
+        against this module's tables.
+        """
         ...
 
     def update(
@@ -42,7 +64,7 @@ class IYoutubeContentRepository(Protocol):
         ...
 
     def reset_stuck_steps(
-        self, stuck_step: "ContentStep", pending_step: "ContentStep"
+        self, stuck_step: ContentStep, pending_step: ContentStep
     ) -> int:
         """Resets contents stuck in a processing step back to a pending step, returning how many were updated."""
         ...

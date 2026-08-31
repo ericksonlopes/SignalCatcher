@@ -23,4 +23,85 @@ dependencies = [
 [dependency-groups]
 dev = [
     "mypy>=2.3.0",
+    "ruff>=0.16.5",
 ]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+extend-exclude = [
+    ".venv",
+    "alembic/versions",
+]
+
+[tool.ruff.lint]
+select = [
+    "E", # pycodestyle errors
+    "F", # pyflakes
+    "I", # isort (import ordering)
+    "UP", # pyupgrade (modern syntax for the target version)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src", "script"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["src"]
+ignore_missing_imports = true
+# Teaches mypy how BaseModel/BaseSettings build their __init__, otherwise every
+# `Settings()` and entity construction is reported as missing named arguments.
+plugins = ["pydantic.mypy"]
+# Modules are imported as "src.*" throughout the project, so anchor the package
+# base at the repository root. Without this, mypy resolves files under src/
+# ambiguously as both "core.*" and "src.core.*" and refuses to run.
+mypy_path = "."
+explicit_package_bases = true
+namespace_packages = true
+# Permissive baseline: the codebase is only partially annotated today.
+# Tighten these globally once the annotations are filled in.
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+
+# The domain layer has no external dependencies, so it is the cheapest place
+# to enforce strict typing and the most valuable one to keep clean.
+[[tool.mypy.overrides]]
+module = "src.modules.*.domain.*"
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+strict_equality = true
+
+# Alembic migrations are generated code and are not worth annotating.
+[[tool.mypy.overrides]]
+module = "alembic.*"
+ignore_errors = true
+
+# --- Documented baseline: remove these as the underlying work lands ---
+
+# The models still use the legacy `Column(...)` declarative style, so every
+# attribute is typed as `Column[X]` instead of `X`. That makes mypy reject every
+# model-to-entity assignment in the mappers. The real fix is migrating the models
+# to the SQLAlchemy 2.0 `Mapped[X]` / `mapped_column()` style, which is a
+# standalone refactor and not part of the current plan.
+[[tool.mypy.overrides]]
+module = [
+    "src.modules.*.infrastructure.repositories.models.*",
+    "src.modules.*.infrastructure.repositories.mappers.*",
+]
+disable_error_code = ["arg-type", "var-annotated"]
+
+# Same `Column[X]` root cause, reached from the repositories: assigning an entity
+# field onto a model attribute. These assignments used to be invisible to mypy
+# because `ConnectorPostgres.__enter__` was untyped, so the session (and everything
+# queried from it) collapsed to Any. Now that the session is typed, the underlying
+# debt shows up. It disappears with the same SQLAlchemy 2.0 migration.
+[[tool.mypy.overrides]]
+module = ["src.modules.*.infrastructure.repositories.*"]
+# "misc" covers the same thing showing up as a dict-comprehension key type, where a
+# model attribute is `Column[str]` instead of `str`.
+disable_error_code = ["assignment", "misc"]
+
+# (The override that used to sit here, silencing arg-type in the dependency providers
+# and the jobs, is gone: DOWNLOAD_YOUTUBE_PATH is a required `str` in Settings now, so
+# `output_path` no longer receives an Optional.)

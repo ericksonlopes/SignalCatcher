@@ -35,9 +35,10 @@ def is_bot_block(error_msg: str) -> bool:
     """Checks if the error indicates YouTube bot detection.
 
     When True, the caller should stop all operations to avoid IP bans.
+
+    Only the "not a bot" wording counts. Matching the broader "sign in to confirm"
+    prefix would also match "Sign in to confirm your age", which is an ordinary
+    per-video restriction and must not abort the whole batch. The apostrophe is left
+    out of the marker because YouTube renders it as both ' and ’.
     """
-    error_lower = error_msg.lower()
-    return (
-        "sign in to confirm you're not a bot" in error_lower
-        or "sign in to confirm" in error_lower
-    )
+    return "not a bot" in error_msg.lower()

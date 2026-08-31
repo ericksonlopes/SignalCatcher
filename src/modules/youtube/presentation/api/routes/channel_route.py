@@ -3,8 +3,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from src.modules.youtube.application.dtos.channel_create_dto import ChannelCreateDTO
-from src.modules.youtube.application.dtos.youtube_channel_create_dto import (
-    YouTubeChannelCreateDTO,
+from src.modules.youtube.application.dtos.saved_youtube_channel_response_dto import (
+    SavedYouTubeChannelResponseDTO,
 )
 from src.modules.youtube.application.dtos.youtube_channel_response_dto import (
     YouTubeChannelResponseDTO,
@@ -19,6 +19,9 @@ from src.modules.youtube.presentation.api.dependencies import (
     get_channel_commands,
     get_channel_queries,
 )
+from src.modules.youtube.presentation.api.models.requests.youtube_channel_create_request import (
+    YouTubeChannelCreateRequest,
+)
 
 router = APIRouter()
 
@@ -30,7 +33,7 @@ router = APIRouter()
     responses={status.HTTP_400_BAD_REQUEST: {"description": "Bad Request"}},
 )
 def create_youtube_channel(
-    channel_data: YouTubeChannelCreateDTO,
+    channel_data: YouTubeChannelCreateRequest,
     use_case: Annotated[ChannelCommands, Depends(get_channel_commands)],
 ):
     """
@@ -54,11 +57,6 @@ def get_all_channels(use_case: Annotated[ChannelQueries, Depends(get_channel_que
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )
-
-
-from src.modules.youtube.application.dtos.saved_youtube_channel_response_dto import (
-    SavedYouTubeChannelResponseDTO,
-)
 
 
 @router.get("/channels", response_model=list[SavedYouTubeChannelResponseDTO])

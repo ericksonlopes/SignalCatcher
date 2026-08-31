@@ -67,6 +67,14 @@ class YoutubeContentService(IYoutubeContentService):
     def get_all_by_step(self, step: ContentStep) -> list[YoutubeContentEntity]:
         return self.repository.get_all_by_step(step)
 
+    def get_many_by_external_ids(
+        self, external_ids: list[str]
+    ) -> dict[str, YoutubeContentEntity]:
+        return self.repository.get_many_by_external_ids(external_ids)
+
+    def find_external_ids_by_search(self, term: str) -> list[str]:
+        return self.repository.find_external_ids_by_search(term)
+
     def reset_stuck_steps(
         self, stuck_step: ContentStep, pending_step: ContentStep
     ) -> int:

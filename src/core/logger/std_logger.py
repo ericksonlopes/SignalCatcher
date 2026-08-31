@@ -1,12 +1,15 @@
+import inspect
 import json
 import logging
+import os
 import sys
-from typing import Any, Dict, Union, Iterable, Set
+from collections.abc import Iterable
+from typing import Any
 
 from src.core.config.settings import settings
 
 
-def _parse_allowed_levels(raw: Union[str, Iterable[str], None]) -> Set[int]:
+def _parse_allowed_levels(raw: str | Iterable[str] | None) -> set[int]:
     level_map = {
         "DEBUG": logging.DEBUG,
         "INFO": logging.INFO,
@@ -14,7 +17,7 @@ def _parse_allowed_levels(raw: Union[str, Iterable[str], None]) -> Set[int]:
         "ERROR": logging.ERROR,
         "CRITICAL": logging.CRITICAL,
     }
-    allowed: Set[int] = set()
+    allowed: set[int] = set()
     if not raw:
         return allowed
 
@@ -31,12 +34,12 @@ def _parse_allowed_levels(raw: Union[str, Iterable[str], None]) -> Set[int]:
             allowed.add(level_map[level])
     return allowed
 
-def get_allowed_levels() -> Set[int]:
+def get_allowed_levels() -> set[int]:
     raw = settings.LIST_LOG_LEVELS
     return _parse_allowed_levels(raw)
 
 class AllowedLevelsFilter(logging.Filter):
-    def __init__(self, allowed_levels: Set[int]):
+    def __init__(self, allowed_levels: set[int]):
         super().__init__()
         self.allowed_levels = allowed_levels
 
@@ -72,15 +75,15 @@ class StdLogger:
             self._logger.propagate = False
 
 
-    def _log_with_context(self, level: int, msg: str, context: Dict[str, Any] = None, *args, **kwargs):
+    def _log_with_context(
+        self, level: int, msg: str, context: dict[str, Any] | None = None, *args, **kwargs
+    ):
         """Método helper para injetar extra={'context': ...} no logger original."""
         extra = kwargs.pop("extra", {})
         extra["context"] = context if context else {}
         kwargs["extra"] = extra
         
         # Encontra dinamicamente o frame real que chamou o log, fora dos nossos wrappers
-        import inspect
-        import os
         frame = inspect.currentframe()
         depth = 1
         while frame:
@@ -93,19 +96,19 @@ class StdLogger:
             
         self._logger.log(level, msg, *args, stacklevel=depth, **kwargs)
 
-    def debug(self, msg: str, context: Dict[str, Any] = None, *args, **kwargs):
+    def debug(self, msg: str, context: dict[str, Any] | None = None, *args, **kwargs):
         self._log_with_context(logging.DEBUG, msg, context, *args, **kwargs)
 
-    def info(self, msg: str, context: Dict[str, Any] = None, *args, **kwargs):
+    def info(self, msg: str, context: dict[str, Any] | None = None, *args, **kwargs):
         self._log_with_context(logging.INFO, msg, context, *args, **kwargs)
 
-    def warning(self, msg: str, context: Dict[str, Any] = None, *args, **kwargs):
+    def warning(self, msg: str, context: dict[str, Any] | None = None, *args, **kwargs):
         self._log_with_context(logging.WARNING, msg, context, *args, **kwargs)
 
-    def error(self, msg: str, context: Dict[str, Any] = None, *args, **kwargs):
+    def error(self, msg: str, context: dict[str, Any] | None = None, *args, **kwargs):
         self._log_with_context(logging.ERROR, msg, context, *args, **kwargs)
-        
-    def critical(self, msg: str, context: Dict[str, Any] = None, *args, **kwargs):
+
+    def critical(self, msg: str, context: dict[str, Any] | None = None, *args, **kwargs):
         self._log_with_context(logging.CRITICAL, msg, context, *args, **kwargs)
 
 class InterceptHandler(logging.Handler):

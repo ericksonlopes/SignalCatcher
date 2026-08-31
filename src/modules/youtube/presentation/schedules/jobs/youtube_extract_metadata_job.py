@@ -2,32 +2,22 @@ from src.core.logger.logger import logger
 from src.modules.youtube.application.use_cases.jobs.extract_metadata_use_case import (
     ExtractMetadataUseCase,
 )
-from src.modules.youtube.infrastructure.repositories.youtube_channel_repository import (
-    YouTubeChannelRepository,
-)
-from src.modules.youtube.infrastructure.repositories.youtube_content_repository import (
-    YoutubeContentRepository,
-)
-from src.modules.youtube.infrastructure.services.youtube_content_service import (
-    YoutubeContentService,
-)
 from src.modules.youtube.infrastructure.services.youtube_scraper import (
     YouTubeScraperService,
 )
+from src.modules.youtube.infrastructure.unit_of_work import YoutubeUnitOfWork
 
 
 def extract_metadata_job():
     """Job to run the metadata extraction script."""
     logger.info("Starting scheduled job: Extract Metadata")
 
-    repo = YoutubeContentRepository(logger=logger)
-    service = YoutubeContentService(repository=repo, logger=logger)
     scraper = YouTubeScraperService(logger=logger)
-    channel_repo = YouTubeChannelRepository(logger=logger)
     use_case = ExtractMetadataUseCase(
-        youtube_content_service=service,
+        # A factory, not an instance: the use case opens a fresh transaction per
+        # phase instead of holding one open across the whole batch.
+        uow_factory=lambda: YoutubeUnitOfWork(logger=logger),
         youtube_scraper=scraper,
-        youtube_channel_repository=channel_repo,
         logger=logger,
     )
 

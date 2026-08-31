@@ -42,7 +42,9 @@ class AddContentFromLinkUseCase:
             external_id=info.id,
             title=info.title or "Untitled",
             url=info.url,
-            origin=info.channel,
+            # `origin` is non-nullable in the model and is used to build the download
+            # directory, so it needs a fallback when the channel is missing.
+            origin=info.channel or "Unknown",
         )
 
         self.logger.info(

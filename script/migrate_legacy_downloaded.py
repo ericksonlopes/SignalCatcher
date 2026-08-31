@@ -8,7 +8,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import text
-from src.infrastructure.repositories.connector import ConnectorPostgres
+from src.core.database.connector import ConnectorPostgres
 
 def migrate_downloaded_to_metadata():
     logging.info("Starting migration of DOWNLOADED to PENDING_METADATA_EXTRACTION...")
@@ -24,7 +24,7 @@ def migrate_downloaded_to_metadata():
                 result = session.execute(
                     text("UPDATE youtube_contents SET step = 'PENDING_METADATA_EXTRACTION' WHERE step = 'DOWNLOADED'")
                 )
-            except Exception as e:
+            except Exception:
                 logging.warning("Failed to update 'step' column. Attempting 'status' column if migration was not run yet.")
                 session.rollback()
                 result = session.execute(
@@ -34,8 +34,8 @@ def migrate_downloaded_to_metadata():
             session.commit()
             logging.info(f"Migration completed successfully! {result.rowcount} records were updated.")
             
-        except Exception as e:
-            logging.error(f"Error during migration: {e}")
+        except Exception:
+            logging.exception("Error during migration.")
             session.rollback()
 
 

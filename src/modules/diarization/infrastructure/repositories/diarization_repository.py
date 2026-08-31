@@ -1,194 +1,157 @@
-import logging
 from typing import Optional
-from src.modules.diarization.infrastructure.repositories.models.diarization_model import DiarizationModel
-from src.core.database.connector import ConnectorPostgres
 
-logger = logging.getLogger(__name__)
+from sqlalchemy import func, or_
+from sqlalchemy.orm import Session
+
+from src.modules.diarization.domain.entities.diarization_entity import DiarizationEntity
+from src.modules.diarization.domain.enums.diarization_step import DiarizationStep
+from src.modules.diarization.domain.interfaces.repositories.diarization_repository import (
+    IDiarizationRepository,
+)
+from src.modules.diarization.infrastructure.repositories.mappers.diarization_mapper import (
+    DiarizationMapper,
+)
+from src.modules.diarization.infrastructure.repositories.models.diarization_model import (
+    DiarizationModel,
+)
 
 
-class DiarizationRepository:
-    def create_task(
+class DiarizationRepository(IDiarizationRepository):
+    """Persistence for diarization tasks.
+
+    Takes part in the caller's transaction: writes flush but never commit, so the unit
+    of work decides when the operation is complete.
+
+    Returns domain entities. It used to hand out SQLAlchemy models and even
+    presentation-ready dicts, and it reached into the youtube_contents table directly to
+    build them; composing the two modules is the application layer's job now.
+    """
+
+    def __init__(self, session: Session):
+        self.session = session
+
+    def create_task(self, task: DiarizationEntity) -> DiarizationEntity:
+        model = DiarizationMapper.to_model(task)
+        self.session.add(model)
+        self.session.flush()
+        self.session.refresh(model)
+        return DiarizationMapper.to_domain(model)
+
+    def get_task(self, task_id: str) -> Optional[DiarizationEntity]:
+        model = (
+            self.session.query(DiarizationModel)
+            .filter(DiarizationModel.id == task_id)
+            .first()
+        )
+        return DiarizationMapper.to_domain(model) if model else None
+
+    def get_paginated(
         self,
-        file_path: str,
-        entity_id: Optional[str] = None,
-        entity_type: Optional[str] = None,
-        language: Optional[str] = None,
-        num_speakers: Optional[int] = None,
-        min_speakers: Optional[int] = None,
-        max_speakers: Optional[int] = None,
-        model_size: str = "large-v2"
-    ) -> DiarizationModel:
-        with ConnectorPostgres() as db:
-            new_task = DiarizationModel(
-                file_path=file_path,
-                entity_id=entity_id,
-                entity_type=entity_type,
-                step="PENDING",
-                language=language,
-                num_speakers=num_speakers,
-                min_speakers=min_speakers,
-                max_speakers=max_speakers,
-                model_size=model_size
-            )
-            db.add(new_task)
-            db.commit()
-            db.refresh(new_task)
-            db.expunge(new_task)
-            return new_task
-
-    def get_task(self, task_id: str) -> Optional[DiarizationModel]:
-        with ConnectorPostgres() as db:
-            task = db.query(DiarizationModel).filter(DiarizationModel.id == task_id).first()
-            if task:
-                db.expunge(task)
-            return task
-
-    def get_all_diarizations(self) -> list[DiarizationModel]:
-        with ConnectorPostgres() as db:
-            diarizations = db.query(DiarizationModel).order_by(DiarizationModel.created_at.desc()).all()
-            for d in diarizations:
-                db.expunge(d)
-            return diarizations
-
-    def get_diarizations_with_details(
-        self,
-        page: int = 1,
-        limit: int = 20,
+        page: int,
+        limit: int,
         step: Optional[str] = None,
-        search: Optional[str] = None,
-    ) -> tuple[list[dict], int]:
-        from src.modules.youtube.infrastructure.repositories.models.youtube_content_model import YoutubeContentModel
-        from sqlalchemy import or_
+        entity_ids: Optional[list[str]] = None,
+        entity_id_search: Optional[str] = None,
+    ) -> tuple[list[DiarizationEntity], int]:
+        query = self.session.query(DiarizationModel).order_by(
+            DiarizationModel.created_at.desc()
+        )
 
-        with ConnectorPostgres() as db:
-            query = (
-                db.query(DiarizationModel, YoutubeContentModel)
-                .outerjoin(YoutubeContentModel, DiarizationModel.entity_id == YoutubeContentModel.external_id)
-                .order_by(DiarizationModel.created_at.desc())
-            )
-
-            if step and step.upper() != "ALL":
-                step_upper = step.upper()
-                if step_upper == "PENDING":
-                    query = query.filter(DiarizationModel.step == "PENDING")
-                elif step_upper == "PROCESSING":
-                    query = query.filter(
-                        DiarizationModel.step.in_(
-                            ["STARTED", "TRANSCRIPTION", "ALIGNMENT", "DIARIZATION", "PROCESSING"]
-                        )
-                    )
-                elif step_upper == "ERROR":
-                    query = query.filter(DiarizationModel.step == "ERROR")
-                elif step_upper == "COMPLETED":
-                    query = query.filter(DiarizationModel.step == "COMPLETED")
-                else:
-                    query = query.filter(DiarizationModel.step == step)
-
-            if search:
-                search_filter = f"%{search}%"
+        if step and step.upper() != "ALL":
+            step_upper = step.upper()
+            if step_upper == DiarizationStep.PROCESSING.value:
+                # "PROCESSING" is a UI bucket covering every in-flight step.
                 query = query.filter(
-                    or_(
-                        YoutubeContentModel.title.ilike(search_filter),
-                        YoutubeContentModel.origin.ilike(search_filter),
-                        DiarizationModel.entity_id.ilike(search_filter),
+                    DiarizationModel.step.in_(
+                        [s.value for s in DiarizationStep.in_progress()]
                     )
                 )
+            else:
+                query = query.filter(DiarizationModel.step == step_upper)
 
-            total = query.count()
-            offset = (page - 1) * limit
-            results = query.offset(offset).limit(limit).all()
+        if entity_ids is not None or entity_id_search is not None:
+            # A search term can match either the linked entity (resolved by the caller,
+            # which is the only side that can look at video titles) or the raw id.
+            conditions = []
+            if entity_ids:
+                conditions.append(DiarizationModel.entity_id.in_(entity_ids))
+            if entity_id_search:
+                conditions.append(
+                    DiarizationModel.entity_id.ilike(f"%{entity_id_search}%")
+                )
+            if conditions:
+                query = query.filter(or_(*conditions))
+            else:
+                # A search was requested and nothing could possibly match.
+                return [], 0
 
-            diarizations = []
-            for d_model, y_model in results:
-                diarizations.append({
-                    "id": d_model.id,
-                    "step": d_model.step,
-                    "created_at": d_model.created_at.isoformat() if d_model.created_at else None,
-                    "entity_id": d_model.entity_id,
-                    "entity_type": d_model.entity_type,
-                    "title": y_model.title if y_model else "Desconhecido",
-                    "channelName": y_model.origin if y_model else "Desconhecido",
-                    "thumbnail": y_model.thumbnail if y_model else "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=300&auto=format&fit=crop&q=80",
-                    "duration": str(y_model.duration) if y_model else "00:00:00",
-                    "result_json": d_model.result_json
-                })
-            return diarizations, total
+        total = query.count()
+        offset = (page - 1) * limit
+        models = query.offset(offset).limit(limit).all()
+        return [DiarizationMapper.to_domain(m) for m in models], total
 
     def count_by_step(self) -> dict[str, int]:
-        from sqlalchemy import func
+        counts = (
+            self.session.query(DiarizationModel.step, func.count(DiarizationModel.id))
+            .group_by(DiarizationModel.step)
+            .all()
+        )
+        return {step: count for step, count in counts if step}
 
-        with ConnectorPostgres() as db:
-            counts = (
-                db.query(DiarizationModel.step, func.count(DiarizationModel.id))
-                .group_by(DiarizationModel.step)
-                .all()
-            )
-            return {step: count for step, count in counts if step}
-
-    def get_diarization_statuses_by_entity_ids(self, entity_ids: list[str]) -> dict[str, str]:
+    def get_steps_by_entity_ids(self, entity_ids: list[str]) -> dict[str, str]:
         if not entity_ids:
             return {}
-        with ConnectorPostgres() as db:
-            records = (
-                db.query(DiarizationModel.entity_id, DiarizationModel.step)
-                .filter(DiarizationModel.entity_id.in_(entity_ids))
-                .order_by(DiarizationModel.created_at.desc())
-                .all()
-            )
-            result = {}
-            for entity_id, step in records:
-                if entity_id and entity_id not in result:
-                    result[entity_id] = step
-            return result
+        records = (
+            self.session.query(DiarizationModel.entity_id, DiarizationModel.step)
+            .filter(DiarizationModel.entity_id.in_(entity_ids))
+            .order_by(DiarizationModel.created_at.desc())
+            .all()
+        )
+        result: dict[str, str] = {}
+        for entity_id, step in records:
+            if entity_id and entity_id not in result:
+                result[entity_id] = step
+        return result
 
-    def reprocess_task(self, task_id: str) -> Optional[DiarizationModel]:
-        with ConnectorPostgres() as db:
-            task = db.query(DiarizationModel).filter(DiarizationModel.id == task_id).first()
-            if not task:
-                task = (
-                    db.query(DiarizationModel)
-                    .filter(DiarizationModel.entity_id == task_id)
-                    .order_by(DiarizationModel.created_at.desc())
-                    .first()
-                )
-            if not task:
-                return None
+    def _find_model(self, task_id: str) -> Optional[DiarizationModel]:
+        """Looks a task up by its own id, falling back to the latest task of an entity."""
+        model = (
+            self.session.query(DiarizationModel)
+            .filter(DiarizationModel.id == task_id)
+            .first()
+        )
+        if model:
+            return model
+        return (
+            self.session.query(DiarizationModel)
+            .filter(DiarizationModel.entity_id == task_id)
+            .order_by(DiarizationModel.created_at.desc())
+            .first()
+        )
 
-            task.step = "PENDING"
-            task.error_message = None
-            task.result_json = None
-            db.commit()
-            db.refresh(task)
-            db.expunge(task)
-            return task
+    def reprocess_task(self, task_id: str) -> Optional[DiarizationEntity]:
+        model = self._find_model(task_id)
+        if not model:
+            return None
 
-    def cancel_task(self, task_id: str) -> Optional[DiarizationModel]:
-        """
-        Cancels a diarization task that is currently in progress.
-        Only cancellable if step is in: PENDING, STARTED, TRANSCRIPTION, ALIGNMENT, DIARIZATION.
-        Returns None if task not found; returns the task with step='CANCELLED' otherwise.
-        Returns the task unchanged if it is already in a terminal state (COMPLETED, CANCELLED, ERROR).
-        """
-        cancellable_steps = {"PENDING", "STARTED", "TRANSCRIPTION", "ALIGNMENT", "DIARIZATION"}
-        with ConnectorPostgres() as db:
-            task = db.query(DiarizationModel).filter(DiarizationModel.id == task_id).first()
-            if not task:
-                task = (
-                    db.query(DiarizationModel)
-                    .filter(DiarizationModel.entity_id == task_id)
-                    .order_by(DiarizationModel.created_at.desc())
-                    .first()
-                )
-            if not task:
-                return None
+        model.step = DiarizationStep.PENDING.value
+        model.error_message = None
+        model.result_json = None
+        self.session.flush()
+        self.session.refresh(model)
+        return DiarizationMapper.to_domain(model)
 
-            if task.step not in cancellable_steps:
-                # Return the task as-is so the caller can detect it's not cancellable
-                db.expunge(task)
-                return task
+    def cancel_task(self, task_id: str) -> Optional[DiarizationEntity]:
+        model = self._find_model(task_id)
+        if not model:
+            return None
 
-            task.step = "CANCELLED"
-            db.commit()
-            db.refresh(task)
-            db.expunge(task)
-            return task
+        cancellable = {s.value for s in DiarizationStep.cancellable()}
+        if model.step not in cancellable:
+            # Returned unchanged so the caller can tell "not found" from "not cancellable".
+            return DiarizationMapper.to_domain(model)
+
+        model.step = DiarizationStep.CANCELLED.value
+        self.session.flush()
+        self.session.refresh(model)
+        return DiarizationMapper.to_domain(model)

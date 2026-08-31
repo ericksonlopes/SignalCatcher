@@ -41,6 +41,18 @@ class IYoutubeContentService(ABC):
         pass
 
     @abstractmethod
+    def get_many_by_external_ids(
+        self, external_ids: list[str]
+    ) -> dict[str, YoutubeContentEntity]:
+        """Batch lookup, so a caller can enrich a page with a single query."""
+        pass
+
+    @abstractmethod
+    def find_external_ids_by_search(self, term: str) -> list[str]:
+        """Lets another module filter by title/origin without joining these tables."""
+        pass
+
+    @abstractmethod
     def reset_stuck_steps(
         self, stuck_step: ContentStep, pending_step: ContentStep
     ) -> int:

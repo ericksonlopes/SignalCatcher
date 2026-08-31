@@ -9,8 +9,10 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # Add the root directory of the project to PYTHONPATH so that we can import from src
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.infrastructure.repositories.connector import ConnectorPostgres
-from src.infrastructure.repositories.models.youtube_content_model import YoutubeContentModel
+from src.core.database.connector import ConnectorPostgres
+from src.modules.youtube.infrastructure.repositories.models.youtube_content_model import (
+    YoutubeContentModel,
+)
 
 
 def delete_content(external_id: str):
@@ -39,8 +41,8 @@ def delete_content(external_id: str):
                     try:
                         os.remove(file_path)
                         logging.info(f"Deleted file: {file_path}")
-                    except Exception as e:
-                        logging.error(f"Failed to delete file {file_path}: {e}")
+                    except Exception:
+                        logging.exception(f"Failed to delete file {file_path}")
             else:
                 logging.warning(f"No file found matching pattern {search_pattern}")
         else:
@@ -51,9 +53,9 @@ def delete_content(external_id: str):
             session.delete(content)
             session.commit()
             logging.info(f"Deleted record for external_id '{external_id}' from database.")
-        except Exception as e:
+        except Exception:
             session.rollback()
-            logging.error(f"Failed to delete record from database: {e}")
+            logging.exception("Failed to delete record from database.")
 
 
 if __name__ == "__main__":

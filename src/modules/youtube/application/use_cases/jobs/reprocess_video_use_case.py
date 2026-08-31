@@ -1,24 +1,22 @@
 import datetime
-import time
+from collections.abc import Callable
 
 from src.core.logger.interfaces import ILogger
 from src.modules.youtube.domain.enums.content_step import ContentStep
 from src.modules.youtube.domain.error_classifier import classify_youtube_error
 from src.modules.youtube.domain.interfaces.services.scraper import IYouTubeScraper
-from src.modules.youtube.domain.interfaces.services.youtube_content_service import (
-    IYoutubeContentService,
-)
+from src.modules.youtube.domain.interfaces.unit_of_work import IYoutubeUnitOfWork
 
 
 class ReprocessVideoUseCase:
     def __init__(
         self,
-        youtube_content_service: IYoutubeContentService,
+        uow_factory: Callable[[], IYoutubeUnitOfWork],
         scraper: IYouTubeScraper,
         output_path: str,
         logger: ILogger,
     ):
-        self.youtube_content_service = youtube_content_service
+        self.uow_factory = uow_factory
         self.scraper = scraper
         self.output_path = output_path
         self.logger = logger
@@ -27,24 +25,30 @@ class ReprocessVideoUseCase:
         """Full reprocess of a single video: metadata extraction + download.
 
         The video must be in REPROCESSING state before calling this method.
+
+        Each step transition gets its own short transaction, with the network calls
+        running between them rather than inside one.
         """
-        content = self.youtube_content_service.get_by_external_id(external_id)
+        # Validate and claim.
+        with self.uow_factory() as uow:
+            content = uow.contents.get_by_external_id(external_id)
 
-        if not content:
-            self.logger.error(f"Cannot reprocess: Content {external_id} not found.")
-            return
+            if not content:
+                self.logger.error(f"Cannot reprocess: Content {external_id} not found.")
+                return
 
-        if content.step != ContentStep.REPROCESSING:
-            self.logger.warning(
-                f"Video {external_id} is not in REPROCESSING state. Aborting."
-            )
-            return
+            if content.step != ContentStep.REPROCESSING:
+                self.logger.warning(
+                    f"Video {external_id} is not in REPROCESSING state. Aborting."
+                )
+                return
+
+            content.step = ContentStep.EXTRACTING_METADATA
+            content = uow.contents.update_content(content)
+            uow.commit()
 
         try:
-            # Phase 1: Extract metadata
-            content.step = ContentStep.EXTRACTING_METADATA
-            self.youtube_content_service.update_content(content)
-
+            # Phase 1: extract metadata, outside any transaction.
             self.logger.info(f"Reprocessing {content.title}: Extracting metadata...")
             info_dict = self.scraper.extract_metadata(content.url)
 
@@ -69,12 +73,15 @@ class ReprocessVideoUseCase:
                 if uploader_id:
                     content.origin = uploader_id.lstrip("@")
 
-            self.youtube_content_service.update_content(content)
+            # The extracted metadata and the move into DOWNLOADING commit together.
+            with self.uow_factory() as uow:
+                content = uow.contents.update_content(content)
 
-            # Phase 2: Download
-            content.step = ContentStep.DOWNLOADING
-            self.youtube_content_service.update_content(content)
+                content.step = ContentStep.DOWNLOADING
+                content = uow.contents.update_content(content)
+                uow.commit()
 
+            # Phase 2: download, outside any transaction.
             self.logger.info(f"Reprocessing {content.title}: Downloading...")
             self.scraper.download_video(
                 url=content.url,
@@ -83,15 +90,21 @@ class ReprocessVideoUseCase:
                 output_path=self.output_path,
             )
 
-            # Finished
-            content.step = ContentStep.COMPLETED
-            content.error_info = None
-            self.youtube_content_service.update_content(content)
+            # Finished: the final step and the cleared error commit together.
+            with self.uow_factory() as uow:
+                content.step = ContentStep.COMPLETED
+                content.error_info = None
+                uow.contents.update_content(content)
+                uow.commit()
+
             self.logger.info(f"Successfully reprocessed: {content.title}")
 
         except Exception as e:
             error_msg = str(e)
             self.logger.error(f"Error reprocessing {content.title}: {error_msg}")
-            content.error_info = error_msg
-            content.step = classify_youtube_error(error_msg)
-            self.youtube_content_service.update_content(content)
+
+            with self.uow_factory() as uow:
+                content.error_info = error_msg
+                content.step = classify_youtube_error(error_msg)
+                uow.contents.update_content(content)
+                uow.commit()

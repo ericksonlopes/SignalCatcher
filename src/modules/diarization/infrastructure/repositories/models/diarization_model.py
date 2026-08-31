@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -6,10 +7,12 @@ from sqlalchemy import event
 from sqlalchemy.orm.attributes import get_history
 
 from src.core.database.connector import Base
-from src.modules.youtube.domain.enums.content_step import ContentStep
+from src.modules.diarization.domain.enums.diarization_step import DiarizationStep
 from src.modules.youtube.infrastructure.repositories.models.step_tracking_model import (
     create_tracking_entry,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def get_utc_now():
@@ -26,12 +29,13 @@ class DiarizationModel(Base):
     entity_id = Column(String, nullable=True)
     entity_type = Column(String, nullable=True)
 
+    # Stored as text, with DiarizationStep as the source of truth for the valid values.
     step = Column(
         String,
         nullable=False,
-        default="PENDING",
+        default=DiarizationStep.PENDING.value,
         index=True,
-    )  # PENDING, PROCESSING, COMPLETED, ERROR
+    )
 
     # Configuration
     language = Column(String, nullable=True)
@@ -53,14 +57,33 @@ class DiarizationModel(Base):
 
 
 # Add event listeners for step tracking
+def _validated_step(raw) -> str | None:
+    """Returns the step name to record, warning instead of discarding unknown values.
+
+    These listeners used to coerce the step into ContentStep inside a bare
+    `except ValueError: pass`. Since CANCELLED is not a ContentStep, every cancellation
+    lost its tracking entry without a trace.
+    """
+    if raw is None:
+        return None
+    try:
+        return DiarizationStep(raw).name
+    except ValueError:
+        logger.warning(
+            "Diarization step '%s' is not a known DiarizationStep; "
+            "recording it in the tracking history as-is.",
+            raw,
+        )
+        return str(raw)
+
+
 @event.listens_for(DiarizationModel, "after_insert")
 def track_diarization_insert(mapper, connection, target):
+    # `mapper` is part of the SQLAlchemy event signature but unused here.
     if target.step:
-        try:
-            step_enum = ContentStep(target.step)
-            create_tracking_entry(mapper, connection, target, None, step_enum)
-        except ValueError:
-            pass
+        create_tracking_entry(
+            connection, target, None, _validated_step(target.step)
+        )
 
 
 @event.listens_for(DiarizationModel, "after_update")
@@ -71,11 +94,9 @@ def track_diarization_update(mapper, connection, target):
         new_step = hist.added[0] if hist.added else target.step
 
         if old_step != new_step:
-            try:
-                old_step_enum = ContentStep(old_step) if old_step else None
-                new_step_enum = ContentStep(new_step)
-                create_tracking_entry(
-                    mapper, connection, target, old_step_enum, new_step_enum
-                )
-            except ValueError:
-                pass
+            create_tracking_entry(
+                connection,
+                target,
+                _validated_step(old_step),
+                _validated_step(new_step),
+            )

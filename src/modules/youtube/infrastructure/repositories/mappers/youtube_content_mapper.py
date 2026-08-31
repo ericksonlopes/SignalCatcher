@@ -38,14 +38,14 @@ class YoutubeContentMapper:
             url=entity.url,
             origin=entity.origin,
             step=entity.step,
-            raw_metadata=entity.raw_metadata,  # type: ignore
-            thumbnail=entity.thumbnail,  # type: ignore
-            duration=entity.duration,  # type: ignore
-            categories=entity.categories,  # type: ignore
-            tags=entity.tags,  # type: ignore
-            file_path=entity.file_path,  # type: ignore
-            error_info=entity.error_info,  # type: ignore
-            created_at=entity.created_at,  # type: ignore
-            updated_at=entity.updated_at,  # type: ignore
-            language=entity.language,  # type: ignore
+            raw_metadata=entity.raw_metadata,
+            thumbnail=entity.thumbnail,
+            duration=entity.duration,
+            categories=entity.categories,
+            tags=entity.tags,
+            file_path=entity.file_path,
+            error_info=entity.error_info,
+            created_at=entity.created_at,
+            updated_at=entity.updated_at,
+            language=entity.language,
         )

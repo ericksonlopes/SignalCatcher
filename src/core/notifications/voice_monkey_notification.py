@@ -8,13 +8,18 @@ class VoiceMonkeyNotification(INotification):
     """
     Notification implementation using Voice Monkey.
     """
-    def __init__(self, api_token: str, monkey_id: str, logger: ILogger):
+    def __init__(
+        self, api_token: str | None, monkey_id: str | None, logger: ILogger
+    ):
+        # Both are optional on purpose: when either is missing, `send` logs a warning
+        # and returns False instead of raising, so the notification is a soft
+        # dependency of the capture pipeline.
         self.api_token = api_token
         self.monkey_id = monkey_id
         self.logger = logger
         self.base_url = "https://api-v3.voicemonkey.io/announce"
 
-    def send(self, message: str = None, **kwargs) -> bool:
+    def send(self, message: str | None = None, **kwargs) -> bool:
         self.logger.debug(
             f"Preparing to send VoiceMonkey notification for device/monkey_id: '{self.monkey_id}'",
             context={"monkey_id": self.monkey_id, "has_api_token": bool(self.api_token)}

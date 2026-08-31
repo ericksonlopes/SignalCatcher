@@ -23,6 +23,18 @@ venv
 .env
 .env.*
 !.env.example
+# yt-dlp reads cookies.txt from the project root; it holds session cookies and must
+# never be baked into the image.
+cookies.txt
+*.pem
+*.key
+credentials.json
+token.json
+
+# Local data that must not enter the image
+youtube_downloads/
+*.sqlite
+*.sqlite3
 
 # Docker
 Dockerfile

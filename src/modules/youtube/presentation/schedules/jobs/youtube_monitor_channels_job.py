@@ -6,43 +6,30 @@ from src.core.notifications.voice_monkey_notification import (
 from src.modules.youtube.application.use_cases.jobs.run_daily_capture_use_case import (
     RunDailyCaptureUseCase,
 )
-from src.modules.youtube.infrastructure.repositories.youtube_content_repository import (
-    YoutubeContentRepository,
-)
-from src.modules.youtube.infrastructure.repositories.youtube_monitored_channel_repository import (
-    YouTubeMonitoredChannelRepository,
-)
 from src.modules.youtube.infrastructure.services.monitor_task_service import (
     MonitorTaskService,
-)
-from src.modules.youtube.infrastructure.services.youtube_content_service import (
-    YoutubeContentService,
 )
 from src.modules.youtube.infrastructure.services.youtube_scraper import (
     YouTubeScraperService,
 )
-from src.modules.youtube.presentation.schedules.jobs.youtube_download_job import (
-    download_videos_job,
-)
-from src.modules.youtube.presentation.schedules.jobs.youtube_extract_metadata_job import (
-    extract_metadata_job,
-)
+from src.modules.youtube.infrastructure.unit_of_work import YoutubeUnitOfWork
 
 
 def youtube_monitor_channels_job():
+    """Detects newly published videos on every active channel.
+
+    Only detection: metadata extraction and downloading are separate scheduled jobs.
+    They used to be called synchronously from here, which meant one 30-minute slot had
+    to fit channel monitoring plus every pending download. Since APScheduler allows a
+    single instance per job, a long download run silently swallowed the next monitoring
+    ticks.
+    """
     youtube_scraper = YouTubeScraperService(logger=global_logger)
-    youtube_monitored_channel_repository = YouTubeMonitoredChannelRepository(
-        logger=global_logger
-    )
-    youtube_content_repository = YoutubeContentRepository(logger=global_logger)
-    youtube_content_service = YoutubeContentService(
-        repository=youtube_content_repository, logger=global_logger
-    )
 
     monitor_service = MonitorTaskService(
         youtube_scraper=youtube_scraper,
-        youtube_monitored_channel_repository=youtube_monitored_channel_repository,
-        youtube_content_service=youtube_content_service,
+        # One transaction per channel, opened inside the service.
+        uow_factory=lambda: YoutubeUnitOfWork(logger=global_logger),
         logger=global_logger,
     )
 
@@ -51,16 +38,10 @@ def youtube_monitor_channels_job():
     total_new_videos = use_case.execute()
 
     global_logger.info(
-        f"Daily YouTube capture job finished. Total new videos detected: {total_new_videos}",
+        f"Channel monitoring finished. Total new videos detected: {total_new_videos}. "
+        f"They will be picked up by the metadata extraction and download jobs.",
         context={"total_new_videos": total_new_videos},
     )
-    extract_metadata_job()
-
-    global_logger.info("Triggering automatic download process...")
-    try:
-        download_videos_job()
-    except Exception as e:
-        global_logger.error(f"Error during automatic download process: {e}")
 
     if total_new_videos > 0:
         global_logger.info(

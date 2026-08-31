@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware import Middleware
 
-from src.core.database.connector import Base, engine
+from src.core.config.settings import settings
 from src.core.logger.logger import logger
 from src.modules.youtube.presentation.schedules.scheduler_manager import start_scheduler
 
@@ -19,8 +19,10 @@ for _log in ["uvicorn", "uvicorn.error", "uvicorn.access", "fastapi"]:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting SignalCatcher API...")
-    Base.metadata.create_all(engine)
-
+    # The schema is owned by Alembic. `Base.metadata.create_all()` used to run here
+    # too, which created tables outside the revision chain and let the real schema
+    # drift from the migration history. Migrations are applied by the container
+    # entrypoint (`alembic upgrade head`) before the server starts.
     scheduler = start_scheduler()
     app.state.scheduler = scheduler
 
@@ -33,8 +35,11 @@ async def lifespan(app: FastAPI):
 middleware = [
     Middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
+        allow_origins=settings.cors_origin_list,
+        # No endpoint relies on cookies or HTTP auth, so credentials are not needed.
+        # The previous combination of allow_origins=["*"] with allow_credentials=True is
+        # forbidden by the CORS spec and rejected by browsers anyway.
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )

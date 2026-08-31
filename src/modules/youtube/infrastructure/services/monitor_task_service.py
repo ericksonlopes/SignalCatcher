@@ -1,18 +1,14 @@
+from collections.abc import Callable
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from src.core.logger.interfaces import ILogger
 from src.modules.youtube.domain.entities.channel_entity import ChannelEntity
-from src.modules.youtube.domain.interfaces.repositories.youtube_monitored_channel_repository import (
-    IYouTubeMonitoredChannelRepository,
-)
 from src.modules.youtube.domain.interfaces.services.monitor_service import (
     IMonitorTaskService,
 )
 from src.modules.youtube.domain.interfaces.services.scraper import IYouTubeScraper
-from src.modules.youtube.domain.interfaces.services.youtube_content_service import (
-    IYoutubeContentService,
-)
+from src.modules.youtube.domain.interfaces.unit_of_work import IYoutubeUnitOfWork
 
 
 class MonitorTaskService(IMonitorTaskService):
@@ -21,13 +17,11 @@ class MonitorTaskService(IMonitorTaskService):
     def __init__(
         self,
         youtube_scraper: IYouTubeScraper,
-        youtube_monitored_channel_repository: IYouTubeMonitoredChannelRepository,
-        youtube_content_service: IYoutubeContentService,
+        uow_factory: Callable[[], IYoutubeUnitOfWork],
         logger: ILogger,
     ):
         self.youtube_scraper = youtube_scraper
-        self.youtube_monitored_channel_repository = youtube_monitored_channel_repository
-        self.youtube_content_service = youtube_content_service
+        self.uow_factory = uow_factory
         self.logger = logger
         # Only YouTube is supported now, so we always use the youtube scraper
         self.scraper_func = self.youtube_scraper.extract_channel_videos
@@ -38,7 +32,7 @@ class MonitorTaskService(IMonitorTaskService):
             f"🔍 Checking: {channel.name}", context={"channel_name": channel.name}
         )
 
-        # Execute extraction using the scraper interface
+        # Execute extraction using the scraper interface, outside any transaction.
         try:
             items = self.scraper_func(channel.url)
         except Exception as e:
@@ -52,25 +46,29 @@ class MonitorTaskService(IMonitorTaskService):
             f"  Contents found: {len(items)}", context={"items_count": len(items)}
         )
 
+        # The new contents and the channel's last_checked_at commit as a unit. Before,
+        # each content committed on its own and last_checked_at committed separately,
+        # so a failure midway advanced the watermark for only part of the channel.
         new_count = 0
-        for item in items:
-            exists = self.youtube_content_service.exists_by_external_id(item.id)
-            if exists:
-                continue
+        with self.uow_factory() as uow:
+            for item in items:
+                if uow.contents.exists_by_external_id(item.id):
+                    continue
 
-            self.youtube_content_service.add_new_content(
-                external_id=item.id,
-                title=item.title or "Untitled",
-                url=item.url,
-                origin=channel.external_id,
-            )
-            new_count += 1
+                uow.contents.add_new_content(
+                    external_id=item.id,
+                    title=item.title or "Untitled",
+                    url=item.url,
+                    origin=channel.external_id,
+                )
+                new_count += 1
 
-        # Update last_checked_at
-        channel.last_checked_at = datetime.now(ZoneInfo("America/Sao_Paulo")).replace(
-            tzinfo=None
-        )
-        self.youtube_monitored_channel_repository.update(channel)
+            # Update last_checked_at
+            channel.last_checked_at = datetime.now(
+                ZoneInfo("America/Sao_Paulo")
+            ).replace(tzinfo=None)
+            uow.monitored_channels.update(channel)
+            uow.commit()
 
         return new_count
 
@@ -79,7 +77,8 @@ class MonitorTaskService(IMonitorTaskService):
         self.logger.debug("🌙 Starting daily check of all channels...")
 
         try:
-            channels = self.youtube_monitored_channel_repository.get_all_active()
+            with self.uow_factory() as uow:
+                channels = uow.monitored_channels.get_all_active()
 
             if not channels:
                 self.logger.warning("⚠️ No active channel registered.")

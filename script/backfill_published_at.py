@@ -10,8 +10,10 @@ logging.basicConfig(
 # Add the root directory of the project to PYTHONPATH
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.infrastructure.repositories.connector import ConnectorPostgres
-from src.infrastructure.repositories.models.youtube_content_model import YoutubeContentModel
+from src.core.database.connector import ConnectorPostgres
+from src.modules.youtube.infrastructure.repositories.models.youtube_content_model import (
+    YoutubeContentModel,
+)
 
 def main():
     logging.info("Starting backfill for published_at...")
@@ -38,8 +40,8 @@ def main():
                     try:
                         item.published_at = datetime.datetime.fromtimestamp(int(timestamp), tz=datetime.timezone.utc)
                         updated_count += 1
-                    except Exception as e:
-                        logging.error(f"Error parsing timestamp for item {item.id}: {e}")
+                    except Exception:
+                        logging.exception(f"Error parsing timestamp for item {item.id}")
 
         session.commit()
         logging.info(f"Successfully backfilled published_at for {updated_count} items!")

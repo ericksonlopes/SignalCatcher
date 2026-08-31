@@ -68,7 +68,7 @@ class IYouTubeScraper(Protocol):
 
     def download_video(
         self, url: str, content_id: str, origin: str, output_path: str
-    ) -> None:
+    ) -> str:
         """Downloads a YouTube video to the specified output path.
 
         Args:
@@ -76,5 +76,8 @@ class IYouTubeScraper(Protocol):
             content_id: The external ID of the content.
             origin: The origin/channel name for directory organization.
             output_path: The base output path for downloaded files.
+
+        Returns:
+            The absolute path of the downloaded file.
         """
         ...

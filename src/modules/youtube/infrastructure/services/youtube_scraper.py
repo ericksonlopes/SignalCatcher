@@ -1,10 +1,16 @@
+import os
+import re
 import time
-from typing import Iterable, Any
+from typing import Any, Iterable
 
+import requests
 from yt_dlp import YoutubeDL
 
+from src.core.config.settings import settings
 from src.core.logger.interfaces import ILogger
+from src.core.utils.file_utils import sanitize_path_parts
 from src.modules.youtube.domain.entities.youtube_video_dto import YouTubeVideoDTO
+from src.modules.youtube.domain.exceptions import ScraperError
 from src.modules.youtube.domain.interfaces.services.scraper import IYouTubeScraper
 
 
@@ -48,7 +54,6 @@ class YouTubeScraperService(IYouTubeScraper):
         }
 
         # Check if cookies.txt exists in the project root to bypass YouTube bot protection
-        import os
 
         project_root = os.path.dirname(
             os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -166,7 +171,7 @@ class YouTubeScraperService(IYouTubeScraper):
             with YoutubeDL(ydl_opts) as ydl:
                 info_dict = ydl.extract_info(channel_url, download=False)
                 if not info_dict:
-                    raise Exception("Failed to extract channel information.")
+                    raise ScraperError("Failed to extract channel information.")
 
                 thumbnails = info_dict.get("thumbnails", [])
                 avatar_url = (
@@ -210,14 +215,12 @@ class YouTubeScraperService(IYouTubeScraper):
         )
 
         def _extract():
-            import requests
-            import re
 
             oembed_url = f"https://www.youtube.com/oembed?url={video_url}&format=json"
             response = requests.get(oembed_url, timeout=10)
 
             if response.status_code != 200:
-                raise Exception(
+                raise ScraperError(
                     f"Failed to extract video information via oEmbed (Status: {response.status_code})."
                 )
 
@@ -265,7 +268,7 @@ class YouTubeScraperService(IYouTubeScraper):
             with YoutubeDL(ydl_opts) as ydl:
                 info_dict = ydl.extract_info(video_url, download=False)
                 if not info_dict:
-                    raise Exception("Failed to extract video information.")
+                    raise ScraperError("Failed to extract video information.")
 
                 return info_dict
 
@@ -327,10 +330,9 @@ class YouTubeScraperService(IYouTubeScraper):
             )
             raise
 
-    def download_video(self, url: str, content_id: str, origin: str, output_path: str):
-        import os
-        from src.core.utils.file_utils import sanitize_path_parts
-
+    def download_video(
+        self, url: str, content_id: str, origin: str, output_path: str
+    ) -> str:
         self.logger.debug(f"Starting download for {url} to {output_path}")
 
         parts = sanitize_path_parts(origin)
@@ -343,7 +345,6 @@ class YouTubeScraperService(IYouTubeScraper):
             {
                 "outtmpl": f"{final_output_path}/{content_id}_%(title)s.%(ext)s",
                 "format": "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best[ext=mp4]/best",
-                "ffmpeg_location": r"C:\Users\ofcer\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.1.2-full_build\bin",
                 "extract_flat": False,
                 "skip_download": False,
                 "ignoreerrors": False,
@@ -352,11 +353,17 @@ class YouTubeScraperService(IYouTubeScraper):
             }
         )
 
+        # Only pass ffmpeg_location when configured. This used to be hardcoded to a
+        # WinGet path on one Windows machine, which is meaningless in the Linux
+        # container; omitting the key lets yt-dlp find ffmpeg on PATH.
+        if settings.FFMPEG_LOCATION:
+            ydl_opts["ffmpeg_location"] = settings.FFMPEG_LOCATION
+
         with YoutubeDL(ydl_opts) as ydl:
             # We use extract_info with download=True to get the final info_dict which contains the filename
             info_dict = ydl.extract_info(url, download=True)
             if not info_dict:
-                raise Exception("Failed to download video or extract info.")
+                raise ScraperError("Failed to download video or extract info.")
                 
             # yt-dlp stores the final filename in the 'requested_downloads' list or '_filename'
             if 'requested_downloads' in info_dict and info_dict['requested_downloads']:

@@ -7,9 +7,58 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # Add the root directory of the project to PYTHONPATH so that we can import from src
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.infrastructure.repositories.connector import ConnectorPostgres
-from src.infrastructure.repositories.models.youtube_content_model import YoutubeContentModel
-from src.domain.models.enums.content_step import ContentStep
+from src.core.database.connector import ConnectorPostgres
+from src.modules.youtube.domain.enums.content_step import ContentStep
+from src.modules.youtube.infrastructure.repositories.models.youtube_content_model import (
+    YoutubeContentModel,
+)
+
+
+def _collect_non_mp4_files(directory):
+    """Returns (file_name, full_path) for every non-mp4 file under the directory."""
+    non_mp4_files = []
+    for root, _dirs, files in os.walk(directory):
+        for file in files:
+            if not file.lower().endswith('.mp4'):
+                non_mp4_files.append((file, os.path.join(root, file)))
+    return non_mp4_files
+
+
+def _reset_content_step(session, content, file_name):
+    """Moves a content back to PENDING_DOWNLOAD so it is re-downloaded from scratch."""
+    if content.step != ContentStep.PENDING_DOWNLOAD:
+        content.step = ContentStep.PENDING_DOWNLOAD
+        content.error_info = f"Found incomplete/wrong format file: {file_name}"
+        session.commit()
+        logging.info(f" {content.title} -> Step alterado para PENDING_DOWNLOAD")
+    else:
+        logging.info(f" {content.title} -> Step já estava como PENDING_DOWNLOAD")
+
+
+def _delete_broken_file(file_path, title):
+    try:
+        os.remove(file_path)
+        logging.info(f" {title} -> Arquivo incompleto deletado do disco.")
+    except Exception:
+        logging.exception(f" {title} -> Falha ao deletar arquivo.")
+
+
+def _handle_non_mp4_file(session, file_name, file_path):
+    # Filename format is ID_Title.ext, so the external id is before the first underscore.
+    external_id = file_name.split('_')[0]
+    content = session.query(YoutubeContentModel).filter(
+        YoutubeContentModel.external_id == external_id
+    ).first()
+
+    if not content:
+        logging.warning(
+            f"ID {external_id} do arquivo {file_name} não foi encontrado no banco de dados. Ignorando."
+        )
+        return
+
+    logging.info(f"ID {external_id} found in DB! (File: {file_name})")
+    _reset_content_step(session, content, file_name)
+    _delete_broken_file(file_path, content.title)
 
 
 def process_non_mp4_files(directory):
@@ -17,16 +66,7 @@ def process_non_mp4_files(directory):
         logging.error(f"Directory does not exist: {directory}")
         return
 
-    non_mp4_files = []
-
-    # Iterate through all files and subdirectories
-    for root, dirs, files in os.walk(directory):
-        for file in files:
-            # Check if file does not end with .mp4 (case insensitive)
-            if not file.lower().endswith('.mp4'):
-                full_path = os.path.join(root, file)
-                non_mp4_files.append((file, full_path))
-
+    non_mp4_files = _collect_non_mp4_files(directory)
     if not non_mp4_files:
         logging.info("All files in the directory are MP4s! No errors found.")
         return
@@ -35,37 +75,7 @@ def process_non_mp4_files(directory):
 
     with ConnectorPostgres() as session:
         for file_name, file_path in non_mp4_files:
-            # Extacting the ID (Since filename format is ID_Title.ext, ID is before the first underscore)
-            external_id = file_name.split('_')[0]
-
-            # Search the database using the extracted ID
-            content = session.query(YoutubeContentModel).filter(
-                YoutubeContentModel.external_id == external_id
-            ).first()
-
-            if content:
-                logging.info(f"ID {external_id} found in DB! (File: {file_name})")
-
-                # Reset step to PENDING_DOWNLOAD to restart download later
-                if content.step != ContentStep.PENDING_DOWNLOAD:
-                    content.step = ContentStep.PENDING_DOWNLOAD
-                    content.error_info = f"Found incomplete/wrong format file: {file_name}"
-                    session.commit()
-                    logging.info(f" {content.title} -> Step alterado para PENDING_DOWNLOAD")
-                else:
-                    logging.info(f" {content.title} -> Step já estava como PENDING_DOWNLOAD")
-
-                # We delete the broken/incomplete file so it downloads completely from scratch next time
-                try:
-                    os.remove(file_path)
-                    logging.info(f" {content.title} -> Arquivo incompleto deletado do disco.")
-                except Exception as e:
-                    logging.error(f" {content.title} -> Falha ao deletar arquivo: {e}")
-
-            else:
-                logging.warning(
-                    f"ID {external_id} do arquivo {file_name} não foi encontrado no banco de dados. Ignorando.")
-
+            _handle_non_mp4_file(session, file_name, file_path)
             logging.info("-" * 50)
 
 

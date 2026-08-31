@@ -8,7 +8,7 @@ from src.modules.youtube.domain.enums.content_step import ContentStep
 
 class StepTrackingResponse(BaseModel):
     id: int
-    previous_step: Optional[ContentStep]
+    previous_step: Optional[ContentStep] = None
     new_step: ContentStep
     changed_at: datetime
-    details: Optional[str]
+    details: Optional[str] = None

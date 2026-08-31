@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on the same branch instead of queueing them up.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      # Matches the Dockerfile (python:3.12-slim) and .python-version. Note that
+      # pyproject still declares requires-python = ">=3.10", and ruff/mypy target
+      # py310 on purpose, so the code stays compatible with the declared minimum.
+      - name: Set up Python
+        run: uv python install 3.12
+
+      # The Dockerfile installs with `uv sync --frozen`, so a lockfile that drifted
+      # from pyproject.toml breaks the image build. Catch it here instead.
+      - name: Check lockfile is up to date
+        run: uv lock --check
+
+      - name: Install dependencies
+        run: uv sync --all-groups
+
+      # Non-blocking for now: ruff was introduced without its findings ever being
+      # triaged, because the binary cannot execute in the environment where it was
+      # configured. The first CI run publishes the real list. Once it is cleaned up,
+      # drop continue-on-error so lint failures block the build.
+      - name: Lint (ruff)
+        continue-on-error: true
+        run: uv run ruff check .
+
+      - name: Type check (mypy)
+        run: uv run python -m mypy
+
+      # The project has no test suite, so this import smoke check is the only
+      # automated proof that the app is wired up and can actually start. Settings
+      # are read at import time, hence the placeholder environment.
+      - name: Import smoke check
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_HOST: localhost
+          POSTGRES_DATABASE: signalcatcher
+          DOWNLOAD_YOUTUBE_PATH: /tmp/downloads
+        run: uv run python -c "import main; print(main.app.title)"

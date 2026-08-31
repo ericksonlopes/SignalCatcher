@@ -1,41 +1,46 @@
 import math
-from typing import Annotated, Optional, List, Any
+from typing import Annotated, List, Optional
 
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from src.core.logger.logger import logger
-from src.modules.diarization.infrastructure.services.diarization_service import (
-    DiarizationService,
+from src.modules.diarization.application.dtos.diarization_card_dto import (
+    DiarizationCardDTO,
 )
+from src.modules.diarization.application.use_cases.diarization_commands import (
+    DiarizationCommands,
+)
+from src.modules.diarization.application.use_cases.diarization_queries import (
+    DiarizationQueries,
+)
+from src.modules.diarization.domain.enums.diarization_step import DiarizationStep
+from src.modules.diarization.presentation.api.dependencies import (
+    get_diarization_commands,
+    get_diarization_queries,
+)
+from src.modules.youtube.application.use_cases.content.content_queries import (
+    ContentQueries,
+)
+from src.modules.youtube.domain.enums.content_step import ContentStep
+from src.modules.youtube.presentation.api.dependencies import get_content_queries
 
 router = APIRouter()
 
-
-def get_diarization_service():
-    return DiarizationService()
+# Error detail messages, defined once so the same string is not repeated across the
+# handlers.
+TASK_NOT_FOUND_DETAIL = "Diarization task not found"
+CONTENT_NOT_FOUND_DETAIL = "Content not found"
 
 
 class DiarizationRequest(BaseModel):
     language: Optional[str] = "en"
 
 
-class DiarizationCardResponse(BaseModel):
-    id: str
-    step: str
-    created_at: Optional[str] = None
-    entity_id: Optional[str] = None
-    entity_type: Optional[str] = None
-    title: str
-    channelName: str
-    thumbnail: str
-    duration: str
-    result_json: Optional[Any] = None
-
-
 class PaginatedDiarizationResponse(BaseModel):
-    items: List[DiarizationCardResponse]
-    diarizations: List[DiarizationCardResponse]
+    items: List[DiarizationCardDTO]
+    # Same payload under two keys, kept for backwards compatibility with the frontend.
+    diarizations: List[DiarizationCardDTO]
     total: int
     page: int
     limit: int
@@ -46,37 +51,27 @@ class PaginatedDiarizationResponse(BaseModel):
 
 @router.post(
     "/youtube/{external_id}",
-    responses={404: {"description": "Content not found"}},
+    responses={
+        404: {"description": "Content not found"},
+        400: {"description": "Bad Request"},
+        500: {"description": "Internal server error"},
+    },
 )
 def trigger_youtube_diarization(
     external_id: str,
     request: DiarizationRequest,
-    service: Annotated[DiarizationService, Depends(get_diarization_service)],
+    commands: Annotated[DiarizationCommands, Depends(get_diarization_commands)],
+    queries: Annotated[ContentQueries, Depends(get_content_queries)],
 ):
     """
     Creates a diarization task for a completed YouTube content.
     """
-    from src.modules.youtube.application.use_cases.content.content_queries import (
-        ContentQueries,
-    )
-    from src.modules.youtube.infrastructure.services.youtube_content_service import (
-        YoutubeContentService,
-    )
-    from src.modules.youtube.infrastructure.repositories.youtube_content_repository import (
-        YoutubeContentRepository,
-    )
-    from src.modules.youtube.domain.enums.content_step import ContentStep
-
     try:
-        # Resolve dependencies to get content - tight coupling, but necessary without a global DI container
-        from src.core.logger.logger import logger as yt_logger
-        youtube_repo = YoutubeContentRepository(logger=yt_logger)
-        youtube_service = YoutubeContentService(repository=youtube_repo, logger=yt_logger)
-        queries = ContentQueries(youtube_service)
-
+        # The content is read through the youtube module's own provider, so this route
+        # no longer builds that module's repository and session by hand.
         content = queries.get_content_by_external_id(external_id)
         if not content:
-            raise HTTPException(status_code=404, detail="Content not found")
+            raise HTTPException(status_code=404, detail=CONTENT_NOT_FOUND_DETAIL)
 
         if (
             content.step != ContentStep.COMPLETED.name
@@ -89,7 +84,7 @@ def trigger_youtube_diarization(
         if not content.file_path:
             raise HTTPException(status_code=400, detail="Content file path is missing")
 
-        task = service.create_task(
+        task = commands.create_task(
             file_path=content.file_path,
             entity_id=content.external_id,
             entity_type="YOUTUBE",
@@ -121,20 +116,22 @@ def trigger_youtube_diarization(
     responses={500: {"description": "Internal server error"}},
 )
 def get_diarizations(
-    service: Annotated[DiarizationService, Depends(get_diarization_service)],
-    page: int = Query(1, ge=1, description="Page number"),
-    limit: int = Query(20, ge=1, le=100, description="Items per page"),
-    step: Optional[str] = Query(None, description="Filter by step status"),
-    search: Optional[str] = Query(None, description="Search by title or channel"),
+    queries: Annotated[DiarizationQueries, Depends(get_diarization_queries)],
+    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
+    limit: Annotated[int, Query(ge=1, le=100, description="Items per page")] = 20,
+    step: Annotated[Optional[str], Query(description="Filter by step status")] = None,
+    search: Annotated[
+        Optional[str], Query(description="Search by title or channel")
+    ] = None,
 ):
     """
     Returns a paginated list of diarizations enriched with YouTube content details.
     """
     try:
-        items, total = service.get_diarizations_with_details(
+        items, total = queries.get_cards(
             page=page, limit=limit, step=step, search=search
         )
-        status_counts = service.count_by_step()
+        status_counts = queries.count_by_step()
         total_status_count = sum(status_counts.values()) if status_counts else 0
         total_pages = math.ceil(total / limit) if limit > 0 else 1
 
@@ -155,30 +152,36 @@ def get_diarizations(
 
 @router.post(
     "/{id}/reprocess",
-    responses={404: {"description": "Diarization task not found"}},
+    responses={
+        404: {"description": "Diarization task not found"},
+        500: {"description": "Internal server error"},
+    },
 )
 @router.post(
     "/{id}/retry",
-    responses={404: {"description": "Diarization task not found"}},
+    responses={
+        404: {"description": "Diarization task not found"},
+        500: {"description": "Internal server error"},
+    },
 )
 def reprocess_diarization(
     id: str,
-    service: Annotated[DiarizationService, Depends(get_diarization_service)],
+    commands: Annotated[DiarizationCommands, Depends(get_diarization_commands)],
 ):
     """
     Resets a diarization task back to PENDING step for reprocessing.
     Supports either the diarization task UUID or the entity_id (e.g. YouTube video external_id).
     """
     try:
-        task = service.reprocess_task(id)
+        task = commands.reprocess_task(id)
         if not task:
-            raise HTTPException(status_code=404, detail="Diarization task not found")
+            raise HTTPException(status_code=404, detail=TASK_NOT_FOUND_DETAIL)
 
         return {
             "message": f"Diarization task {id} reprocess started (reset to PENDING)",
             "task_id": task.id,
             "entity_id": task.entity_id,
-            "step": task.step,
+            "step": task.step.value,
         }
     except HTTPException:
         raise
@@ -192,11 +195,12 @@ def reprocess_diarization(
     responses={
         404: {"description": "Diarization task not found"},
         409: {"description": "Diarization task is not in a cancellable state"},
+        500: {"description": "Internal server error"},
     },
 )
 def cancel_diarization(
     id: str,
-    service: Annotated[DiarizationService, Depends(get_diarization_service)],
+    commands: Annotated[DiarizationCommands, Depends(get_diarization_commands)],
 ):
     """
     Cancels a diarization task that is currently in progress.
@@ -205,25 +209,27 @@ def cancel_diarization(
     After cancellation the step is set to CANCELLED, allowing a new diarization to be triggered.
     """
     try:
-        task = service.cancel_task(id)
+        task = commands.cancel_task(id)
         if not task:
-            raise HTTPException(status_code=404, detail="Diarization task not found")
+            raise HTTPException(status_code=404, detail=TASK_NOT_FOUND_DETAIL)
 
-        if task.step != "CANCELLED":
+        if task.step is not DiarizationStep.CANCELLED:
             raise HTTPException(
                 status_code=409,
-                detail=f"Diarization task cannot be cancelled (current step: {task.step})",
+                detail=(
+                    "Diarization task cannot be cancelled "
+                    f"(current step: {task.step.value})"
+                ),
             )
 
         return {
             "message": f"Diarization task {id} cancelled successfully",
             "task_id": task.id,
             "entity_id": task.entity_id,
-            "step": task.step,
+            "step": task.step.value,
         }
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Failed to cancel diarization task {id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-

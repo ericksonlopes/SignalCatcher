@@ -1,66 +1,73 @@
 import datetime
+from collections.abc import Callable
 
 from src.core.logger.interfaces import ILogger
+from src.modules.youtube.domain.entities.youtube_content_entity import (
+    YoutubeContentEntity,
+)
 from src.modules.youtube.domain.enums.content_step import ContentStep
 from src.modules.youtube.domain.error_classifier import (
     classify_youtube_error,
     is_bot_block,
 )
-from src.modules.youtube.domain.interfaces.repositories.youtube_channel_repository import (
-    IYouTubeChannelRepository,
-)
 from src.modules.youtube.domain.interfaces.services.scraper import IYouTubeScraper
-from src.modules.youtube.domain.interfaces.services.youtube_content_service import (
-    IYoutubeContentService,
-)
+from src.modules.youtube.domain.interfaces.unit_of_work import IYoutubeUnitOfWork
 
 
 class ExtractMetadataUseCase:
 
     def __init__(
         self,
-        youtube_content_service: IYoutubeContentService,
+        uow_factory: Callable[[], IYoutubeUnitOfWork],
         youtube_scraper: IYouTubeScraper,
-        youtube_channel_repository: IYouTubeChannelRepository,
         logger: ILogger,
     ):
-        self.youtube_content_service = youtube_content_service
+        self.uow_factory = uow_factory
         self.youtube_scraper = youtube_scraper
-        self.youtube_channel_repository = youtube_channel_repository
         self.logger = logger
 
     def reset_stuck_items(self) -> int:
         """Resets items stuck in EXTRACTING_METADATA back to PENDING_METADATA_EXTRACTION.
 
-        Should be called before starting the extraction loop to recover from crashed runs.
+        Should be called before starting the extraction loop to recover from a run that
+        was killed outright, which is the one case a transaction cannot undo.
         """
-        return self.youtube_content_service.reset_stuck_steps(
-            stuck_step=ContentStep.EXTRACTING_METADATA,
-            pending_step=ContentStep.PENDING_METADATA_EXTRACTION,
-        )
+        with self.uow_factory() as uow:
+            count = uow.contents.reset_stuck_steps(
+                stuck_step=ContentStep.EXTRACTING_METADATA,
+                pending_step=ContentStep.PENDING_METADATA_EXTRACTION,
+            )
+            uow.commit()
+        return count
 
     def execute(self) -> bool:
         """
         Executes one pending metadata extraction.
         Returns True if a content was processed, False if there are no pending contents.
+
+        The work is split into phases with their own transactions. The scrape is a
+        network call and runs between them, so no transaction is held open across it.
         """
-        content = self.youtube_content_service.get_first_by_step(
-            ContentStep.PENDING_METADATA_EXTRACTION
-        )
+        # Phase 1: claim one pending content and commit, so EXTRACTING_METADATA is
+        # visible while the scrape runs.
+        with self.uow_factory() as uow:
+            content = uow.contents.get_first_by_step(
+                ContentStep.PENDING_METADATA_EXTRACTION
+            )
 
-        if not content:
-            return False
+            if not content:
+                return False
 
-        self.logger.info(
-            f"Extracting metadata for content: {content.title} ({content.url})"
-        )
+            self.logger.info(
+                f"Extracting metadata for content: {content.title} ({content.url})"
+            )
 
-        # Transition to EXTRACTING_METADATA
-        content.step = ContentStep.EXTRACTING_METADATA
-        self.youtube_content_service.update_content(content)
+            content.step = ContentStep.EXTRACTING_METADATA
+            content = uow.contents.update_content(content)
+            uow.commit()
 
         try:
-            # Extract metadata using the scraper
+            # Phase 2: the scrape, outside any transaction.
             metadata_dict = self.youtube_scraper.extract_metadata(content.url)
 
             content.raw_metadata = metadata_dict
@@ -81,6 +88,7 @@ class ExtractMetadataUseCase:
 
             # Update channel and content origin using external_id (handle)
             uploader_id = metadata_dict.get("uploader_id")
+            channel_info: dict | None = None
             if uploader_id:
                 external_id = uploader_id.lstrip("@")
 
@@ -97,18 +105,25 @@ class ExtractMetadataUseCase:
                     "thumbnails": [],  # Channel thumbnails aren't usually in video metadata_dict, but that's fine
                 }
 
-                # Upsert channel
-                self.youtube_channel_repository.upsert_channel(channel_info)
-
                 # Update origin
                 content.origin = external_id
 
-            # Complete step
-            content.step = ContentStep.METADATA_EXTRACTED
-            self.youtube_content_service.update_content(content)
+            # Phase 3: the channel upsert, the extracted metadata and both remaining
+            # steps land as a unit. METADATA_EXTRACTED is written before
+            # PENDING_DOWNLOAD so the step history keeps recording the transition,
+            # but a crash can no longer strand the row on either of them. Previously
+            # the upsert committed separately from the origin that points at it.
+            with self.uow_factory() as uow:
+                if channel_info is not None:
+                    uow.channels.upsert_channel(channel_info)
 
-            content.step = ContentStep.PENDING_DOWNLOAD
-            self.youtube_content_service.update_content(content)
+                content.step = ContentStep.METADATA_EXTRACTED
+                content = uow.contents.update_content(content)
+
+                content.step = ContentStep.PENDING_DOWNLOAD
+                uow.contents.update_content(content)
+                uow.commit()
+
             self.logger.info(f"Successfully extracted metadata for: {content.title}")
 
         except Exception as e:
@@ -117,15 +132,29 @@ class ExtractMetadataUseCase:
                 f"Error extracting metadata for {content.title}: {error_msg}"
             )
 
-            content.error_info = error_msg
-            content.step = classify_youtube_error(error_msg)
-            self.youtube_content_service.update_content(content)
+            classified_step = classify_youtube_error(error_msg)
+            self._record_failure(content, error_msg, classified_step)
 
-            # If YouTube blocked our IP, we must abort the entire job loop to avoid hammering them.
-            if is_bot_block(error_msg):
+            # If YouTube blocked our IP, we must abort the entire job loop to avoid
+            # hammering them. Only an unclassified failure qualifies: a recognised
+            # per-video restriction is terminal for that video alone.
+            if classified_step is ContentStep.ERROR and is_bot_block(error_msg):
                 self.logger.critical(
                     "YouTube bot block detected! Pausing scheduler job."
                 )
                 raise e
 
         return True
+
+    def _record_failure(
+        self,
+        content: YoutubeContentEntity,
+        error_msg: str,
+        classified_step: ContentStep,
+    ) -> None:
+        """Stores the classified step and the error detail in a single transaction."""
+        with self.uow_factory() as uow:
+            content.error_info = error_msg
+            content.step = classified_step
+            uow.contents.update_content(content)
+            uow.commit()

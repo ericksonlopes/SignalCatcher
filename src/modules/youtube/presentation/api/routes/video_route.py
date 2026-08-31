@@ -1,10 +1,19 @@
 import math
+import math
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Depends
-from fastapi import Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 
 from src.core.logger.logger import logger
+from src.modules.diarization.application.use_cases.diarization_queries import (
+    DiarizationQueries,
+)
+from src.modules.diarization.presentation.api.dependencies import (
+    get_diarization_queries,
+)
+from src.modules.youtube.application.use_cases.channels.channel_queries import (
+    ChannelQueries,
+)
 from src.modules.youtube.application.use_cases.content.add_content_from_link_use_case import (
     AddContentFromLinkUseCase,
 )
@@ -14,14 +23,12 @@ from src.modules.youtube.application.use_cases.content.content_commands import (
 from src.modules.youtube.application.use_cases.content.content_queries import (
     ContentQueries,
 )
+from src.modules.youtube.domain.enums.content_step import ContentStep
 from src.modules.youtube.presentation.api.dependencies import (
-    get_content_commands,
-    get_content_queries,
     get_add_content_from_link_use_case,
     get_channel_queries,
-)
-from src.modules.youtube.application.use_cases.channels.channel_queries import (
-    ChannelQueries,
+    get_content_commands,
+    get_content_queries,
 )
 from src.modules.youtube.presentation.api.models.requests.youtube_video_add_request import (
     YouTubeVideoAddRequest,
@@ -35,20 +42,21 @@ from src.modules.youtube.presentation.api.models.responses.step_tracking_respons
 from src.modules.youtube.presentation.api.models.responses.youtube_video_card_response import (
     YoutubeVideoCardResponse,
 )
-
-router = APIRouter()
-
-
-from fastapi import BackgroundTasks
-from src.modules.youtube.presentation.schedules.jobs.youtube_extract_metadata_job import (
-    extract_metadata_job,
-)
 from src.modules.youtube.presentation.schedules.jobs.youtube_download_job import (
     download_videos_job,
 )
+from src.modules.youtube.presentation.schedules.jobs.youtube_extract_metadata_job import (
+    extract_metadata_job,
+)
 from src.modules.youtube.presentation.schedules.jobs.youtube_process_errors_job import (
     process_errors_job,
+    reprocess_single_video_job,
 )
+
+router = APIRouter()
+
+# Error detail message defined once so the same literal is not repeated across handlers.
+CONTENT_NOT_FOUND_DETAIL = "Content not found"
 
 
 def process_single_video_pipeline():
@@ -60,7 +68,8 @@ def process_single_video_pipeline():
 
 
 @router.post(
-    "/content/retry-errors", responses={500: {"description": "Internal Server Error"}}
+    "/content/retry-errors",
+    responses={500: {"description": "Internal Server Error"}},
 )
 def retry_error_contents(background_tasks: BackgroundTasks):
     """
@@ -75,7 +84,8 @@ def retry_error_contents(background_tasks: BackgroundTasks):
 
 
 @router.post(
-    "/content/trigger-metadata-extraction", responses={500: {"description": "Internal Server Error"}}
+    "/content/trigger-metadata-extraction",
+    responses={500: {"description": "Internal Server Error"}},
 )
 def trigger_metadata_extraction(background_tasks: BackgroundTasks):
     """
@@ -90,7 +100,8 @@ def trigger_metadata_extraction(background_tasks: BackgroundTasks):
 
 
 @router.post(
-    "/content/trigger-downloads", responses={500: {"description": "Internal Server Error"}}
+    "/content/trigger-downloads",
+    responses={500: {"description": "Internal Server Error"}},
 )
 def trigger_downloads(background_tasks: BackgroundTasks):
     """
@@ -106,7 +117,10 @@ def trigger_downloads(background_tasks: BackgroundTasks):
 
 @router.post(
     "/content/{external_id}/retry",
-    responses={404: {"description": "Content not found"}},
+    responses={
+        404: {"description": "Content not found"},
+        500: {"description": "Internal Server Error"},
+    },
 )
 def retry_single_content(
     external_id: str,
@@ -117,15 +131,10 @@ def retry_single_content(
     Retries processing a single video by its external ID.
     It sets the video's status to REPROCESSING and runs a dedicated reprocessing pipeline.
     """
-    from src.modules.youtube.domain.enums.content_step import ContentStep
-    from src.modules.youtube.presentation.schedules.jobs.youtube_process_errors_job import (
-        reprocess_single_video_job,
-    )
-
     try:
         success = use_case.set_reprocessing(external_id)
         if not success:
-            raise HTTPException(status_code=404, detail="Content not found")
+            raise HTTPException(status_code=404, detail=CONTENT_NOT_FOUND_DETAIL)
 
         # Pass the ID to the dedicated reprocessing job
         background_tasks.add_task(reprocess_single_video_job, external_id)
@@ -142,7 +151,11 @@ def retry_single_content(
 
 
 @router.delete(
-    "/content/{external_id}", responses={404: {"description": "Content not found"}}
+    "/content/{external_id}",
+    responses={
+        404: {"description": "Content not found"},
+        500: {"description": "Internal Server Error"},
+    },
 )
 def delete_single_content(
     external_id: str,
@@ -151,12 +164,10 @@ def delete_single_content(
     """
     Sets a video step to DELETED and removes its physical file from the SSD.
     """
-    from src.modules.youtube.domain.enums.content_step import ContentStep
-
     try:
         success = use_case.delete_content(external_id)
         if not success:
-            raise HTTPException(status_code=404, detail="Content not found")
+            raise HTTPException(status_code=404, detail=CONTENT_NOT_FOUND_DETAIL)
 
         return {
             "message": f"Content {external_id} deleted successfully",
@@ -170,7 +181,13 @@ def delete_single_content(
 
 
 
-@router.post("/content", responses={400: {"description": "Bad Request"}})
+@router.post(
+    "/content",
+    responses={
+        400: {"description": "Bad Request"},
+        500: {"description": "Internal Server Error"},
+    },
+)
 def add_youtube_content_from_link(
     request: YouTubeVideoAddRequest,
     background_tasks: BackgroundTasks,
@@ -195,7 +212,8 @@ def add_youtube_content_from_link(
 
 
 @router.get(
-    "/content/status-count", responses={500: {"description": "Internal Server Error"}}
+    "/content/status-count",
+    responses={500: {"description": "Internal Server Error"}},
 )
 def get_content_status_count(
     use_case: Annotated[ContentQueries, Depends(get_content_queries)],
@@ -222,14 +240,21 @@ def get_content_status_count(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/content", response_model=PaginatedResponse[YoutubeVideoCardResponse])
+@router.get(
+    "/content",
+    response_model=PaginatedResponse[YoutubeVideoCardResponse],
+    responses={500: {"description": "Internal Server Error"}},
+)
 def get_youtube_contents(
     use_case: Annotated[ContentQueries, Depends(get_content_queries)],
-    page: int = Query(1, ge=1, description="Page number"),
-    limit: int = Query(20, ge=1, le=100, description="Items per page"),
-    step: str | None = Query(None, description="Filter by step status"),
-    search: str | None = Query(None, description="Search by title"),
-    channel: str | None = Query(None, description="Filter by channel/origin name"),
+    diarization: Annotated[DiarizationQueries, Depends(get_diarization_queries)],
+    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
+    limit: Annotated[int, Query(ge=1, le=100, description="Items per page")] = 20,
+    step: Annotated[str | None, Query(description="Filter by step status")] = None,
+    search: Annotated[str | None, Query(description="Search by title")] = None,
+    channel: Annotated[
+        str | None, Query(description="Filter by channel/origin name")
+    ] = None,
 ):
     """
     Returns a paginated list of YouTube contents.
@@ -243,16 +268,13 @@ def get_youtube_contents(
         status_counts = use_case.get_status_count()
         total_status_count = sum(status_counts.values()) if status_counts else 0
 
-        # Fetch diarization statuses for returned items
+        # Fetch diarization statuses for returned items. The lookup is best-effort:
+        # a failure here degrades the cards instead of failing the whole listing.
         external_ids = [item.external_id for item in items if item.external_id]
         diarization_map = {}
         if external_ids:
             try:
-                from src.modules.diarization.infrastructure.services.diarization_service import (
-                    DiarizationService,
-                )
-                diar_service = DiarizationService()
-                diarization_map = diar_service.get_diarization_statuses_by_entity_ids(external_ids)
+                diarization_map = diarization.get_steps_by_entity_ids(external_ids)
             except Exception as ex:
                 logger.warning(f"Could not fetch diarization statuses: {ex}")
 
@@ -298,7 +320,12 @@ def get_youtube_contents(
 
 
 @router.get(
-    "/content/{external_id}/tracking", response_model=list[StepTrackingResponse]
+    "/content/{external_id}/tracking",
+    response_model=list[StepTrackingResponse],
+    responses={
+        404: {"description": "Content not found"},
+        500: {"description": "Internal Server Error"},
+    },
 )
 def get_content_tracking(
     external_id: str,
@@ -310,7 +337,7 @@ def get_content_tracking(
     try:
         trackings = use_case.get_tracking(external_id)
         if trackings is None:
-            raise HTTPException(status_code=404, detail="Content not found")
+            raise HTTPException(status_code=404, detail=CONTENT_NOT_FOUND_DETAIL)
 
         return [
             StepTrackingResponse(

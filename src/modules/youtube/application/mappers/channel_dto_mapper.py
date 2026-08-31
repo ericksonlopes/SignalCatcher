@@ -1,5 +1,4 @@
 from src.modules.youtube.application.dtos.channel_create_dto import ChannelCreateDTO
-from src.modules.youtube.application.dtos.channel_response_dto import ChannelResponseDTO
 from src.modules.youtube.application.dtos.saved_youtube_channel_response_dto import (
     SavedYouTubeChannelResponseDTO,
 )
@@ -13,10 +12,6 @@ class ChannelDtoMapper:
     @staticmethod
     def to_entity(dto: ChannelCreateDTO) -> ChannelEntity:
         return ChannelEntity(external_id=dto.external_id, name=dto.name, url=dto.url)
-
-    @staticmethod
-    def to_response_dto(entity: ChannelEntity) -> ChannelResponseDTO:
-        return ChannelResponseDTO.model_validate(entity)
 
     @staticmethod
     def to_youtube_response_dto(entity: ChannelEntity) -> YouTubeChannelResponseDTO:

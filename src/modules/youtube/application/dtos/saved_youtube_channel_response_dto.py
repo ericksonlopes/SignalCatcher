@@ -1,10 +1,12 @@
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class SavedYouTubeChannelResponseDTO(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     external_id: str
     title: Optional[str] = None
@@ -14,6 +16,3 @@ class SavedYouTubeChannelResponseDTO(BaseModel):
     thumbnails: Optional[List[Dict[str, Any]]] = None
     created_at: Optional[datetime] = None
     video_count: int = 0
-
-    class Config:
-        from_attributes = True
