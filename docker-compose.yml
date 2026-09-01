@@ -24,7 +24,7 @@ services:
     volumes:
       # Host directory that receives the downloads. It used to be hardcoded to one
       # machine's mount point, which made the file unusable anywhere else.
-      - ${DOWNLOADS_HOST_PATH:-./youtube_downloads}:/app/youtube_downloads
+      - ${DOWNLOADS_HOST_PATH:-/media/eriberry/SSD_1/youtube}:/app/youtube_downloads
     networks:
       - shared_postgres_network
     dns:

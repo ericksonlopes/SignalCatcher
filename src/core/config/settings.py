@@ -55,8 +55,11 @@ class Settings(BaseSettings):
 
     @property
     def cors_origin_list(self) -> list[str]:
+        # A browser's Origin header never has a trailing slash, and CORS matching is
+        # exact, so "http://host:3000/" would never match. Strip it here so a stray
+        # slash in the env var does not silently break every request.
         return [
-            origin.strip()
+            origin.strip().rstrip("/")
             for origin in self.CORS_ALLOWED_ORIGINS.split(",")
             if origin.strip()
         ]
