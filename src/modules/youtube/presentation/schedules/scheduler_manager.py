@@ -16,6 +16,9 @@ from src.modules.youtube.presentation.schedules.jobs.youtube_monitor_channels_jo
 from src.modules.youtube.presentation.schedules.jobs.youtube_process_errors_job import (
     process_errors_job,
 )
+from src.modules.youtube.presentation.schedules.jobs.youtube_promote_scheduled_job import (
+    promote_scheduled_job,
+)
 
 # Job ids that no longer exist. They stay in the SQLAlchemyJobStore across restarts,
 # so they have to be deleted explicitly: otherwise the old entry keeps firing its
@@ -54,7 +57,16 @@ JOB_DEFINITIONS = (
         # Retrying errors re-downloads videos, so it stays deliberately infrequent.
         "func": process_errors_job,
         "id": "youtube_process_errors",
-        "minutes": 360,
+        "minutes": 30,
+        "misfire_grace_time": 600,
+    },
+    {
+        # Re-queues scheduled premieres / upcoming lives for download. Premieres air
+        # on their own schedule, so checking a few times a day is enough; a video that
+        # still has not aired just returns to SCHEDULED without erroring.
+        "func": promote_scheduled_job,
+        "id": "youtube_promote_scheduled",
+        "minutes": 30,
         "misfire_grace_time": 600,
     },
 )

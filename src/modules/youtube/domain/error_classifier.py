@@ -27,6 +27,16 @@ def classify_youtube_error(error_msg: str) -> ContentStep:
         return ContentStep.COPYRIGHT_REMOVED
     elif "account associated with this video has been terminated" in error_lower:
         return ContentStep.ACCOUNT_TERMINATED
+    elif (
+        "premieres in" in error_lower
+        or "premiere will begin" in error_lower
+        or "this live event will begin in" in error_lower
+        or "this live event will begin" in error_lower
+        or "this video will be available" in error_lower
+    ):
+        # Scheduled premiere / upcoming live: not terminal. The video becomes
+        # downloadable once it airs, so it is retried later instead of erroring.
+        return ContentStep.SCHEDULED
     else:
         return ContentStep.ERROR
 

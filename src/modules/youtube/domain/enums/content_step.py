@@ -12,6 +12,11 @@ class ContentStep(str, enum.Enum):
     PENDING_DOWNLOAD = "PENDING_DOWNLOAD"
     DOWNLOADING = "DOWNLOADING"
     DOWNLOADED = "DOWNLOADED"
+
+    # Video is a scheduled premiere / upcoming live that has not aired yet. This is a
+    # temporary state, not a terminal error: the video becomes downloadable once it
+    # airs, so it must be retried later rather than treated as ERROR.
+    SCHEDULED = "SCHEDULED"
     
     # Diarization steps
     PENDING = "PENDING"

@@ -79,7 +79,7 @@ def trigger_job(job_id: str, request: Request):
     Manually triggers a scheduled job by its ID.
 
     Valid ids: youtube_monitor_channels, youtube_extract_metadata,
-    youtube_download_videos, youtube_process_errors.
+    youtube_download_videos, youtube_process_errors, youtube_promote_scheduled.
     Example: POST /api/youtube/scheduler/jobs/youtube_download_videos/run
     """
     scheduler: BackgroundScheduler = request.app.state.scheduler
