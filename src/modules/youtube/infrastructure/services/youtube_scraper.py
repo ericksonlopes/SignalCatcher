@@ -350,6 +350,12 @@ class YouTubeScraperService(IYouTubeScraper):
                 "ignoreerrors": False,
                 "js_runtimes": {"node": {}},
                 "remote_components": ["ejs:github"],
+                # Write straight to the final filename instead of downloading to a
+                # ".part" file and renaming at the end. The downloads volume is an
+                # ntfs-3g (FUSE) mount shared over Samba, where that final rename
+                # intermittently fails with ENOENT and throws away a finished
+                # download. Skipping the rename removes that failure mode.
+                "nopart": True,
             }
         )
 

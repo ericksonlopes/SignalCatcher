@@ -123,4 +123,5 @@ Deleta um vídeo do banco e remove o arquivo físico do disco.
 Executa manualmente um job agendado do APScheduler.
 
 **Path Params:**
-- `job_id` — ID do job (ex: `youtube_monitor_channels_job`)
+- `job_id` — ID do job. Ids válidos: `youtube_monitor_channels`,
+  `youtube_extract_and_download`, `youtube_process_errors`, `youtube_promote_scheduled`

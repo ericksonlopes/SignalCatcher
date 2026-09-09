@@ -88,7 +88,8 @@ O `error_classifier.py` analisa mensagens de erro do yt-dlp e classifica em esta
 
 ## Extração de Metadados
 
-- Job: `youtube_extract_metadata_job`
+- Job: `extract_and_download_job` (fase 1; `extract_metadata_job` continua exposto para
+  execução isolada via API)
 - Processo:
   1. Busca vídeos com step `PENDING_METADATA_EXTRACTION`
   2. Usa YouTube oEmbed (`https://www.youtube.com/oembed`) para título e canal

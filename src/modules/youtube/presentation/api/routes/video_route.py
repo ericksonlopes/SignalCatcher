@@ -45,6 +45,9 @@ from src.modules.youtube.presentation.api.models.responses.youtube_video_card_re
 from src.modules.youtube.presentation.schedules.jobs.youtube_download_job import (
     download_videos_job,
 )
+from src.modules.youtube.presentation.schedules.jobs.youtube_extract_and_download_job import (
+    extract_and_download_job,
+)
 from src.modules.youtube.presentation.schedules.jobs.youtube_extract_metadata_job import (
     extract_metadata_job,
 )
@@ -60,9 +63,10 @@ CONTENT_NOT_FOUND_DETAIL = "Content not found"
 
 
 def process_single_video_pipeline():
+    # Same extraction-then-download chain the scheduler runs, reused here so the manual
+    # path cannot drift from the scheduled one.
     try:
-        extract_metadata_job()
-        download_videos_job()
+        extract_and_download_job()
     except Exception as e:
         logger.error(f"Error in manual video processing pipeline: {e}")
 

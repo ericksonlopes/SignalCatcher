@@ -4,11 +4,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from src.core.database.connector import engine
 from src.core.logger.logger import logger
-from src.modules.youtube.presentation.schedules.jobs.youtube_download_job import (
-    download_videos_job,
-)
-from src.modules.youtube.presentation.schedules.jobs.youtube_extract_metadata_job import (
-    extract_metadata_job,
+from src.modules.youtube.presentation.schedules.jobs.youtube_extract_and_download_job import (
+    extract_and_download_job,
 )
 from src.modules.youtube.presentation.schedules.jobs.youtube_monitor_channels_job import (
     youtube_monitor_channels_job,
@@ -23,11 +20,20 @@ from src.modules.youtube.presentation.schedules.jobs.youtube_promote_scheduled_j
 # Job ids that no longer exist. They stay in the SQLAlchemyJobStore across restarts,
 # so they have to be deleted explicitly: otherwise the old entry keeps firing its
 # still-importable function alongside the new job, monitoring every channel twice.
-LEGACY_JOB_IDS = ("daily_youtube_capture_job",)
+#
+# `youtube_extract_metadata` and `youtube_download_videos` were merged into the single
+# `youtube_extract_and_download` job; without this cleanup the persisted entries would
+# keep running extraction and download in parallel with the merged job.
+LEGACY_JOB_IDS = (
+    "daily_youtube_capture_job",
+    "youtube_extract_metadata",
+    "youtube_download_videos",
+)
 
 # The stage jobs used to be called synchronously from inside the monitor job, which
 # meant a single 30-minute slot had to fit channel monitoring plus metadata extraction
-# plus every pending download. They are independent now, each with its own cadence.
+# plus every pending download. Channel monitoring is independent now; extraction and
+# download share one job because download depends on extraction having finished.
 #
 # `max_instances=1` keeps a long run from overlapping itself; `coalesce=True` collapses
 # runs missed while the process was down into a single catch-up instead of a burst; and
@@ -40,17 +46,13 @@ JOB_DEFINITIONS = (
         "misfire_grace_time": 300,
     },
     {
-        "func": extract_metadata_job,
-        "id": "youtube_extract_metadata",
+        # Extraction and download are chained in one job so a download pass always
+        # starts right after extraction finishes, instead of waiting for its own tick.
+        # Downloads are the long pole (a single video can take hours), so this leans on
+        # max_instances=1 to skip any tick that is still busy.
+        "func": extract_and_download_job,
+        "id": "youtube_extract_and_download",
         "minutes": 15,
-        "misfire_grace_time": 300,
-    },
-    {
-        # Downloads are the long pole: a single video can take hours, so this runs on a
-        # wide interval and relies on max_instances=1 to skip a tick that is still busy.
-        "func": download_videos_job,
-        "id": "youtube_download_videos",
-        "minutes": 60,
         "misfire_grace_time": 600,
     },
     {

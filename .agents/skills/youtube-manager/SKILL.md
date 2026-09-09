@@ -48,7 +48,7 @@ src/modules/youtube/
 │
 └── presentation/
     ├── api/routes/                  # video_route.py, channel_route.py, playlist_route.py
-    └── schedules/jobs/              # youtube_monitor_channels_job, youtube_extract_metadata_job
+    └── schedules/jobs/              # youtube_monitor_channels_job, youtube_extract_and_download_job
 ```
 
 ### Pipeline de Processamento (ContentStep)
@@ -84,8 +84,8 @@ STARTED → PENDING_METADATA_EXTRACTION → EXTRACTING_METADATA → METADATA_EXT
 ### Jobs APScheduler
 
 - `youtube_monitor_channels_job` — a cada 30 min, escaneia canais ativos, notifica via Alexa
-- `youtube_extract_metadata_job` — extrai metadados pendentes
-- Jobs de download — baixa vídeos em 1080p MP4
+- `extract_and_download_job` (id `youtube_extract_and_download`) — a cada 15 min, extrai
+  todos os metadados pendentes e, ao terminar, baixa a fila de vídeos em 1080p MP4
 
 ### Integração yt-dlp
 

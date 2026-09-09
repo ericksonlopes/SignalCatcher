@@ -7,6 +7,9 @@ from src.core.logger.logger import logger
 from src.modules.youtube.presentation.schedules.jobs.youtube_download_job import (
     download_videos_job,
 )
+from src.modules.youtube.presentation.schedules.jobs.youtube_extract_and_download_job import (
+    extract_and_download_job,
+)
 from src.modules.youtube.presentation.schedules.jobs.youtube_extract_metadata_job import (
     extract_metadata_job,
 )
@@ -38,6 +41,22 @@ def execute_download_videos(background_tasks: BackgroundTasks):
     background_tasks.add_task(download_videos_job)
     logger.info("⚡ Background task for download_videos_job triggered via API.")
     return {"message": "download_videos_job execution started in the background."}
+
+
+@router.post(
+    "/jobs/extract-and-download/execute", status_code=status.HTTP_202_ACCEPTED
+)
+def execute_extract_and_download(background_tasks: BackgroundTasks):
+    """
+    Executes metadata extraction followed by the download queue, same as the scheduled
+    `youtube_extract_and_download` job.
+
+    The `/jobs/extract-metadata/execute` and `/jobs/download-videos/execute` endpoints
+    are still available when only one of the two phases is wanted.
+    """
+    background_tasks.add_task(extract_and_download_job)
+    logger.info("⚡ Background task for extract_and_download_job triggered via API.")
+    return {"message": "extract_and_download_job execution started in the background."}
 
 
 @router.post("/jobs/process-errors/execute", status_code=status.HTTP_202_ACCEPTED)
@@ -78,9 +97,9 @@ def trigger_job(job_id: str, request: Request):
     """
     Manually triggers a scheduled job by its ID.
 
-    Valid ids: youtube_monitor_channels, youtube_extract_metadata,
-    youtube_download_videos, youtube_process_errors, youtube_promote_scheduled.
-    Example: POST /api/youtube/scheduler/jobs/youtube_download_videos/run
+    Valid ids: youtube_monitor_channels, youtube_extract_and_download,
+    youtube_process_errors, youtube_promote_scheduled.
+    Example: POST /api/youtube/scheduler/jobs/youtube_extract_and_download/run
     """
     scheduler: BackgroundScheduler = request.app.state.scheduler
 
