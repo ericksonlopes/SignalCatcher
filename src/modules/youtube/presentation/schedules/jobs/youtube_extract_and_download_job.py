@@ -8,17 +8,7 @@ from src.modules.youtube.presentation.schedules.jobs.youtube_extract_metadata_jo
 
 
 def extract_and_download_job():
-    """Runs metadata extraction to completion, then drains the download queue.
-
-    Extraction and download used to be two independent scheduled jobs, which meant a
-    download tick could fire while metadata was still being extracted and find nothing
-    to do, leaving freshly extracted videos waiting for the next tick. Chaining them in
-    a single job guarantees every video that just became downloadable is picked up in
-    the same run.
-
-    Both steps already swallow and log their own exceptions, so a failure inside
-    extraction never prevents the download phase from running.
-    """
+    """Drain metadata then downloads; aborted phases reach worker telemetry."""
     logger.info("Starting scheduled job: Extract Metadata + Download Videos")
 
     extract_metadata_job()

@@ -1,34 +1,26 @@
 import math
-import math
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
+from src.core.database.job_control import JobControlRepository
 from src.core.logger.logger import logger
-from src.modules.diarization.application.use_cases.diarization_queries import (
-    DiarizationQueries,
-)
-from src.modules.diarization.presentation.api.dependencies import (
-    get_diarization_queries,
-)
-from src.modules.youtube.application.use_cases.channels.channel_queries import (
-    ChannelQueries,
-)
+from src.modules.diarization.application.use_cases.diarization_queries import DiarizationQueries
+from src.modules.diarization.presentation.api.dependencies import get_diarization_queries
+from src.modules.youtube.application.use_cases.channels.channel_queries import ChannelQueries
 from src.modules.youtube.application.use_cases.content.add_content_from_link_use_case import (
     AddContentFromLinkUseCase,
 )
-from src.modules.youtube.application.use_cases.content.content_commands import (
-    ContentCommands,
-)
-from src.modules.youtube.application.use_cases.content.content_queries import (
-    ContentQueries,
-)
+from src.modules.youtube.application.use_cases.content.content_commands import ContentCommands
+from src.modules.youtube.application.use_cases.content.content_queries import ContentQueries
 from src.modules.youtube.domain.enums.content_step import ContentStep
+from src.modules.youtube.domain.processing import ContentBusyError
 from src.modules.youtube.presentation.api.dependencies import (
     get_add_content_from_link_use_case,
     get_channel_queries,
     get_content_commands,
     get_content_queries,
+    get_job_control,
 )
 from src.modules.youtube.presentation.api.models.requests.youtube_video_add_request import (
     YouTubeVideoAddRequest,
@@ -42,177 +34,72 @@ from src.modules.youtube.presentation.api.models.responses.step_tracking_respons
 from src.modules.youtube.presentation.api.models.responses.youtube_video_card_response import (
     YoutubeVideoCardResponse,
 )
-from src.modules.youtube.presentation.schedules.jobs.youtube_download_job import (
-    download_videos_job,
-)
-from src.modules.youtube.presentation.schedules.jobs.youtube_extract_and_download_job import (
-    extract_and_download_job,
-)
-from src.modules.youtube.presentation.schedules.jobs.youtube_extract_metadata_job import (
-    extract_metadata_job,
-)
-from src.modules.youtube.presentation.schedules.jobs.youtube_process_errors_job import (
-    process_errors_job,
-    reprocess_single_video_job,
-)
 
 router = APIRouter()
-
-# Error detail message defined once so the same literal is not repeated across handlers.
 CONTENT_NOT_FOUND_DETAIL = "Content not found"
+JobControl = Annotated[JobControlRepository, Depends(get_job_control)]
 
 
-def process_single_video_pipeline():
-    # Same extraction-then-download chain the scheduler runs, reused here so the manual
-    # path cannot drift from the scheduled one.
-    try:
-        extract_and_download_job()
-    except Exception as e:
-        logger.error(f"Error in manual video processing pipeline: {e}")
+@router.post("/content/retry-errors", status_code=202)
+def retry_error_contents(control: JobControl):
+    control.request("youtube_process_errors")
+    return {"message": "Error retry request queued."}
 
 
-@router.post(
-    "/content/retry-errors",
-    responses={500: {"description": "Internal Server Error"}},
-)
-def retry_error_contents(background_tasks: BackgroundTasks):
-    """
-    Triggers the background job to retry downloading all videos that are currently in the ERROR step.
-    """
-    try:
-        background_tasks.add_task(process_errors_job)
-        return {"message": "Error retry job started in the background."}
-    except Exception as e:
-        logger.error(f"Failed to trigger error retry job: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+@router.post("/content/trigger-metadata-extraction", status_code=202)
+def trigger_metadata_extraction(control: JobControl):
+    control.request("youtube_extract_metadata")
+    return {"message": "Metadata extraction request queued."}
 
 
-@router.post(
-    "/content/trigger-metadata-extraction",
-    responses={500: {"description": "Internal Server Error"}},
-)
-def trigger_metadata_extraction(background_tasks: BackgroundTasks):
-    """
-    Triggers the background job to extract metadata for pending videos.
-    """
-    try:
-        background_tasks.add_task(extract_metadata_job)
-        return {"message": "Metadata extraction job started in the background."}
-    except Exception as e:
-        logger.error(f"Failed to trigger metadata extraction job: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+@router.post("/content/trigger-downloads", status_code=202)
+def trigger_downloads(control: JobControl):
+    control.request("youtube_download_videos")
+    return {"message": "Download request queued."}
 
 
-@router.post(
-    "/content/trigger-downloads",
-    responses={500: {"description": "Internal Server Error"}},
-)
-def trigger_downloads(background_tasks: BackgroundTasks):
-    """
-    Triggers the background job to download pending videos.
-    """
-    try:
-        background_tasks.add_task(download_videos_job)
-        return {"message": "Video download job started in the background."}
-    except Exception as e:
-        logger.error(f"Failed to trigger video download job: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post(
-    "/content/{external_id}/retry",
-    responses={
-        404: {"description": "Content not found"},
-        500: {"description": "Internal Server Error"},
-    },
-)
+@router.post("/content/{external_id}/retry", status_code=202)
 def retry_single_content(
     external_id: str,
-    background_tasks: BackgroundTasks,
     use_case: Annotated[ContentCommands, Depends(get_content_commands)],
+    control: JobControl,
 ):
-    """
-    Retries processing a single video by its external ID.
-    It sets the video's status to REPROCESSING and runs a dedicated reprocessing pipeline.
-    """
     try:
-        success = use_case.set_reprocessing(external_id)
-        if not success:
-            raise HTTPException(status_code=404, detail=CONTENT_NOT_FOUND_DETAIL)
-
-        # Pass the ID to the dedicated reprocessing job
-        background_tasks.add_task(reprocess_single_video_job, external_id)
-
-        return {
-            "message": f"Retry started for content {external_id}",
-            "step": ContentStep.REPROCESSING.name,
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to retry single content {external_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        if not use_case.set_reprocessing(external_id):
+            raise HTTPException(404, CONTENT_NOT_FOUND_DETAIL)
+        control.request("youtube_process_errors")
+        return {"message": "Retry queued.", "step": ContentStep.REPROCESSING.name}
+    except ContentBusyError as exc:
+        raise HTTPException(409, str(exc)) from exc
 
 
-@router.delete(
-    "/content/{external_id}",
-    responses={
-        404: {"description": "Content not found"},
-        500: {"description": "Internal Server Error"},
-    },
-)
+@router.delete("/content/{external_id}", status_code=202)
 def delete_single_content(
     external_id: str,
     use_case: Annotated[ContentCommands, Depends(get_content_commands)],
+    control: JobControl,
 ):
-    """
-    Sets a video step to DELETED and removes its physical file from the SSD.
-    """
     try:
-        success = use_case.delete_content(external_id)
-        if not success:
-            raise HTTPException(status_code=404, detail=CONTENT_NOT_FOUND_DETAIL)
-
-        return {
-            "message": f"Content {external_id} deleted successfully",
-            "step": ContentStep.DELETED.name,
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to delete single content {external_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        if not use_case.delete_content(external_id):
+            raise HTTPException(404, CONTENT_NOT_FOUND_DETAIL)
+        control.request("youtube_delete_contents")
+        return {"message": "File deletion queued.", "deletion_requested": True}
+    except ContentBusyError as exc:
+        raise HTTPException(409, str(exc)) from exc
 
 
-
-@router.post(
-    "/content",
-    responses={
-        400: {"description": "Bad Request"},
-        500: {"description": "Internal Server Error"},
-    },
-)
+@router.post("/content")
 def add_youtube_content_from_link(
     request: YouTubeVideoAddRequest,
-    background_tasks: BackgroundTasks,
-    use_case: Annotated[
-        AddContentFromLinkUseCase, Depends(get_add_content_from_link_use_case)
-    ],
+    use_case: Annotated[AddContentFromLinkUseCase, Depends(get_add_content_from_link_use_case)],
+    control: JobControl,
 ):
-    """
-    Adds a new content from a given YouTube link.
-    It extracts the video metadata (title, channel) and creates a content entity.
-    """
     try:
         content = use_case.execute(request.url)
-        background_tasks.add_task(process_single_video_pipeline)
+        control.request("youtube_extract_and_download")
         return {"message": "Content added successfully", "content": content}
-    except ValueError as e:
-        logger.warning(f"Failed to add YouTube content from link: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"Failed to add YouTube content from link: {e}")
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 @router.get(
@@ -228,20 +115,20 @@ def get_content_status_count(
     """
     try:
         counts = use_case.get_status_count()
-        
+
         total_videos = sum(counts.values()) if counts else 0
         total_saved_channels = len(channel_use_case.get_saved_channels())
         total_monitored_channels = len(channel_use_case.get_all_channels())
-        
+
         return {
             "status_counts": counts,
             "total_videos": total_videos,
             "total_saved_channels": total_saved_channels,
-            "total_monitored_channels": total_monitored_channels
+            "total_monitored_channels": total_monitored_channels,
         }
     except Exception as e:
         logger.error(f"Failed to get content status count: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
 @router.get(
@@ -256,9 +143,7 @@ def get_youtube_contents(
     limit: Annotated[int, Query(ge=1, le=100, description="Items per page")] = 20,
     step: Annotated[str | None, Query(description="Filter by step status")] = None,
     search: Annotated[str | None, Query(description="Search by title")] = None,
-    channel: Annotated[
-        str | None, Query(description="Filter by channel/origin name")
-    ] = None,
+    channel: Annotated[str | None, Query(description="Filter by channel/origin name")] = None,
 ):
     """
     Returns a paginated list of YouTube contents.
@@ -267,7 +152,6 @@ def get_youtube_contents(
         items, total = use_case.get_contents(
             page=page, limit=limit, step=step, search=search, channel=channel
         )
-
 
         status_counts = use_case.get_status_count()
         total_status_count = sum(status_counts.values()) if status_counts else 0
@@ -301,11 +185,16 @@ def get_youtube_contents(
                     tags=item.tags,
                     file_path=item.file_path,
                     language=item.language,
+                    created_at=item.created_at,
+                    published_at=item.published_at,
+                    deletion_requested=item.deletion_requested,
+                    attempt_count=item.attempt_count,
+                    next_retry_at=item.next_retry_at,
+                    error_info=item.error_info,
                     is_diarized=(d_status == "COMPLETED"),
                     diarization_status=d_status,
                 )
             )
-
 
         total_pages = math.ceil(total / limit)
 
@@ -320,7 +209,7 @@ def get_youtube_contents(
         )
     except Exception as e:
         logger.error(f"Failed to get paginated contents: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
 @router.get(
@@ -357,4 +246,4 @@ def get_content_tracking(
         raise
     except Exception as e:
         logger.error(f"Failed to get tracking for {external_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal Server Error")

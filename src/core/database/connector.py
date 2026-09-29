@@ -6,12 +6,12 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 from src.core.config.settings import settings
 
-connect_args: dict[str, Any] = {}
+connect_args: dict[str, Any] = {"connect_timeout": 5, "options": "-c statement_timeout=10000"}
 
 if settings.database_url.startswith("sqlite"):
-    connect_args["check_same_thread"] = False
+    connect_args = {"check_same_thread": False}
 
-engine = create_engine(settings.database_url, connect_args=connect_args)
+engine = create_engine(settings.database_url, connect_args=connect_args, pool_pre_ping=True)
 
 # Session factory. Kept under this name because it is imported as such across the
 # project; `SqlAlchemyUnitOfWork` takes it as its default session factory.

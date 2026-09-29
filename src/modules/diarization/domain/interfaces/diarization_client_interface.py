@@ -19,7 +19,7 @@ class IDiarizationClient(ABC):
         num_speakers: int | None = None,
         min_speakers: int | None = None,
         max_speakers: int | None = None,
-        model_size: str = "large-v2"
+        model_size: str = "large-v2",
     ) -> DiarizationResponse:
         """Faz o upload de um arquivo para a API de diarização."""
         pass

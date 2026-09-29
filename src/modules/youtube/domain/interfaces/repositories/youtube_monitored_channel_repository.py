@@ -1,14 +1,14 @@
-from typing import Protocol, Optional
+from typing import Protocol
 
 from src.modules.youtube.domain.entities.channel_entity import ChannelEntity
 
 
 class IYouTubeMonitoredChannelRepository(Protocol):
-    def get_by_url(self, url: str) -> Optional[ChannelEntity]:
+    def get_by_url(self, url: str) -> ChannelEntity | None:
         """Fetches a channel by its URL."""
         ...
 
-    def get_by_id(self, channel_id: int) -> Optional[ChannelEntity]:
+    def get_by_id(self, channel_id: int) -> ChannelEntity | None:
         """Fetches a channel by its ID."""
         ...
 

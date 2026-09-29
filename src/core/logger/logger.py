@@ -14,29 +14,19 @@ class Logger(ILogger):
     def __init__(self) -> None:
         self._logger = StdLogger(LOG_FORMAT)
 
-    def debug(
-        self, msg: str, context: dict[str, Any] | None = None, *args, **kwargs
-    ) -> None:
+    def debug(self, msg: str, context: dict[str, Any] | None = None, *args, **kwargs) -> None:
         self._logger.debug(msg, context, *args, **kwargs)
 
-    def info(
-        self, msg: str, context: dict[str, Any] | None = None, *args, **kwargs
-    ) -> None:
+    def info(self, msg: str, context: dict[str, Any] | None = None, *args, **kwargs) -> None:
         self._logger.info(msg, context, *args, **kwargs)
 
-    def warning(
-        self, msg: str, context: dict[str, Any] | None = None, *args, **kwargs
-    ) -> None:
+    def warning(self, msg: str, context: dict[str, Any] | None = None, *args, **kwargs) -> None:
         self._logger.warning(msg, context, *args, **kwargs)
 
-    def error(
-        self, msg: str, context: dict[str, Any] | None = None, *args, **kwargs
-    ) -> None:
+    def error(self, msg: str, context: dict[str, Any] | None = None, *args, **kwargs) -> None:
         self._logger.error(msg, context, *args, **kwargs)
 
-    def critical(
-        self, msg: str, context: dict[str, Any] | None = None, *args, **kwargs
-    ) -> None:
+    def critical(self, msg: str, context: dict[str, Any] | None = None, *args, **kwargs) -> None:
         self._logger.critical(msg, context, *args, **kwargs)
 
     def get_intercept_handler(self) -> InterceptHandler:

@@ -1,14 +1,13 @@
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel
 
 
 class ChannelEntity(BaseModel):
-    id: Optional[int] = None
+    id: int | None = None
     external_id: str
-    name: Optional[str] = None
+    name: str | None = None
     url: str
     active: bool = True
-    created_at: Optional[datetime] = None
-    last_checked_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    last_checked_at: datetime | None = None

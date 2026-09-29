@@ -1,12 +1,15 @@
 import logging
 from typing import Any, BinaryIO
+
 import requests
 from requests.exceptions import RequestException
 
 from src.core.config.settings import settings
 from src.modules.diarization.application.dtos import DiarizationPathRequest, DiarizationResponse
 from src.modules.diarization.domain.exceptions import DiarizationApiError
-from src.modules.diarization.domain.interfaces.diarization_client_interface import IDiarizationClient
+from src.modules.diarization.domain.interfaces.diarization_client_interface import (
+    IDiarizationClient,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -19,21 +22,22 @@ class DiarizationApiClient(IDiarizationClient):
         # Narrowed into a non-optional attribute so callers (and the type checker)
         # can rely on it being present after construction.
         self.base_url: str = base_url
+        self.timeout = (settings.DIARIZATION_CONNECT_TIMEOUT, settings.DIARIZATION_READ_TIMEOUT)
 
     def process_by_path(self, request: DiarizationPathRequest) -> DiarizationResponse:
         url = f"{self.base_url.rstrip('/')}/api/diarization/process-path"
         logger.info(f"Enviando requisição de diarização por path para: {url}")
-        
+
         try:
-            response = requests.post(url, json=request.model_dump(exclude_none=True))
+            response = requests.post(
+                url, json=request.model_dump(exclude_none=True), timeout=self.timeout
+            )
             response.raise_for_status()
             data = response.json()
             return DiarizationResponse(**data)
-        except RequestException as e:
+        except (RequestException, ValueError) as e:
             logger.exception("Erro na requisição à API de Diarização.")
-            raise DiarizationApiError(
-                f"Falha ao comunicar com a API de diarização: {e}"
-            ) from e
+            raise DiarizationApiError(f"Falha ao comunicar com a API de diarização: {e}") from e
 
     def process_by_file(
         self,
@@ -43,18 +47,14 @@ class DiarizationApiClient(IDiarizationClient):
         num_speakers: int | None = None,
         min_speakers: int | None = None,
         max_speakers: int | None = None,
-        model_size: str = "large-v2"
+        model_size: str = "large-v2",
     ) -> DiarizationResponse:
         url = f"{self.base_url.rstrip('/')}/api/diarization/process-file"
         logger.info(f"Enviando requisição de diarização por arquivo para: {url}")
-        
-        files = {
-            "file": (filename, file_obj, "audio/wav")
-        }
+
+        files = {"file": (filename, file_obj, "audio/wav")}
         # Mixed value types: model_size/language are strings, the speaker counts are ints.
-        data: dict[str, Any] = {
-            "model_size": model_size
-        }
+        data: dict[str, Any] = {"model_size": model_size}
         if language:
             data["language"] = language
         if num_speakers:
@@ -65,12 +65,10 @@ class DiarizationApiClient(IDiarizationClient):
             data["max_speakers"] = max_speakers
 
         try:
-            response = requests.post(url, files=files, data=data)
+            response = requests.post(url, files=files, data=data, timeout=self.timeout)
             response.raise_for_status()
             response_data = response.json()
             return DiarizationResponse(**response_data)
-        except RequestException as e:
+        except (RequestException, ValueError) as e:
             logger.exception("Erro no upload para a API de Diarização.")
-            raise DiarizationApiError(
-                f"Falha no upload para a API de diarização: {e}"
-            ) from e
+            raise DiarizationApiError(f"Falha no upload para a API de diarização: {e}") from e

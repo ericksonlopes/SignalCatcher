@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -9,27 +9,27 @@ from src.modules.diarization.domain.enums.diarization_step import DiarizationSte
 class DiarizationEntity(BaseModel):
     """A diarization task, independent of how it is stored."""
 
-    id: Optional[str] = None
+    id: str | None = None
     file_path: str
     step: DiarizationStep = DiarizationStep.PENDING
 
     # Link back to whatever produced the audio (a YouTube content, for instance).
-    entity_id: Optional[str] = None
-    entity_type: Optional[str] = None
+    entity_id: str | None = None
+    entity_type: str | None = None
 
     # Configuration handed to the diarization service.
-    language: Optional[str] = None
-    num_speakers: Optional[int] = None
-    min_speakers: Optional[int] = None
-    max_speakers: Optional[int] = None
+    language: str | None = None
+    num_speakers: int | None = None
+    min_speakers: int | None = None
+    max_speakers: int | None = None
     model_size: str = "large-v2"
 
     # Results
-    result_json: Optional[Any] = None
-    error_message: Optional[str] = None
+    result_json: Any | None = None
+    error_message: str | None = None
 
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
     @property
     def is_cancellable(self) -> bool:

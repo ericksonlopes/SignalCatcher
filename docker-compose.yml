@@ -1,43 +1,66 @@
+x-backend: &backend
+  build: .
+  image: signalcatcher:local
+  environment:
+    POSTGRES_USER: ${POSTGRES_USER:?Configure POSTGRES_USER}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configure POSTGRES_PASSWORD}
+    POSTGRES_HOST: ${POSTGRES_HOST:-postgresql}
+    POSTGRES_DATABASE: ${POSTGRES_DATABASE:-signalcatcher}
+    DOWNLOAD_YOUTUBE_PATH: /youtube
+    ADMIN_API_KEY: ${ADMIN_API_KEY:?Configure ADMIN_API_KEY}
+    LIST_LOG_LEVELS: ${LIST_LOG_LEVELS:-ERROR,WARNING,INFO}
+    CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+    DIARIZATION_API_URL: ${DIARIZATION_API_URL:-http://diarization:8001}
+    DIARIZATION_CONNECT_TIMEOUT: ${DIARIZATION_CONNECT_TIMEOUT:-10}
+    DIARIZATION_READ_TIMEOUT: ${DIARIZATION_READ_TIMEOUT:-300}
+    PROCESSING_LEASE_SECONDS: ${PROCESSING_LEASE_SECONDS:-300}
+    MAX_PROCESSING_ATTEMPTS: ${MAX_PROCESSING_ATTEMPTS:-5}
+    RETRY_BASE_SECONDS: ${RETRY_BASE_SECONDS:-300}
+    RETRY_MAX_SECONDS: ${RETRY_MAX_SECONDS:-86400}
+    WORKER_HEARTBEAT_MAX_AGE: ${WORKER_HEARTBEAT_MAX_AGE:-60}
+    FFMPEG_LOCATION: ${FFMPEG_LOCATION:-}
+    VOICE_MONKEY_API_TOKEN: ${VOICE_MONKEY_API_TOKEN:-}
+    VOICE_MONKEY_NEW_VIDEO_FOR_DOWNLOAD_MONKEY_ID: ${VOICE_MONKEY_NEW_VIDEO_FOR_DOWNLOAD_MONKEY_ID:-}
+  volumes:
+    - /media/eriberry/SSD_1/youtube:/youtube
+  networks:
+    - shared_postgres_network
+
 services:
+  migrate:
+    <<: *backend
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+
   app:
-    build: .
-    container_name: signalcatcher_app
+    <<: *backend
     restart: unless-stopped
     ports:
       - "5001:8000"
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      # Aponta para o nome do container do Postgres na outra stack
-      POSTGRES_HOST: ${POSTGRES_HOST-postgresql}
-      POSTGRES_DATABASE: ${POSTGRES_DATABASE-signalcatcher}
-      LIST_LOG_LEVELS: ${LIST_LOG_LEVELS:-ERROR,WARNING,INFO}
-      VOICE_MONKEY_API_TOKEN: ${VOICE_MONKEY_API_TOKEN:-}
-      VOICE_MONKEY_NEW_VIDEO_FOR_DOWNLOAD_MONKEY_ID: ${VOICE_MONKEY_NEW_VIDEO_FOR_DOWNLOAD_MONKEY_ID:-}
-      DOWNLOAD_YOUTUBE_PATH: /app/youtube_downloads
-      DIARIZATION_API_URL: ${DIARIZATION_API_URL:-http://localhost:8001}
-      # Browser origins allowed to call the API. The image no longer defaults to "*",
-      # so a frontend on another host has to be listed here.
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
-      # Left empty on purpose: the image installs ffmpeg on PATH, and yt-dlp finds it.
-      FFMPEG_LOCATION: ${FFMPEG_LOCATION:-}
-    volumes:
-      # Host directory that receives the downloads. It used to be hardcoded to one
-      # machine's mount point, which made the file unusable anywhere else.
-      - ${DOWNLOADS_HOST_PATH:-/media/eriberry/SSD_1/youtube}:/app/youtube_downloads
-    networks:
-      - shared_postgres_network
-    dns:
-      - 8.8.8.8
-      - 1.1.1.1
-    # /status exists for exactly this purpose and was not being used.
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8000/status"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/ready"]
       interval: 30s
-      timeout: 5s
+      timeout: 10s
       retries: 3
-      # Migrations run before the server starts, so allow time before counting failures.
-      start_period: 40s
+      start_period: 60s
+
+  worker:
+    <<: *backend
+    command: ["python", "worker.py"]
+    restart: unless-stopped
+    stop_grace_period: 60s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "worker.py", "--healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
 networks:
   shared_postgres_network:

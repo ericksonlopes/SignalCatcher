@@ -3,6 +3,7 @@ from collections.abc import Iterator
 from fastapi import Depends
 
 from src.core.config.settings import settings
+from src.core.database.job_control import JobControlRepository
 from src.core.logger.interfaces import ILogger
 from src.core.logger.logger import logger as global_logger
 from src.core.notifications.voice_monkey_notification import VoiceMonkeyNotification
@@ -27,7 +28,7 @@ from src.modules.youtube.application.use_cases.content.content_queries import (
 from src.modules.youtube.domain.interfaces.repositories.youtube_channel_repository import (
     IYouTubeChannelRepository,
 )
-from src.modules.youtube.domain.interfaces.repositories.youtube_monitored_channel_repository import (
+from src.modules.youtube.domain.interfaces.repositories.youtube_monitored_channel_repository import (  # noqa: E501 - qualified module path
     IYouTubeMonitoredChannelRepository,
 )
 from src.modules.youtube.domain.interfaces.services.youtube_content_service import (
@@ -60,19 +61,19 @@ def get_unit_of_work(
 
 
 def get_youtube_monitored_channel_repository(
-    uow: YoutubeUnitOfWork = Depends(get_unit_of_work),
+    uow: YoutubeUnitOfWork = Depends(get_unit_of_work, scope="function"),
 ) -> IYouTubeMonitoredChannelRepository:
     return uow.monitored_channels
 
 
 def get_youtube_channel_repository(
-    uow: YoutubeUnitOfWork = Depends(get_unit_of_work),
+    uow: YoutubeUnitOfWork = Depends(get_unit_of_work, scope="function"),
 ) -> IYouTubeChannelRepository:
     return uow.channels
 
 
 def get_youtube_content_service(
-    uow: YoutubeUnitOfWork = Depends(get_unit_of_work),
+    uow: YoutubeUnitOfWork = Depends(get_unit_of_work, scope="function"),
 ) -> IYoutubeContentService:
     return uow.contents
 
@@ -91,9 +92,7 @@ def get_channel_commands(
     repository: IYouTubeMonitoredChannelRepository = Depends(
         get_youtube_monitored_channel_repository
     ),
-    yt_channel_repo: IYouTubeChannelRepository = Depends(
-        get_youtube_channel_repository
-    ),
+    yt_channel_repo: IYouTubeChannelRepository = Depends(get_youtube_channel_repository),
     logger: ILogger = Depends(get_logger),
 ) -> ChannelCommands:
     return ChannelCommands(
@@ -109,23 +108,17 @@ def get_channel_queries(
     repository: IYouTubeMonitoredChannelRepository = Depends(
         get_youtube_monitored_channel_repository
     ),
-    yt_channel_repo: IYouTubeChannelRepository = Depends(
-        get_youtube_channel_repository
-    ),
+    yt_channel_repo: IYouTubeChannelRepository = Depends(get_youtube_channel_repository),
     logger: ILogger = Depends(get_logger),
 ) -> ChannelQueries:
-    return ChannelQueries(
-        repository=repository, logger=logger, yt_channel_repo=yt_channel_repo
-    )
+    return ChannelQueries(repository=repository, logger=logger, yt_channel_repo=yt_channel_repo)
 
 
 def get_content_commands(
     service: IYoutubeContentService = Depends(get_youtube_content_service),
     logger: ILogger = Depends(get_logger),
 ) -> ContentCommands:
-    return ContentCommands(
-        service=service, output_path=settings.DOWNLOAD_YOUTUBE_PATH, logger=logger
-    )
+    return ContentCommands(service=service)
 
 
 def get_content_queries(
@@ -160,3 +153,9 @@ def get_add_content_from_playlist_use_case(
         youtube_scraper=YouTubeScraperService(logger=logger),
         logger=logger,
     )
+
+
+def get_job_control(
+    uow: YoutubeUnitOfWork = Depends(get_unit_of_work, scope="function"),
+) -> JobControlRepository:
+    return JobControlRepository(uow.session)

@@ -51,14 +51,16 @@ def run_backfill():
                 if external_id is None:
                     continue
 
-                content = db.query(YoutubeContentModel).filter(
-                    YoutubeContentModel.external_id == external_id
-                ).first()
+                content = (
+                    db.query(YoutubeContentModel)
+                    .filter(YoutubeContentModel.external_id == external_id)
+                    .first()
+                )
 
                 if content:
                     storage_path = _link_file_to_content(db, content, file)
                     updated_count += 1
-                    print(f"[SUCCESS] Arquivo vinculado e step COMPLETED: {content.title} -> {storage_path}")
+                    print(f"[SUCCESS] Arquivo vinculado: {content.title} -> {storage_path}")
                 else:
                     not_found_in_db_count += 1
                     print(f"[MISSING IN DB] Arquivo no disco sem registro no banco: {file}")

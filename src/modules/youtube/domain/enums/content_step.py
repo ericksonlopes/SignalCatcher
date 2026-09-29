@@ -17,7 +17,7 @@ class ContentStep(str, enum.Enum):
     # temporary state, not a terminal error: the video becomes downloadable once it
     # airs, so it must be retried later rather than treated as ERROR.
     SCHEDULED = "SCHEDULED"
-    
+
     # Diarization steps
     PENDING = "PENDING"
     TRANSCRIPTION = "TRANSCRIPTION"

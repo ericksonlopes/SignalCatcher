@@ -1,39 +1,18 @@
-import logging
-import os
 import sys
+from pathlib import Path
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from src.core.logger.logger import logger
+from src.modules.youtube.infrastructure.unit_of_work import YoutubeUnitOfWork
 
-from src.infrastructure.repositories.connector import ConnectorPostgres
-from src.infrastructure.repositories.models.youtube_content_model import YoutubeContentModel
-from src.domain.models.enums.content_step import ContentStep
 
-def main():
-    logging.info("Searching for zombie items stuck in processing states...")
+def main() -> None:
+    with YoutubeUnitOfWork(logger=logger) as uow:
+        count = uow.contents.recover_expired_leases()
+        uow.commit()
+    logger.info(f"Recovered {count} expired content reservations.")
 
-    stuck_mapping = {
-        ContentStep.PENDING_METADATA_EXTRACTION: ContentStep.COMPLETED,
-    }
-
-    with ConnectorPostgres() as session:
-        for stuck_step, pending_step in stuck_mapping.items():
-            stuck_items = session.query(YoutubeContentModel).filter(
-                YoutubeContentModel.step == stuck_step
-            ).all()
-
-            if stuck_items:
-                logging.info(f"Found {len(stuck_items)} items stuck in {stuck_step.name}. Resetting to {pending_step.name}...")
-                for item in stuck_items:
-                    item.step = pending_step
-            else:
-                logging.info(f"No items stuck in {stuck_step.name}.")
-
-        session.commit()
-        logging.info("Successfully cleaned up stuck items!")
 
 if __name__ == "__main__":
     main()

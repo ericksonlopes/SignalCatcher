@@ -1,5 +1,3 @@
-from typing import Optional
-
 from src.modules.diarization.application.dtos.diarization_card_dto import (
     DiarizationCardDTO,
 )
@@ -34,10 +32,10 @@ class DiarizationQueries:
         self,
         page: int,
         limit: int,
-        step: Optional[str] = None,
-        search: Optional[str] = None,
+        step: str | None = None,
+        search: str | None = None,
     ) -> tuple[list[DiarizationCardDTO], int]:
-        entity_ids: Optional[list[str]] = None
+        entity_ids: list[str] | None = None
         if search:
             # Only the youtube module can match a term against video titles and channel
             # names, so it resolves the term into ids first.

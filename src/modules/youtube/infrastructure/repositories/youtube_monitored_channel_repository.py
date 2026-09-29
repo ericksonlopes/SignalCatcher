@@ -1,10 +1,8 @@
-from typing import Optional
-
 from sqlalchemy.orm import Session, joinedload
 
 from src.core.logger.interfaces import ILogger
 from src.modules.youtube.domain.entities.channel_entity import ChannelEntity
-from src.modules.youtube.domain.interfaces.repositories.youtube_monitored_channel_repository import (
+from src.modules.youtube.domain.interfaces.repositories.youtube_monitored_channel_repository import (  # noqa: E501 - qualified module path
     IYouTubeMonitoredChannelRepository,
 )
 from src.modules.youtube.infrastructure.repositories.mappers.channel_mapper import (
@@ -26,7 +24,7 @@ class YouTubeMonitoredChannelRepository(IYouTubeMonitoredChannelRepository):
         self.session = session
         self.logger = logger
 
-    def get_by_url(self, url: str) -> Optional[ChannelEntity]:
+    def get_by_url(self, url: str) -> ChannelEntity | None:
         try:
             channel = (
                 self.session.query(YouTubeMonitoredChannelModel)
@@ -44,7 +42,7 @@ class YouTubeMonitoredChannelRepository(IYouTubeMonitoredChannelRepository):
             )
             raise
 
-    def get_by_id(self, channel_id: int) -> Optional[ChannelEntity]:
+    def get_by_id(self, channel_id: int) -> ChannelEntity | None:
         try:
             channel = (
                 self.session.query(YouTubeMonitoredChannelModel)
@@ -86,9 +84,7 @@ class YouTubeMonitoredChannelRepository(IYouTubeMonitoredChannelRepository):
             )
             return [ChannelMapper.to_domain(c) for c in channels]
         except Exception as e:
-            self.logger.error(
-                f"Error getting all active channels: {e}", context={"error": str(e)}
-            )
+            self.logger.error(f"Error getting all active channels: {e}", context={"error": str(e)})
             raise
 
     def get_all(self) -> list[ChannelEntity]:
@@ -100,9 +96,7 @@ class YouTubeMonitoredChannelRepository(IYouTubeMonitoredChannelRepository):
             )
             return [ChannelMapper.to_domain(c) for c in channels]
         except Exception as e:
-            self.logger.error(
-                f"Error getting all channels: {e}", context={"error": str(e)}
-            )
+            self.logger.error(f"Error getting all channels: {e}", context={"error": str(e)})
             raise
 
     def update(self, channel_entity: ChannelEntity) -> ChannelEntity:

@@ -7,6 +7,7 @@ from src.modules.youtube.domain.interfaces.services.scraper import IYouTubeScrap
 from src.modules.youtube.domain.interfaces.services.youtube_content_service import (
     IYoutubeContentService,
 )
+from src.modules.youtube.domain.processing import is_youtube_url
 
 
 class AddContentFromLinkUseCase:
@@ -29,7 +30,7 @@ class AddContentFromLinkUseCase:
         raise ValueError(f"URL '{url}' is not supported yet.")
 
     def _is_youtube_link(self, url: str) -> bool:
-        return "youtube.com" in url or "youtu.be" in url
+        return is_youtube_url(url)
 
     def _process_youtube_link(self, url: str) -> YoutubeContentEntity:
         self.logger.info(f"Extracting YouTube video info from {url}")
@@ -48,7 +49,7 @@ class AddContentFromLinkUseCase:
         )
 
         self.logger.info(
-            f"Content created successfully (id={created_content.id}). Triggering VoiceMonkey notification...",
+            f"Content {created_content.id} created. Sending notification...",
             context={
                 "content_id": created_content.id,
                 "external_id": info.id,

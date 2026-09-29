@@ -1,6 +1,6 @@
 from src.core.logger.interfaces import ILogger
 from src.modules.youtube.domain.entities.channel_entity import ChannelEntity
-from src.modules.youtube.domain.interfaces.repositories.youtube_monitored_channel_repository import (
+from src.modules.youtube.domain.interfaces.repositories.youtube_monitored_channel_repository import (  # noqa: E501 - qualified module path
     IYouTubeMonitoredChannelRepository,
 )
 from src.modules.youtube.domain.interfaces.services.channel_service import (

@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import Protocol
 
 from src.modules.youtube.domain.entities.youtube_video_dto import YouTubeVideoDTO
@@ -52,9 +53,7 @@ class IYouTubeScraper(Protocol):
         """
         ...
 
-    def extract_playlist_videos(
-        self, playlist_url: str
-    ) -> tuple[list[YouTubeVideoDTO], str]:
+    def extract_playlist_videos(self, playlist_url: str) -> tuple[list[YouTubeVideoDTO], str]:
         """
         Extracts videos from a YouTube playlist.
 
@@ -67,7 +66,12 @@ class IYouTubeScraper(Protocol):
         ...
 
     def download_video(
-        self, url: str, content_id: str, origin: str, output_path: str
+        self,
+        url: str,
+        content_id: str,
+        origin: str,
+        output_path: str,
+        progress_guard: Callable[[], None] | None = None,
     ) -> str:
         """Downloads a YouTube video to the specified output path.
 

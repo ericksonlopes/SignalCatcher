@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from types import TracebackType
-from typing import Callable, Protocol
+from typing import Protocol
 
 from sqlalchemy.orm import Session
 
@@ -33,18 +34,14 @@ class SqlAlchemyUnitOfWork:
     exception triggers a rollback before the session is closed.
     """
 
-    def __init__(
-        self, session_factory: Callable[[], Session] = DefaultSessionFactory
-    ) -> None:
+    def __init__(self, session_factory: Callable[[], Session] = DefaultSessionFactory) -> None:
         self._session_factory = session_factory
         self._session: Session | None = None
 
     @property
     def session(self) -> Session:
         if self._session is None:
-            raise RuntimeError(
-                "UnitOfWork.session is only available inside a `with` block."
-            )
+            raise RuntimeError("UnitOfWork.session is only available inside a `with` block.")
         return self._session
 
     def __enter__(self) -> SqlAlchemyUnitOfWork:

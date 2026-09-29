@@ -1,4 +1,4 @@
-from typing import Optional, List
+from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
@@ -13,11 +13,17 @@ class YoutubeVideoCardResponse(BaseModel):
     url: str
     channel_name: str  # Mapping origin
     step: ContentStep
-    thumbnail: Optional[str] = None
-    duration: Optional[int] = None
-    description: Optional[str] = None
-    tags: Optional[List[str]] = None
-    file_path: Optional[str] = None
-    language: Optional[str] = None
+    thumbnail: str | None = None
+    duration: int | None = None
+    description: str | None = None
+    tags: list[str] | None = None
+    file_path: str | None = None
+    language: str | None = None
     is_diarized: bool = False
-    diarization_status: Optional[str] = None
+    diarization_status: str | None = None
+    deletion_requested: bool = False
+    attempt_count: int = 0
+    next_retry_at: datetime | None = None
+    error_info: str | None = None
+    created_at: datetime | None = None
+    published_at: datetime | None = None

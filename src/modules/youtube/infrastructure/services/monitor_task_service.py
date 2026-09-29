@@ -28,9 +28,7 @@ class MonitorTaskService(IMonitorTaskService):
 
     def process_channel(self, channel: ChannelEntity) -> int:
         """Processes a single channel and returns the number of new contents."""
-        self.logger.debug(
-            f"🔍 Checking: {channel.name}", context={"channel_name": channel.name}
-        )
+        self.logger.debug(f"🔍 Checking: {channel.name}", context={"channel_name": channel.name})
 
         # Execute extraction using the scraper interface, outside any transaction.
         try:
@@ -42,9 +40,7 @@ class MonitorTaskService(IMonitorTaskService):
             )
             return 0
 
-        self.logger.debug(
-            f"  Contents found: {len(items)}", context={"items_count": len(items)}
-        )
+        self.logger.debug(f"  Contents found: {len(items)}", context={"items_count": len(items)})
 
         # The new contents and the channel's last_checked_at commit as a unit. Before,
         # each content committed on its own and last_checked_at committed separately,
@@ -64,9 +60,9 @@ class MonitorTaskService(IMonitorTaskService):
                 new_count += 1
 
             # Update last_checked_at
-            channel.last_checked_at = datetime.now(
-                ZoneInfo("America/Sao_Paulo")
-            ).replace(tzinfo=None)
+            channel.last_checked_at = datetime.now(ZoneInfo("America/Sao_Paulo")).replace(
+                tzinfo=None
+            )
             uow.monitored_channels.update(channel)
             uow.commit()
 
@@ -110,7 +106,5 @@ class MonitorTaskService(IMonitorTaskService):
             )
             return total_new
         except Exception as e:
-            self.logger.error(
-                f"Unexpected error in daily routine: {e}", context={"error": str(e)}
-            )
+            self.logger.error(f"Unexpected error in daily routine: {e}", context={"error": str(e)})
             return 0

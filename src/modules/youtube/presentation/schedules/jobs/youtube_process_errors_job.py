@@ -28,6 +28,7 @@ def process_errors_job():
         global_logger.info(f"Error retry process finished. {retried} videos retried.")
     except Exception as e:
         global_logger.error(f"Error retry job aborted: {e}")
+        raise
 
 
 def reprocess_single_video_job(external_id: str):

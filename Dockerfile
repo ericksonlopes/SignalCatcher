@@ -24,7 +24,7 @@ RUN uv sync --frozen --no-install-project
 # downloads directory) even if .dockerignore is ever incomplete.
 COPY src ./src
 COPY alembic ./alembic
-COPY alembic.ini main.py ./
+COPY alembic.ini main.py worker.py ./
 
 RUN uv sync --frozen
 
@@ -36,5 +36,5 @@ RUN groupadd --gid 1000 appuser \
 
 USER appuser
 
-# Roda as migrações do banco primeiro e depois inicia o servidor
-CMD ["/bin/sh", "-c", "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Migrations are owned by the dedicated Compose migrate service.
+CMD ["/bin/sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]

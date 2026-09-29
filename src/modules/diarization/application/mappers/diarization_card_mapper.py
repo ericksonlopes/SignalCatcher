@@ -24,9 +24,7 @@ class DiarizationCardMapper:
             title=content.title if content else UNKNOWN_LABEL,
             channelName=content.origin if content else UNKNOWN_LABEL,
             thumbnail=(
-                content.thumbnail
-                if content and content.thumbnail
-                else PLACEHOLDER_THUMBNAIL
+                content.thumbnail if content and content.thumbnail else PLACEHOLDER_THUMBNAIL
             ),
             # Kept as the raw seconds cast to a string, which is what the endpoint has
             # always returned, even though the fallback below is a clock-formatted value.

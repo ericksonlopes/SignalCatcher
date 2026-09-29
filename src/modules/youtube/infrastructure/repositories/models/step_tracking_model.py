@@ -29,12 +29,10 @@ class StepTrackingModel(Base):
     new_step = Column(String, nullable=False)
 
     changed_at = Column(DateTime, default=get_brazil_time, nullable=False)
-    details = Column(
-        String, nullable=True
-    )  # Store any error messages or extra log context
+    details = Column(String, nullable=True)  # Store any error messages or extra log context
 
     def __repr__(self):
-        return f"<StepTrackingModel(entity_type='{self.entity_type}', entity_id={self.entity_id}, new_step='{self.new_step}')>"
+        return f"<StepTrackingModel({self.entity_type}, {self.entity_id}, {self.new_step})>"
 
 
 def _step_name(step) -> str | None:
@@ -60,7 +58,8 @@ def create_tracking_entry(connection, target, previous_step, new_step) -> None:
         )
         return
 
-    # Using the connection to execute an insert directly to avoid session state conflicts during flush
+    # Using the connection to execute an insert directly to avoid session state conflicts
+    # during flush
     connection.execute(
         StepTrackingModel.__table__.insert().values(
             entity_id=str(target.id),

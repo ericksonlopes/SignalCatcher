@@ -1,5 +1,5 @@
 import math
-from typing import Annotated, List, Optional
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -34,19 +34,19 @@ CONTENT_NOT_FOUND_DETAIL = "Content not found"
 
 
 class DiarizationRequest(BaseModel):
-    language: Optional[str] = "en"
+    language: str | None = "en"
 
 
 class PaginatedDiarizationResponse(BaseModel):
-    items: List[DiarizationCardDTO]
+    items: list[DiarizationCardDTO]
     # Same payload under two keys, kept for backwards compatibility with the frontend.
-    diarizations: List[DiarizationCardDTO]
+    diarizations: list[DiarizationCardDTO]
     total: int
     page: int
     limit: int
     total_pages: int
-    status_counts: Optional[dict[str, int]] = None
-    total_status_count: Optional[int] = None
+    status_counts: dict[str, int] | None = None
+    total_status_count: int | None = None
 
 
 @router.post(
@@ -73,13 +73,11 @@ def trigger_youtube_diarization(
         if not content:
             raise HTTPException(status_code=404, detail=CONTENT_NOT_FOUND_DETAIL)
 
-        if (
-            content.step != ContentStep.COMPLETED.name
-            and content.step != ContentStep.COMPLETED
-        ):
-            raise HTTPException(
-                status_code=400, detail="Content must be completed to diarize"
-            )
+        if content.deletion_requested:
+            raise HTTPException(status_code=409, detail="Content is awaiting file deletion")
+
+        if content.step != ContentStep.COMPLETED.name and content.step != ContentStep.COMPLETED:
+            raise HTTPException(status_code=400, detail="Content must be completed to diarize")
 
         if not content.file_path:
             raise HTTPException(status_code=400, detail="Content file path is missing")
@@ -119,18 +117,14 @@ def get_diarizations(
     queries: Annotated[DiarizationQueries, Depends(get_diarization_queries)],
     page: Annotated[int, Query(ge=1, description="Page number")] = 1,
     limit: Annotated[int, Query(ge=1, le=100, description="Items per page")] = 20,
-    step: Annotated[Optional[str], Query(description="Filter by step status")] = None,
-    search: Annotated[
-        Optional[str], Query(description="Search by title or channel")
-    ] = None,
+    step: Annotated[str | None, Query(description="Filter by step status")] = None,
+    search: Annotated[str | None, Query(description="Search by title or channel")] = None,
 ):
     """
     Returns a paginated list of diarizations enriched with YouTube content details.
     """
     try:
-        items, total = queries.get_cards(
-            page=page, limit=limit, step=step, search=search
-        )
+        items, total = queries.get_cards(page=page, limit=limit, step=step, search=search)
         status_counts = queries.count_by_step()
         total_status_count = sum(status_counts.values()) if status_counts else 0
         total_pages = math.ceil(total / limit) if limit > 0 else 1
@@ -205,7 +199,8 @@ def cancel_diarization(
     """
     Cancels a diarization task that is currently in progress.
     Supports either the diarization task UUID or the entity_id (e.g. YouTube video external_id).
-    Only tasks with step in [PENDING, STARTED, TRANSCRIPTION, ALIGNMENT, DIARIZATION] can be cancelled.
+    Only tasks with step in [PENDING, STARTED, TRANSCRIPTION, ALIGNMENT, DIARIZATION] can be
+    cancelled.
     After cancellation the step is set to CANCELLED, allowing a new diarization to be triggered.
     """
     try:
@@ -216,10 +211,7 @@ def cancel_diarization(
         if task.step is not DiarizationStep.CANCELLED:
             raise HTTPException(
                 status_code=409,
-                detail=(
-                    "Diarization task cannot be cancelled "
-                    f"(current step: {task.step.value})"
-                ),
+                detail=(f"Diarization task cannot be cancelled (current step: {task.step.value})"),
             )
 
         return {

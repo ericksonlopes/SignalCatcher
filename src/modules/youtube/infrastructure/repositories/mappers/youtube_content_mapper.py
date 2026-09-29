@@ -27,6 +27,12 @@ class YoutubeContentMapper:
             created_at=model.created_at,
             updated_at=model.updated_at,
             language=model.language,
+            lease_token=model.lease_token,
+            lease_expires_at=model.lease_expires_at,
+            attempt_count=model.attempt_count,
+            next_retry_at=model.next_retry_at,
+            deletion_requested=model.deletion_requested,
+            deletion_attempt_count=model.deletion_attempt_count,
         )
 
     @staticmethod
@@ -48,4 +54,8 @@ class YoutubeContentMapper:
             created_at=entity.created_at,
             updated_at=entity.updated_at,
             language=entity.language,
+            published_at=entity.published_at,
+            attempt_count=entity.attempt_count,
+            deletion_requested=entity.deletion_requested,
+            deletion_attempt_count=entity.deletion_attempt_count,
         )

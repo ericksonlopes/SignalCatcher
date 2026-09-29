@@ -1,5 +1,3 @@
-from typing import Optional
-
 from pydantic import BaseModel
 
 
@@ -12,6 +10,6 @@ class YouTubeVideoDTO(BaseModel):
     """
 
     id: str
-    title: Optional[str] = None
+    title: str | None = None
     url: str
-    channel: Optional[str] = None
+    channel: str | None = None

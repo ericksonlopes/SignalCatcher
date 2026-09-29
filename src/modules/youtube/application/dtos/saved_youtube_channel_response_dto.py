@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
@@ -9,10 +9,10 @@ class SavedYouTubeChannelResponseDTO(BaseModel):
 
     id: int
     external_id: str
-    title: Optional[str] = None
-    description: Optional[str] = None
-    url: Optional[str] = None
-    channel_url: Optional[str] = None
-    thumbnails: Optional[List[Dict[str, Any]]] = None
-    created_at: Optional[datetime] = None
+    title: str | None = None
+    description: str | None = None
+    url: str | None = None
+    channel_url: str | None = None
+    thumbnails: list[dict[str, Any]] | None = None
+    created_at: datetime | None = None
     video_count: int = 0

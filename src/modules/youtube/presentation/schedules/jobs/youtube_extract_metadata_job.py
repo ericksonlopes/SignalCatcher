@@ -37,3 +37,4 @@ def extract_metadata_job():
         logger.info("Extract Metadata job finished successfully.")
     except Exception as e:
         logger.error(f"Error running Extract Metadata job: {e}")
+        raise

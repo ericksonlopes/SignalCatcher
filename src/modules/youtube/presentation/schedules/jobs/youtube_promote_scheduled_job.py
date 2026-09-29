@@ -15,11 +15,10 @@ def promote_scheduled_job():
 
     try:
         promoted = use_case.execute()
-        global_logger.info(
-            f"Scheduled-premiere promotion finished. {promoted} videos re-queued."
-        )
+        global_logger.info(f"Scheduled-premiere promotion finished. {promoted} videos re-queued.")
     except Exception as e:
         global_logger.error(f"Scheduled-premiere promotion job aborted: {e}")
+        raise
 
 
 if __name__ == "__main__":

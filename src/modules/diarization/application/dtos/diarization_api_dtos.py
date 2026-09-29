@@ -1,5 +1,3 @@
-from typing import List, Optional
-
 from pydantic import BaseModel, Field
 
 
@@ -8,18 +6,10 @@ class DiarizationPathRequest(BaseModel):
         ...,
         description="Caminho absoluto ou relativo para o arquivo de áudio no servidor.",
     )
-    language: Optional[str] = Field(
-        None, description="Código do idioma (ex: 'pt', 'en')."
-    )
-    num_speakers: Optional[int] = Field(
-        None, ge=1, description="Número exato de falantes no áudio."
-    )
-    min_speakers: Optional[int] = Field(
-        None, ge=1, description="Número mínimo de falantes."
-    )
-    max_speakers: Optional[int] = Field(
-        None, ge=1, description="Número máximo de falantes."
-    )
+    language: str | None = Field(None, description="Código do idioma (ex: 'pt', 'en').")
+    num_speakers: int | None = Field(None, ge=1, description="Número exato de falantes no áudio.")
+    min_speakers: int | None = Field(None, ge=1, description="Número mínimo de falantes.")
+    max_speakers: int | None = Field(None, ge=1, description="Número máximo de falantes.")
     model_size: str = Field("large-v2", description="Tamanho do modelo Whisper.")
 
 
@@ -34,5 +24,5 @@ class DiarizationResponse(BaseModel):
     audio_path: str
     language: str
     duration: float
-    speakers: List[str]
-    segments: List[SegmentDto]
+    speakers: list[str]
+    segments: list[SegmentDto]

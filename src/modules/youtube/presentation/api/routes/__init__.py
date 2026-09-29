@@ -1,8 +1,6 @@
 from fastapi import APIRouter
 
-from src.modules.youtube.presentation.api.routes import channel_route
-from src.modules.youtube.presentation.api.routes import playlist_route
-from src.modules.youtube.presentation.api.routes import video_route
+from src.modules.youtube.presentation.api.routes import channel_route, playlist_route, video_route
 from src.modules.youtube.presentation.schedules import scheduler_routes
 
 youtube_router = APIRouter()

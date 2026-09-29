@@ -2,8 +2,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, String, DateTime, JSON, Integer
-from sqlalchemy import event
+from sqlalchemy import JSON, Column, DateTime, Integer, String, event
 from sqlalchemy.orm.attributes import get_history
 
 from src.core.database.connector import Base
@@ -81,9 +80,7 @@ def _validated_step(raw) -> str | None:
 def track_diarization_insert(mapper, connection, target):
     # `mapper` is part of the SQLAlchemy event signature but unused here.
     if target.step:
-        create_tracking_entry(
-            connection, target, None, _validated_step(target.step)
-        )
+        create_tracking_entry(connection, target, None, _validated_step(target.step))
 
 
 @event.listens_for(DiarizationModel, "after_update")

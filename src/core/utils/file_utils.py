@@ -1,13 +1,18 @@
 import re
 
+
 def sanitize_path_parts(origin: str) -> list[str]:
     """
-    Splits a path/origin string by '/' and sanitizes each part 
+    Splits a path/origin string by '/' and sanitizes each part
     by replacing invalid filename characters with '_'.
     """
     if not origin:
         return []
-    return [re.sub(r'[\\*?:"<>|]', "_", p) for p in origin.split("/")]
+    return [
+        re.sub(r'[\\*?:"<>|\x00-\x1f]', "_", part).strip().rstrip(".") or "_"
+        for part in origin.split("/")
+    ]
+
 
 def format_storage_path(origin: str, filename: str) -> str:
     """

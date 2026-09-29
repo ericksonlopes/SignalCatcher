@@ -34,9 +34,11 @@ def _parse_allowed_levels(raw: str | Iterable[str] | None) -> set[int]:
             allowed.add(level_map[level])
     return allowed
 
+
 def get_allowed_levels() -> set[int]:
     raw = settings.LIST_LOG_LEVELS
     return _parse_allowed_levels(raw)
+
 
 class AllowedLevelsFilter(logging.Filter):
     def __init__(self, allowed_levels: set[int]):
@@ -49,6 +51,7 @@ class AllowedLevelsFilter(logging.Filter):
             return True
         return record.levelno in self.allowed_levels
 
+
 class CustomFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         record.filepath = record.pathname
@@ -58,22 +61,24 @@ class CustomFormatter(logging.Formatter):
             record.context = json.dumps(record.context)
         return super().format(record)
 
+
 class StdLogger:
     def __init__(self, log_format: str):
         self._logger = logging.getLogger("app_logger")
-        self._logger.setLevel(logging.DEBUG)  # Always capture everything, handler decides what prints
-        
+        self._logger.setLevel(
+            logging.DEBUG
+        )  # Always capture everything, handler decides what prints
+
         if not self._logger.handlers:
             handler = logging.StreamHandler(sys.stdout)
             formatter = CustomFormatter(log_format, style="{")
             handler.setFormatter(formatter)
-            
+
             allowed_levels = get_allowed_levels()
             handler.addFilter(AllowedLevelsFilter(allowed_levels))
-            
+
             self._logger.addHandler(handler)
             self._logger.propagate = False
-
 
     def _log_with_context(
         self, level: int, msg: str, context: dict[str, Any] | None = None, *args, **kwargs
@@ -82,18 +87,21 @@ class StdLogger:
         extra = kwargs.pop("extra", {})
         extra["context"] = context if context else {}
         kwargs["extra"] = extra
-        
+
         # Encontra dinamicamente o frame real que chamou o log, fora dos nossos wrappers
         frame = inspect.currentframe()
         depth = 1
         while frame:
             filename = frame.f_code.co_filename
             # Ignora os arquivos de logging do python e nossos wrappers
-            if "logging" not in filename and os.path.basename(filename) not in ("std_logger.py", "logger.py"):
+            if "logging" not in filename and os.path.basename(filename) not in (
+                "std_logger.py",
+                "logger.py",
+            ):
                 break
             frame = frame.f_back
             depth += 1
-            
+
         self._logger.log(level, msg, *args, stacklevel=depth, **kwargs)
 
     def debug(self, msg: str, context: dict[str, Any] | None = None, *args, **kwargs):
@@ -111,10 +119,13 @@ class StdLogger:
     def critical(self, msg: str, context: dict[str, Any] | None = None, *args, **kwargs):
         self._log_with_context(logging.CRITICAL, msg, context, *args, **kwargs)
 
+
 class InterceptHandler(logging.Handler):
     """
-    Intercepta logs de outras bibliotecas (uvicorn, fastapi, etc) e joga pro nosso logger customizado.
+    Intercepta logs de outras bibliotecas (uvicorn, fastapi, etc) e joga pro nosso logger
+    customizado.
     """
+
     def __init__(self, custom_logger):
         super().__init__()
         self.custom_logger = custom_logger
@@ -123,8 +134,7 @@ class InterceptHandler(logging.Handler):
         # Injeta o contexto se não existir
         if not hasattr(record, "context"):
             record.context = {"exc_info": record.exc_text} if record.exc_info else {}
-            
+
         # Repassa o LogRecord original com a linha e arquivo originais intactos
         # self.custom_logger._logger._logger aponta para o logging.Logger real ("app_logger")
         self.custom_logger._logger._logger.handle(record)
-

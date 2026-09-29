@@ -1,13 +1,15 @@
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
+from src.core.database.job_control import JobControlRepository
 from src.core.logger.logger import logger
 from src.modules.youtube.application.use_cases.content.add_content_from_playlist_use_case import (
     AddContentFromPlaylistUseCase,
 )
 from src.modules.youtube.presentation.api.dependencies import (
     get_add_content_from_playlist_use_case,
+    get_job_control,
 )
 from src.modules.youtube.presentation.api.models.requests.youtube_playlist_add_request import (
     YouTubePlaylistAddRequest,
@@ -16,16 +18,10 @@ from src.modules.youtube.presentation.api.models.requests.youtube_playlist_add_r
 router = APIRouter()
 
 
-from fastapi import BackgroundTasks
-from src.modules.youtube.presentation.schedules.jobs.youtube_extract_metadata_job import (
-    extract_metadata_job,
-)
-
-
 @router.post("/playlist", responses={400: {"description": "Bad Request"}})
 def add_youtube_content_from_playlist(
     request: YouTubePlaylistAddRequest,
-    background_tasks: BackgroundTasks,
+    control: Annotated[JobControlRepository, Depends(get_job_control)],
     use_case: Annotated[
         AddContentFromPlaylistUseCase, Depends(get_add_content_from_playlist_use_case)
     ],
@@ -37,7 +33,7 @@ def add_youtube_content_from_playlist(
     try:
         contents = use_case.execute(request.url, request.save_in_playlist_folder)
         if contents:
-            background_tasks.add_task(extract_metadata_job)
+            control.request("youtube_extract_and_download")
         return {
             "message": f"Successfully added {len(contents)} videos from playlist",
             "videos_added": len(contents),

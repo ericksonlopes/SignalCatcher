@@ -33,9 +33,7 @@ class YouTubeChannelRepository(IYouTubeChannelRepository):
 
             # Check if it exists
             existing_channel = (
-                self.session.query(YouTubeChannelModel)
-                .filter_by(external_id=external_id)
-                .first()
+                self.session.query(YouTubeChannelModel).filter_by(external_id=external_id).first()
             )
 
             if existing_channel:
@@ -45,9 +43,7 @@ class YouTubeChannelRepository(IYouTubeChannelRepository):
                 existing_channel.url = channel_info.get("url")
                 existing_channel.channel_url = channel_info.get("channel_url")
                 existing_channel.thumbnails = channel_info.get("thumbnails")
-                self.logger.debug(
-                    f"YouTubeChannel '{external_id}' updated in database."
-                )
+                self.logger.debug(f"YouTubeChannel '{external_id}' updated in database.")
             else:
                 # Insert
                 new_channel = YouTubeChannelModel(
@@ -95,7 +91,5 @@ class YouTubeChannelRepository(IYouTubeChannelRepository):
                 channels.append(channel)
             return channels
         except Exception as e:
-            self.logger.error(
-                "Error retrieving saved youtube channels", context={"error": str(e)}
-            )
+            self.logger.error("Error retrieving saved youtube channels", context={"error": str(e)})
             raise

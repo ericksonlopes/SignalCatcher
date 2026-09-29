@@ -9,7 +9,7 @@ from src.modules.youtube.application.mappers.channel_dto_mapper import ChannelDt
 from src.modules.youtube.domain.interfaces.repositories.youtube_channel_repository import (
     IYouTubeChannelRepository,
 )
-from src.modules.youtube.domain.interfaces.repositories.youtube_monitored_channel_repository import (
+from src.modules.youtube.domain.interfaces.repositories.youtube_monitored_channel_repository import (  # noqa: E501 - qualified module path
     IYouTubeMonitoredChannelRepository,
 )
 
@@ -35,19 +35,14 @@ class ChannelQueries:
             raise
 
     def get_saved_channels(self) -> list[SavedYouTubeChannelResponseDTO]:
-        self.logger.debug(
-            "Iniciando a busca de todos os canais salvos (youtube_channels)."
-        )
+        self.logger.debug("Iniciando a busca de todos os canais salvos (youtube_channels).")
         try:
             if not self.yt_channel_repo:
                 raise ValueError("YouTube Channel Repository não configurado.")
             saved_channels = self.yt_channel_repo.get_all()
             return [
-                ChannelDtoMapper.to_saved_youtube_channel_response_dto(s)
-                for s in saved_channels
+                ChannelDtoMapper.to_saved_youtube_channel_response_dto(s) for s in saved_channels
             ]
         except Exception as e:
-            self.logger.error(
-                "Erro ao buscar canais salvos.", context={"error": str(e)}
-            )
+            self.logger.error("Erro ao buscar canais salvos.", context={"error": str(e)})
             raise

@@ -54,9 +54,7 @@ def get_all_channels(use_case: Annotated[ChannelQueries, Depends(get_channel_que
     try:
         return use_case.get_all_channels()
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @router.get("/channels", response_model=list[SavedYouTubeChannelResponseDTO])
@@ -69,14 +67,10 @@ def get_saved_channels(
     try:
         return use_case.get_saved_channels()
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
-@router.patch(
-    "/monitored_channels/{channel_id}/status", response_model=YouTubeChannelResponseDTO
-)
+@router.patch("/monitored_channels/{channel_id}/status", response_model=YouTubeChannelResponseDTO)
 def toggle_channel_status(
     channel_id: int, use_case: Annotated[ChannelCommands, Depends(get_channel_commands)]
 ):
@@ -88,6 +82,4 @@ def toggle_channel_status(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))

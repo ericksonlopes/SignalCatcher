@@ -15,16 +15,18 @@ class IYoutubeContentRepository(Protocol):
         """Returns the content matching the given external ID."""
         ...
 
-    def create(
-        self, youtube_content_entity: YoutubeContentEntity
-    ) -> YoutubeContentEntity:
+    def create(self, youtube_content_entity: YoutubeContentEntity) -> YoutubeContentEntity:
         """Saves a new content to the database."""
         ...
 
     def get_paginated(
-        self, page: int, limit: int, step: str | None = None, search: str | None = None, channel: str | None = None
+        self,
+        page: int,
+        limit: int,
+        step: str | None = None,
+        search: str | None = None,
+        channel: str | None = None,
     ) -> tuple[list[YoutubeContentEntity], int]:
-
         """Returns a paginated list of contents and the total count."""
         ...
 
@@ -40,9 +42,7 @@ class IYoutubeContentRepository(Protocol):
         """Returns every content matching the given step."""
         ...
 
-    def get_many_by_external_ids(
-        self, external_ids: list[str]
-    ) -> dict[str, YoutubeContentEntity]:
+    def get_many_by_external_ids(self, external_ids: list[str]) -> dict[str, YoutubeContentEntity]:
         """Returns the contents for the given external IDs, keyed by external ID.
 
         Lets a caller enrich a page of results with one query instead of one per item.
@@ -57,18 +57,34 @@ class IYoutubeContentRepository(Protocol):
         """
         ...
 
-    def update(
-        self, youtube_content_entity: YoutubeContentEntity
-    ) -> YoutubeContentEntity:
+    def update(self, youtube_content_entity: YoutubeContentEntity) -> YoutubeContentEntity:
         """Updates an existing content in the database."""
         ...
 
-    def reset_stuck_steps(
-        self, stuck_step: ContentStep, pending_step: ContentStep
-    ) -> int:
-        """Resets contents stuck in a processing step back to a pending step, returning how many were updated."""
+    def reset_stuck_steps(self, stuck_step: ContentStep, pending_step: ContentStep) -> int:
+        """Resets contents stuck in a processing step back to a pending step, returning "
+        "how many were updated."""
         ...
 
     def get_tracking_by_external_id(self, external_id: str) -> list:
         """Returns the tracking history of a specific content."""
         ...
+
+    def claim_next(
+        self,
+        steps: list[ContentStep],
+        processing_step: ContentStep | None,
+        exclude_ids: set[str] | None = None,
+        external_id: str | None = None,
+        deletion: bool = False,
+    ) -> YoutubeContentEntity | None: ...
+
+    def renew_lease(self, external_id: str, token: str) -> bool: ...
+
+    def release_lease(self, external_id: str, token: str) -> None: ...
+
+    def request_reprocessing(self, external_id: str) -> bool: ...
+
+    def request_deletion(self, external_id: str) -> bool: ...
+
+    def recover_expired_leases(self) -> int: ...

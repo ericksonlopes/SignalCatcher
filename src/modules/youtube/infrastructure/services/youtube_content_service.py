@@ -22,9 +22,7 @@ class YoutubeContentService(IYoutubeContentService):
         self, external_id: str, title: str, url: str, origin: str
     ) -> YoutubeContentEntity:
         if self.repository.exists_by_external_id(external_id):
-            self.logger.warning(
-                f"Content with external_id {external_id} already exists."
-            )
+            self.logger.warning(f"Content with external_id {external_id} already exists.")
             raise ValueError("Content already exists.")
 
         content = YoutubeContentEntity(
@@ -41,9 +39,7 @@ class YoutubeContentService(IYoutubeContentService):
         created_content.step = ContentStep.PENDING_METADATA_EXTRACTION
         self.repository.update(created_content)
 
-        self.logger.info(
-            f"New content created: {created_content.title} ({created_content.id})"
-        )
+        self.logger.info(f"New content created: {created_content.title} ({created_content.id})")
         return created_content
 
     def exists_by_external_id(self, external_id: str) -> bool:
@@ -67,31 +63,56 @@ class YoutubeContentService(IYoutubeContentService):
     def get_all_by_step(self, step: ContentStep) -> list[YoutubeContentEntity]:
         return self.repository.get_all_by_step(step)
 
-    def get_many_by_external_ids(
-        self, external_ids: list[str]
-    ) -> dict[str, YoutubeContentEntity]:
+    def get_many_by_external_ids(self, external_ids: list[str]) -> dict[str, YoutubeContentEntity]:
         return self.repository.get_many_by_external_ids(external_ids)
 
     def find_external_ids_by_search(self, term: str) -> list[str]:
         return self.repository.find_external_ids_by_search(term)
 
-    def reset_stuck_steps(
-        self, stuck_step: ContentStep, pending_step: ContentStep
-    ) -> int:
-        return self.repository.reset_stuck_steps(
-            stuck_step=stuck_step, pending_step=pending_step
-        )
+    def reset_stuck_steps(self, stuck_step: ContentStep, pending_step: ContentStep) -> int:
+        return self.repository.reset_stuck_steps(stuck_step=stuck_step, pending_step=pending_step)
 
     def count_by_step(self) -> dict[str, int]:
         return self.repository.count_by_step()
 
     def get_paginated(
-        self, page: int, limit: int, step: str | None = None, search: str | None = None, channel: str | None = None
+        self,
+        page: int,
+        limit: int,
+        step: str | None = None,
+        search: str | None = None,
+        channel: str | None = None,
     ) -> tuple[list[YoutubeContentEntity], int]:
         return self.repository.get_paginated(
             page=page, limit=limit, step=step, search=search, channel=channel
         )
 
-
     def get_tracking_by_external_id(self, external_id: str) -> list[Any]:
         return self.repository.get_tracking_by_external_id(external_id)
+
+    def claim_next(
+        self,
+        steps: list[ContentStep],
+        processing_step: ContentStep | None,
+        exclude_ids: set[str] | None = None,
+        external_id: str | None = None,
+        deletion: bool = False,
+    ) -> YoutubeContentEntity | None:
+        return self.repository.claim_next(
+            steps, processing_step, exclude_ids, external_id, deletion
+        )
+
+    def renew_lease(self, external_id: str, token: str) -> bool:
+        return self.repository.renew_lease(external_id, token)
+
+    def release_lease(self, external_id: str, token: str) -> None:
+        self.repository.release_lease(external_id, token)
+
+    def request_reprocessing(self, external_id: str) -> bool:
+        return self.repository.request_reprocessing(external_id)
+
+    def request_deletion(self, external_id: str) -> bool:
+        return self.repository.request_deletion(external_id)
+
+    def recover_expired_leases(self) -> int:
+        return self.repository.recover_expired_leases()

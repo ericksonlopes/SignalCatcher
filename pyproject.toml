@@ -11,8 +11,8 @@ dependencies = [
     "pydantic-settings>=2.14.2",
     "sqlalchemy>=2.0.51",
     "yt-dlp>=2026.7.4",
-    "apscheduler>=3.10.4",
-    "fastapi>=0.111.0",
+    "apscheduler>=3.10.4,<4",
+    "fastapi>=0.121.0",
     "uvicorn>=0.30.1",
     "requests>=2.34.2",
     "google-api-python-client>=2.198.0",
@@ -42,12 +42,16 @@ select = [
     "UP", # pyupgrade (modern syntax for the target version)
 ]
 
+# Maintenance scripts bootstrap the repository on sys.path before local imports.
+[tool.ruff.lint.per-file-ignores]
+"script/*.py" = ["E402"]
+
 [tool.ruff.lint.isort]
 known-first-party = ["src", "script"]
 
 [tool.mypy]
 python_version = "3.10"
-files = ["src"]
+files = ["src", "main.py", "worker.py"]
 ignore_missing_imports = true
 # Teaches mypy how BaseModel/BaseSettings build their __init__, otherwise every
 # `Settings()` and entity construction is reported as missing named arguments.

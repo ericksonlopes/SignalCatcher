@@ -39,8 +39,7 @@ class PromoteScheduledUseCase:
 
             for content in scheduled:
                 self.logger.info(
-                    f"Re-queuing scheduled video for download: "
-                    f"{content.title} ({content.url})"
+                    f"Re-queuing scheduled video for download: {content.title} ({content.url})"
                 )
                 content.step = ContentStep.PENDING_DOWNLOAD
                 content.error_info = None

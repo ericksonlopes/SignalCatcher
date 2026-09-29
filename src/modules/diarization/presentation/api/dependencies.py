@@ -33,7 +33,7 @@ def get_diarization_unit_of_work() -> Iterator[DiarizationUnitOfWork]:
 
 
 def get_diarization_repository(
-    uow: DiarizationUnitOfWork = Depends(get_diarization_unit_of_work),
+    uow: DiarizationUnitOfWork = Depends(get_diarization_unit_of_work, scope="function"),
 ) -> IDiarizationRepository:
     return uow.diarizations
 
@@ -50,6 +50,4 @@ def get_diarization_queries(
 ) -> DiarizationQueries:
     # Two units of work take part here, one per module. Both sides of this query are
     # read-only, so they do not need to share a transaction.
-    return DiarizationQueries(
-        repository=repository, youtube_contents=youtube_contents
-    )
+    return DiarizationQueries(repository=repository, youtube_contents=youtube_contents)

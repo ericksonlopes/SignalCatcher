@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -7,8 +7,7 @@ from pydantic import BaseModel
 # the persistence layer.
 UNKNOWN_LABEL = "Desconhecido"
 PLACEHOLDER_THUMBNAIL = (
-    "https://images.unsplash.com/photo-1590602847861-f357a9332bbc"
-    "?w=300&auto=format&fit=crop&q=80"
+    "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=300&auto=format&fit=crop&q=80"
 )
 UNKNOWN_DURATION = "00:00:00"
 
@@ -22,11 +21,11 @@ class DiarizationCardDTO(BaseModel):
 
     id: str
     step: str
-    created_at: Optional[str] = None
-    entity_id: Optional[str] = None
-    entity_type: Optional[str] = None
+    created_at: str | None = None
+    entity_id: str | None = None
+    entity_type: str | None = None
     title: str = UNKNOWN_LABEL
     channelName: str = UNKNOWN_LABEL  # noqa: N815 - matches the existing API contract
     thumbnail: str = PLACEHOLDER_THUMBNAIL
     duration: str = UNKNOWN_DURATION
-    result_json: Optional[Any] = None
+    result_json: Any | None = None

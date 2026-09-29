@@ -1,5 +1,3 @@
-from typing import Optional
-
 from src.modules.diarization.domain.entities.diarization_entity import DiarizationEntity
 from src.modules.diarization.domain.enums.diarization_step import DiarizationStep
 from src.modules.diarization.domain.interfaces.repositories.diarization_repository import (
@@ -16,12 +14,12 @@ class DiarizationCommands:
     def create_task(
         self,
         file_path: str,
-        entity_id: Optional[str] = None,
-        entity_type: Optional[str] = None,
-        language: Optional[str] = None,
-        num_speakers: Optional[int] = None,
-        min_speakers: Optional[int] = None,
-        max_speakers: Optional[int] = None,
+        entity_id: str | None = None,
+        entity_type: str | None = None,
+        language: str | None = None,
+        num_speakers: int | None = None,
+        min_speakers: int | None = None,
+        max_speakers: int | None = None,
         model_size: str = "large-v2",
     ) -> DiarizationEntity:
         if not file_path:
@@ -40,8 +38,8 @@ class DiarizationCommands:
         )
         return self.repository.create_task(task)
 
-    def reprocess_task(self, task_id: str) -> Optional[DiarizationEntity]:
+    def reprocess_task(self, task_id: str) -> DiarizationEntity | None:
         return self.repository.reprocess_task(task_id)
 
-    def cancel_task(self, task_id: str) -> Optional[DiarizationEntity]:
+    def cancel_task(self, task_id: str) -> DiarizationEntity | None:
         return self.repository.cancel_task(task_id)

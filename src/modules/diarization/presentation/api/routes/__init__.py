@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+
 from src.modules.diarization.presentation.api.routes import diarization_route
 
 diarization_router = APIRouter()

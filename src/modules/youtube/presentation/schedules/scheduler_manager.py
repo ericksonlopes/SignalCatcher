@@ -1,11 +1,22 @@
-from apscheduler.jobstores.base import JobLookupError
-from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
+from collections.abc import Callable
+from datetime import datetime, timezone
+from threading import Lock
+from time import monotonic
+
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from src.core.database.connector import engine
+from src.core.database.connector import Session
+from src.core.database.job_control import JobControlRepository
 from src.core.logger.logger import logger
+from src.modules.youtube.presentation.schedules.jobs.youtube_delete_contents_job import (
+    delete_contents_job,
+)
+from src.modules.youtube.presentation.schedules.jobs.youtube_download_job import download_videos_job
 from src.modules.youtube.presentation.schedules.jobs.youtube_extract_and_download_job import (
     extract_and_download_job,
+)
+from src.modules.youtube.presentation.schedules.jobs.youtube_extract_metadata_job import (
+    extract_metadata_job,
 )
 from src.modules.youtube.presentation.schedules.jobs.youtube_monitor_channels_job import (
     youtube_monitor_channels_job,
@@ -17,103 +28,70 @@ from src.modules.youtube.presentation.schedules.jobs.youtube_promote_scheduled_j
     promote_scheduled_job,
 )
 
-# Job ids that no longer exist. They stay in the SQLAlchemyJobStore across restarts,
-# so they have to be deleted explicitly: otherwise the old entry keeps firing its
-# still-importable function alongside the new job, monitoring every channel twice.
-#
-# `youtube_extract_metadata` and `youtube_download_videos` were merged into the single
-# `youtube_extract_and_download` job; without this cleanup the persisted entries would
-# keep running extraction and download in parallel with the merged job.
-LEGACY_JOB_IDS = (
-    "daily_youtube_capture_job",
-    "youtube_extract_metadata",
-    "youtube_download_videos",
-)
-
-# The stage jobs used to be called synchronously from inside the monitor job, which
-# meant a single 30-minute slot had to fit channel monitoring plus metadata extraction
-# plus every pending download. Channel monitoring is independent now; extraction and
-# download share one job because download depends on extraction having finished.
-#
-# `max_instances=1` keeps a long run from overlapping itself; `coalesce=True` collapses
-# runs missed while the process was down into a single catch-up instead of a burst; and
-# `misfire_grace_time` bounds how late a missed run may still start.
-JOB_DEFINITIONS = (
-    {
-        "func": youtube_monitor_channels_job,
-        "id": "youtube_monitor_channels",
-        "minutes": 30,
-        "misfire_grace_time": 300,
-    },
-    {
-        # Extraction and download are chained in one job so a download pass always
-        # starts right after extraction finishes, instead of waiting for its own tick.
-        # Downloads are the long pole (a single video can take hours), so this leans on
-        # max_instances=1 to skip any tick that is still busy.
-        "func": extract_and_download_job,
-        "id": "youtube_extract_and_download",
-        "minutes": 15,
-        "misfire_grace_time": 600,
-    },
-    {
-        # Retrying errors re-downloads videos, so it stays deliberately infrequent.
-        "func": process_errors_job,
-        "id": "youtube_process_errors",
-        "minutes": 30,
-        "misfire_grace_time": 600,
-    },
-    {
-        # Re-queues scheduled premieres / upcoming lives for download. Premieres air
-        # on their own schedule, so checking a few times a day is enough; a video that
-        # still has not aired just returns to SCHEDULED without erroring.
-        "func": promote_scheduled_job,
-        "id": "youtube_promote_scheduled",
-        "minutes": 30,
-        "misfire_grace_time": 600,
-    },
-)
+# Definitions live in code; durable requests and telemetry live in PostgreSQL.
+# Only the dedicated worker owns this in-memory scheduler.
+JOB_DEFINITIONS: dict[str, tuple[Callable[[], None], int | None]] = {
+    "youtube_monitor_channels": (youtube_monitor_channels_job, 30),
+    "youtube_extract_and_download": (extract_and_download_job, 15),
+    "youtube_process_errors": (process_errors_job, 30),
+    "youtube_promote_scheduled": (promote_scheduled_job, 30),
+    "youtube_delete_contents": (delete_contents_job, 1),
+    "youtube_extract_metadata": (extract_metadata_job, None),
+    "youtube_download_videos": (download_videos_job, None),
+}
+_pipeline_lock = Lock()
+_monitor_lock = Lock()
 
 
-def _remove_legacy_jobs(scheduler: BackgroundScheduler) -> None:
-    for job_id in LEGACY_JOB_IDS:
+def _run_job(job_id: str) -> None:
+    # Monitoring can run alongside media work; media operations share one lane.
+    gate = _monitor_lock if job_id == "youtube_monitor_channels" else _pipeline_lock
+    if not gate.acquire(blocking=False):
+        with Session.begin() as session:
+            JobControlRepository(session).request(job_id)
+        return
+    started = monotonic()
+    error = None
+    did_start = False
+    try:
+        with Session.begin() as session:
+            did_start = JobControlRepository(session).start(job_id)
+        if not did_start:
+            return
+        JOB_DEFINITIONS[job_id][0]()
+    except Exception as exc:
+        error = str(exc)
+        logger.error(f"Job {job_id} failed: {exc}")
+    finally:
         try:
-            scheduler.remove_job(job_id)
-            logger.info(f"Removed stale scheduled job '{job_id}' from the job store.")
-        except JobLookupError:
-            # Expected on a store that never had the old id, or after the first cleanup.
-            pass
-
-
-def _register_jobs(scheduler: BackgroundScheduler) -> None:
-    for definition in JOB_DEFINITIONS:
-        scheduler.add_job(
-            definition["func"],
-            trigger="interval",
-            minutes=definition["minutes"],
-            id=definition["id"],
-            max_instances=1,
-            coalesce=True,
-            misfire_grace_time=definition["misfire_grace_time"],
-            replace_existing=True,
-        )
-        logger.info(
-            f"Scheduled job '{definition['id']}' every {definition['minutes']} minute(s)."
-        )
+            if did_start:
+                with Session.begin() as session:
+                    JobControlRepository(session).finish(job_id, monotonic() - started, error)
+        finally:
+            gate.release()
 
 
 def start_scheduler() -> BackgroundScheduler:
-    jobstores = {"default": SQLAlchemyJobStore(engine=engine)}
-
-    scheduler = BackgroundScheduler(jobstores=jobstores)
-
-    # Started paused so the cleanup and registration below finish before anything can
-    # fire. Persisted jobs whose next run is already in the past would otherwise run
-    # while we are still reconciling the schedule.
-    scheduler.start(paused=True)
-    _remove_legacy_jobs(scheduler)
-    _register_jobs(scheduler)
-    scheduler.resume()
-
-    logger.info("🚀 Scheduler running in the background! Executing jobs periodically.")
-
+    scheduler = BackgroundScheduler(timezone="UTC")
+    for job_id, (_, minutes) in JOB_DEFINITIONS.items():
+        options = {} if minutes is not None else {"next_run_time": None}
+        scheduler.add_job(
+            _run_job,
+            args=[job_id],
+            trigger="interval",
+            minutes=minutes or 1440,
+            id=job_id,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=600,
+            **options,
+        )
+    scheduler.start()
     return scheduler
+
+
+def dispatch_requests(scheduler: BackgroundScheduler, pending: list[str]) -> None:
+    for job_id in pending:
+        gate = _monitor_lock if job_id == "youtube_monitor_channels" else _pipeline_lock
+        if not gate.locked():
+            scheduler.modify_job(job_id, next_run_time=datetime.now(timezone.utc))

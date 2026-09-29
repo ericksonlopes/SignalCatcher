@@ -7,13 +7,14 @@ from src.modules.youtube.application.mappers.channel_dto_mapper import ChannelDt
 from src.modules.youtube.domain.interfaces.repositories.youtube_channel_repository import (
     IYouTubeChannelRepository,
 )
-from src.modules.youtube.domain.interfaces.repositories.youtube_monitored_channel_repository import (
+from src.modules.youtube.domain.interfaces.repositories.youtube_monitored_channel_repository import (  # noqa: E501 - qualified module path
     IYouTubeMonitoredChannelRepository,
 )
 from src.modules.youtube.domain.interfaces.services.channel_service import (
     IChannelService,
 )
 from src.modules.youtube.domain.interfaces.services.scraper import IYouTubeScraper
+from src.modules.youtube.domain.processing import is_youtube_url
 
 
 class ChannelCommands:
@@ -35,6 +36,9 @@ class ChannelCommands:
         self.logger.debug(
             "Iniciando a criação de um novo canal.", context={"channel_url": data.url}
         )
+
+        if not is_youtube_url(data.url):
+            raise ValueError("A valid YouTube URL is required.")
 
         # Verify and extract channel info
         if self.scraper and self.yt_channel_repo:

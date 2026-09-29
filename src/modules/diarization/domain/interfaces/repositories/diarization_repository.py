@@ -1,4 +1,4 @@
-from typing import Optional, Protocol
+from typing import Protocol
 
 from src.modules.diarization.domain.entities.diarization_entity import DiarizationEntity
 
@@ -8,7 +8,7 @@ class IDiarizationRepository(Protocol):
         """Persists a new diarization task."""
         ...
 
-    def get_task(self, task_id: str) -> Optional[DiarizationEntity]:
+    def get_task(self, task_id: str) -> DiarizationEntity | None:
         """Returns a task by its own id."""
         ...
 
@@ -16,9 +16,9 @@ class IDiarizationRepository(Protocol):
         self,
         page: int,
         limit: int,
-        step: Optional[str] = None,
-        entity_ids: Optional[list[str]] = None,
-        entity_id_search: Optional[str] = None,
+        step: str | None = None,
+        entity_ids: list[str] | None = None,
+        entity_id_search: str | None = None,
     ) -> tuple[list[DiarizationEntity], int]:
         """Returns a page of tasks and the total number of matches.
 
@@ -36,11 +36,11 @@ class IDiarizationRepository(Protocol):
         """Returns the most recent step per linked entity id."""
         ...
 
-    def reprocess_task(self, task_id: str) -> Optional[DiarizationEntity]:
+    def reprocess_task(self, task_id: str) -> DiarizationEntity | None:
         """Resets a task back to PENDING, clearing its previous result and error."""
         ...
 
-    def cancel_task(self, task_id: str) -> Optional[DiarizationEntity]:
+    def cancel_task(self, task_id: str) -> DiarizationEntity | None:
         """Cancels a task that is still in progress.
 
         Returns None when no task matches. Returns the task untouched when it already

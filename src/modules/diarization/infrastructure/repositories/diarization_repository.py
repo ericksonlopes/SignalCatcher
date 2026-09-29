@@ -1,5 +1,3 @@
-from typing import Optional
-
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
@@ -37,34 +35,26 @@ class DiarizationRepository(IDiarizationRepository):
         self.session.refresh(model)
         return DiarizationMapper.to_domain(model)
 
-    def get_task(self, task_id: str) -> Optional[DiarizationEntity]:
-        model = (
-            self.session.query(DiarizationModel)
-            .filter(DiarizationModel.id == task_id)
-            .first()
-        )
+    def get_task(self, task_id: str) -> DiarizationEntity | None:
+        model = self.session.query(DiarizationModel).filter(DiarizationModel.id == task_id).first()
         return DiarizationMapper.to_domain(model) if model else None
 
     def get_paginated(
         self,
         page: int,
         limit: int,
-        step: Optional[str] = None,
-        entity_ids: Optional[list[str]] = None,
-        entity_id_search: Optional[str] = None,
+        step: str | None = None,
+        entity_ids: list[str] | None = None,
+        entity_id_search: str | None = None,
     ) -> tuple[list[DiarizationEntity], int]:
-        query = self.session.query(DiarizationModel).order_by(
-            DiarizationModel.created_at.desc()
-        )
+        query = self.session.query(DiarizationModel).order_by(DiarizationModel.created_at.desc())
 
         if step and step.upper() != "ALL":
             step_upper = step.upper()
             if step_upper == DiarizationStep.PROCESSING.value:
                 # "PROCESSING" is a UI bucket covering every in-flight step.
                 query = query.filter(
-                    DiarizationModel.step.in_(
-                        [s.value for s in DiarizationStep.in_progress()]
-                    )
+                    DiarizationModel.step.in_([s.value for s in DiarizationStep.in_progress()])
                 )
             else:
                 query = query.filter(DiarizationModel.step == step_upper)
@@ -76,9 +66,7 @@ class DiarizationRepository(IDiarizationRepository):
             if entity_ids:
                 conditions.append(DiarizationModel.entity_id.in_(entity_ids))
             if entity_id_search:
-                conditions.append(
-                    DiarizationModel.entity_id.ilike(f"%{entity_id_search}%")
-                )
+                conditions.append(DiarizationModel.entity_id.ilike(f"%{entity_id_search}%"))
             if conditions:
                 query = query.filter(or_(*conditions))
             else:
@@ -113,13 +101,9 @@ class DiarizationRepository(IDiarizationRepository):
                 result[entity_id] = step
         return result
 
-    def _find_model(self, task_id: str) -> Optional[DiarizationModel]:
+    def _find_model(self, task_id: str) -> DiarizationModel | None:
         """Looks a task up by its own id, falling back to the latest task of an entity."""
-        model = (
-            self.session.query(DiarizationModel)
-            .filter(DiarizationModel.id == task_id)
-            .first()
-        )
+        model = self.session.query(DiarizationModel).filter(DiarizationModel.id == task_id).first()
         if model:
             return model
         return (
@@ -129,7 +113,7 @@ class DiarizationRepository(IDiarizationRepository):
             .first()
         )
 
-    def reprocess_task(self, task_id: str) -> Optional[DiarizationEntity]:
+    def reprocess_task(self, task_id: str) -> DiarizationEntity | None:
         model = self._find_model(task_id)
         if not model:
             return None
@@ -141,7 +125,7 @@ class DiarizationRepository(IDiarizationRepository):
         self.session.refresh(model)
         return DiarizationMapper.to_domain(model)
 
-    def cancel_task(self, task_id: str) -> Optional[DiarizationEntity]:
+    def cancel_task(self, task_id: str) -> DiarizationEntity | None:
         model = self._find_model(task_id)
         if not model:
             return None

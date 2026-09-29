@@ -6,7 +6,7 @@ from typing import Protocol
 from src.modules.youtube.domain.interfaces.repositories.youtube_channel_repository import (
     IYouTubeChannelRepository,
 )
-from src.modules.youtube.domain.interfaces.repositories.youtube_monitored_channel_repository import (
+from src.modules.youtube.domain.interfaces.repositories.youtube_monitored_channel_repository import (  # noqa: E501 - qualified module path
     IYouTubeMonitoredChannelRepository,
 )
 from src.modules.youtube.domain.interfaces.services.youtube_content_service import (

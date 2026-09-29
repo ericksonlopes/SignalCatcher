@@ -1,7 +1,9 @@
 import os
 import re
 import time
-from typing import Any, Iterable
+from collections.abc import Callable, Iterable
+from pathlib import Path
+from typing import Any
 
 import requests
 from yt_dlp import YoutubeDL
@@ -37,7 +39,10 @@ class YouTubeScraperService(IYouTubeScraper):
                     "AppleWebKit/537.36 (KHTML, like Gecko) "
                     "Chrome/123.0.0.0 Safari/537.36"
                 ),
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                "Accept": (
+                    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/"
+                    "webp,*/*;q=0.8"
+                ),
                 "Accept-Language": "en-US,en;q=0.5",
                 "Referer": "https://www.google.com/",
             },
@@ -81,11 +86,8 @@ class YouTubeScraperService(IYouTubeScraper):
                 YouTubeVideoDTO(
                     id=video_id,
                     title=entry.get("title"),
-                    url=entry.get("url")
-                    or f"https://www.youtube.com/watch?v={video_id}",
-                    channel=entry.get("channel")
-                    or entry.get("uploader")
-                    or default_channel,
+                    url=entry.get("url") or f"https://www.youtube.com/watch?v={video_id}",
+                    channel=entry.get("channel") or entry.get("uploader") or default_channel,
                 )
             )
         return videos
@@ -127,9 +129,7 @@ class YouTubeScraperService(IYouTubeScraper):
             with YoutubeDL(ydl_opts) as ydl:
                 channel_info = ydl.extract_info(normalized_url, download=False)
                 if not channel_info or "entries" not in channel_info:
-                    extracted_channel_name = (
-                        channel_info.get("channel", "") if channel_info else ""
-                    )
+                    extracted_channel_name = channel_info.get("channel", "") if channel_info else ""
                     return [], extracted_channel_name
 
                 extracted_channel_name = (
@@ -175,9 +175,7 @@ class YouTubeScraperService(IYouTubeScraper):
 
                 thumbnails = info_dict.get("thumbnails", [])
                 avatar_url = (
-                    thumbnails[-1]["url"]
-                    if thumbnails and "url" in thumbnails[-1]
-                    else None
+                    thumbnails[-1]["url"] if thumbnails and "url" in thumbnails[-1] else None
                 )
 
                 uploader_id = info_dict.get("uploader_id") or info_dict.get("id")
@@ -220,9 +218,7 @@ class YouTubeScraperService(IYouTubeScraper):
             response = requests.get(oembed_url, timeout=10)
 
             if response.status_code != 200:
-                raise ScraperError(
-                    f"Failed to extract video information via oEmbed (Status: {response.status_code})."
-                )
+                raise ScraperError(f"oEmbed extraction failed: HTTP {response.status_code}.")
 
             data = response.json()
 
@@ -261,9 +257,7 @@ class YouTubeScraperService(IYouTubeScraper):
             ydl_opts = self._get_common_ydl_opts()
             # For metadata extraction, we don't want extract_flat, we want full info
             # We set ignoreerrors to False so yt-dlp raises the actual bot block error
-            ydl_opts.update(
-                {"extract_flat": False, "skip_download": True, "ignoreerrors": False}
-            )
+            ydl_opts.update({"extract_flat": False, "skip_download": True, "ignoreerrors": False})
 
             with YoutubeDL(ydl_opts) as ydl:
                 info_dict = ydl.extract_info(video_url, download=False)
@@ -281,9 +275,7 @@ class YouTubeScraperService(IYouTubeScraper):
             )
             raise
 
-    def extract_playlist_videos(
-        self, playlist_url: str
-    ) -> tuple[list[YouTubeVideoDTO], str]:
+    def extract_playlist_videos(self, playlist_url: str) -> tuple[list[YouTubeVideoDTO], str]:
         """Extracts all videos from a YouTube playlist.
 
         Returns a tuple of (list of YouTubeVideoDTO objects, playlist title).
@@ -331,12 +323,23 @@ class YouTubeScraperService(IYouTubeScraper):
             raise
 
     def download_video(
-        self, url: str, content_id: str, origin: str, output_path: str
+        self,
+        url: str,
+        content_id: str,
+        origin: str,
+        output_path: str,
+        progress_guard: Callable[[], None] | None = None,
     ) -> str:
         self.logger.debug(f"Starting download for {url} to {output_path}")
 
         parts = sanitize_path_parts(origin)
-        final_output_path = os.path.join(output_path, *parts)
+        root = Path(output_path).resolve()
+        directory = root.joinpath(*parts).resolve()
+        if not directory.is_relative_to(root):
+            raise ValueError("Download path is outside the downloads directory.")
+        if not re.fullmatch(r"[A-Za-z0-9_-]+", content_id):
+            raise ValueError("Invalid content identifier for download.")
+        final_output_path = str(directory)
         os.makedirs(final_output_path, exist_ok=True)
 
         ydl_opts = self._get_common_ydl_opts()
@@ -344,7 +347,10 @@ class YouTubeScraperService(IYouTubeScraper):
         ydl_opts.update(
             {
                 "outtmpl": f"{final_output_path}/{content_id}_%(title)s.%(ext)s",
-                "format": "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best[ext=mp4]/best",
+                "format": (
+                    "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/"
+                    "best[height<=1080][ext=mp4]/best[ext=mp4]/best"
+                ),
                 "extract_flat": False,
                 "skip_download": False,
                 "ignoreerrors": False,
@@ -356,6 +362,9 @@ class YouTubeScraperService(IYouTubeScraper):
                 # intermittently fails with ENOENT and throws away a finished
                 # download. Skipping the rename removes that failure mode.
                 "nopart": True,
+                # A killed nopart download leaves a final-looking partial file.
+                # Retries replace it instead of accepting it as complete.
+                "overwrites": True,
             }
         )
 
@@ -365,19 +374,25 @@ class YouTubeScraperService(IYouTubeScraper):
         if settings.FFMPEG_LOCATION:
             ydl_opts["ffmpeg_location"] = settings.FFMPEG_LOCATION
 
+        if progress_guard:
+            progress_guard()
+            ydl_opts["progress_hooks"] = [lambda _: progress_guard()]
+            ydl_opts["postprocessor_hooks"] = [lambda _: progress_guard()]
+
         with YoutubeDL(ydl_opts) as ydl:
-            # We use extract_info with download=True to get the final info_dict which contains the filename
+            # We use extract_info with download=True to get the final info_dict which
+            # contains the filename
             info_dict = ydl.extract_info(url, download=True)
             if not info_dict:
                 raise ScraperError("Failed to download video or extract info.")
-                
+
             # yt-dlp stores the final filename in the 'requested_downloads' list or '_filename'
-            if 'requested_downloads' in info_dict and info_dict['requested_downloads']:
-                final_file_path = info_dict['requested_downloads'][0]['filepath']
-            elif '_filename' in info_dict:
-                final_file_path = info_dict['_filename']
+            if "requested_downloads" in info_dict and info_dict["requested_downloads"]:
+                final_file_path = info_dict["requested_downloads"][0]["filepath"]
+            elif "_filename" in info_dict:
+                final_file_path = info_dict["_filename"]
             else:
                 # Fallback to reconstructing the path
                 final_file_path = ydl.prepare_filename(info_dict)
-                
+
             return os.path.abspath(final_file_path)

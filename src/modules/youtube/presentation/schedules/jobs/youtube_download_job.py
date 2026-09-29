@@ -28,11 +28,10 @@ def download_videos_job():
         processed = 0
         while use_case.execute():
             processed += 1
-        global_logger.info(
-            f"No more videos pending download. Finishing. Processed {processed}."
-        )
+        global_logger.info(f"No more videos pending download. Finishing. Processed {processed}.")
     except Exception as e:
         global_logger.error(f"Download job aborted: {e}")
+        raise
 
 
 if __name__ == "__main__":

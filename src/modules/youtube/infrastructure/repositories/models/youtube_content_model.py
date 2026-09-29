@@ -1,19 +1,22 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-
-def get_brazil_time():
-    return datetime.now(ZoneInfo("America/Sao_Paulo")).replace(tzinfo=None)
-
-
-from sqlalchemy import Column, Integer, String, DateTime, Enum, JSON
+from sqlalchemy import JSON, Boolean, Column, DateTime, Enum, Index, Integer, String
 
 from src.core.database.connector import Base
 from src.modules.youtube.domain.enums.content_step import ContentStep
 
 
+def get_brazil_time():
+    return datetime.now(ZoneInfo("America/Sao_Paulo")).replace(tzinfo=None)
+
+
 class YoutubeContentModel(Base):
     __tablename__ = "youtube_contents"
+    __table_args__ = (
+        Index("ix_youtube_processing_queue", "step", "next_retry_at", "id"),
+        Index("ix_youtube_deletion_queue", "deletion_requested", "next_retry_at"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     external_id = Column(
@@ -31,6 +34,12 @@ class YoutubeContentModel(Base):
     thumbnail = Column(String, nullable=True)
     duration = Column(Integer, nullable=True)  # Format: Seconds
     language = Column(String, nullable=True)  # Extracted language from raw_metadata
+    lease_token = Column(String, nullable=True)
+    lease_expires_at = Column(DateTime(timezone=True), nullable=True)
+    attempt_count = Column(Integer, nullable=False, default=0, server_default="0")
+    next_retry_at = Column(DateTime(timezone=True), nullable=True)
+    deletion_requested = Column(Boolean, nullable=False, default=False, server_default="false")
+    deletion_attempt_count = Column(Integer, nullable=False, default=0, server_default="0")
     categories = Column(JSON, nullable=True)  # List of categories
     tags = Column(JSON, nullable=True)  # List of tags
     file_path = Column(String, nullable=True)  # Absolute path to the downloaded audio/video file
