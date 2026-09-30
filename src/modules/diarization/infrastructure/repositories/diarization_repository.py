@@ -47,7 +47,16 @@ class DiarizationRepository(IDiarizationRepository):
         entity_ids: list[str] | None = None,
         entity_id_search: str | None = None,
     ) -> tuple[list[DiarizationEntity], int]:
-        query = self.session.query(DiarizationModel).order_by(DiarizationModel.created_at.desc())
+        # Completed tasks are ordered by their last processing update, so a task
+        # requested earlier but finished now appears among the latest results.
+        latest = (
+            func.coalesce(DiarizationModel.updated_at, DiarizationModel.created_at)
+            if step and step.upper() == DiarizationStep.COMPLETED.value
+            else DiarizationModel.created_at
+        )
+        query = self.session.query(DiarizationModel).order_by(
+            latest.desc(), DiarizationModel.id.desc()
+        )
 
         if step and step.upper() != "ALL":
             step_upper = step.upper()
@@ -119,6 +128,7 @@ class DiarizationRepository(IDiarizationRepository):
             return None
 
         model.step = DiarizationStep.PENDING.value
+        model.progress_percent = None
         model.error_message = None
         model.result_json = None
         self.session.flush()
@@ -136,6 +146,7 @@ class DiarizationRepository(IDiarizationRepository):
             return DiarizationMapper.to_domain(model)
 
         model.step = DiarizationStep.CANCELLED.value
+        model.progress_percent = None
         self.session.flush()
         self.session.refresh(model)
         return DiarizationMapper.to_domain(model)

@@ -14,6 +14,8 @@ class DiarizationStep(str, enum.Enum):
     TRANSCRIPTION = "TRANSCRIPTION"
     ALIGNMENT = "ALIGNMENT"
     DIARIZATION = "DIARIZATION"
+    # Speaker assignment finished; the worker is preparing/persisting the result.
+    DIARIZED = "DIARIZED"
     # Kept because rows written by earlier versions may still carry it, and the list
     # endpoint filters on it.
     PROCESSING = "PROCESSING"
@@ -29,6 +31,7 @@ class DiarizationStep(str, enum.Enum):
             cls.TRANSCRIPTION,
             cls.ALIGNMENT,
             cls.DIARIZATION,
+            cls.DIARIZED,
             cls.PROCESSING,
         )
 

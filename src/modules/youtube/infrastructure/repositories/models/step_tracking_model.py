@@ -1,5 +1,6 @@
 import enum
 import logging
+from datetime import datetime, timezone
 
 from sqlalchemy import Column, DateTime, Integer, String, event
 from sqlalchemy.orm.attributes import get_history
@@ -67,6 +68,13 @@ def create_tracking_entry(connection, target, previous_step, new_step) -> None:
             previous_step=_step_name(previous_step),
             new_step=new_step_name,
             details=getattr(target, "error_info", None),
+            # Diarization timestamps use UTC in both services. Keep the existing
+            # local-time convention for the YouTube capture history.
+            changed_at=(
+                datetime.now(timezone.utc).replace(tzinfo=None)
+                if target.__tablename__ == "diarization"
+                else get_brazil_time()
+            ),
         )
     )
 

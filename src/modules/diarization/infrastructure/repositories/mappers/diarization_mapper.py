@@ -14,6 +14,7 @@ class DiarizationMapper:
             # Stored as free text, so an unrecognised value falls back to ERROR rather
             # than blowing up the whole listing.
             step=DiarizationMapper._to_step(model.step),
+            progress_percent=model.progress_percent,
             entity_id=model.entity_id,
             entity_type=model.entity_type,
             language=model.language,
@@ -32,6 +33,7 @@ class DiarizationMapper:
         return DiarizationModel(
             file_path=entity.file_path,
             step=entity.step.value,
+            progress_percent=entity.progress_percent,
             entity_id=entity.entity_id,
             entity_type=entity.entity_type,
             language=entity.language,
