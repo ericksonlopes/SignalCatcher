@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from sqlalchemy import func, or_, text
 from sqlalchemy.orm import Session
 
@@ -195,6 +197,8 @@ class DiarizationRepository(IDiarizationRepository):
         model.lease_expires_at = None
         model.error_message = None
         model.result_json = None
+        model.queue_priority = 0
+        model.queued_at = datetime.now(timezone.utc).replace(tzinfo=None)
         self.session.flush()
         self.session.refresh(model)
         return DiarizationMapper.to_domain(model)
@@ -213,6 +217,58 @@ class DiarizationRepository(IDiarizationRepository):
         model.progress_percent = None
         model.worker_token = None
         model.lease_expires_at = None
+        model.queue_priority = 0
+        self.session.flush()
+        self.session.refresh(model)
+        return DiarizationMapper.to_domain(model)
+
+    def prioritize_task(self, task_id: str) -> DiarizationEntity | None:
+        if self.session.get_bind().dialect.name == "postgresql":
+            self.session.execute(
+                text("SELECT pg_advisory_xact_lock(hashtext('diarization:queue'))")
+            )
+        model = self._find_model(task_id)
+        if model is None:
+            return None
+        if model.step == DiarizationStep.COMPLETED.value:
+            raise ValueError("Request a new diarization before prioritizing a completed result.")
+        if model.step in {step.value for step in DiarizationStep.in_progress()}:
+            return DiarizationMapper.to_domain(model)
+
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        active = (
+            self.session.query(DiarizationModel)
+            .filter(
+                DiarizationModel.step.in_([step.value for step in DiarizationStep.in_progress()])
+            )
+            .order_by(DiarizationModel.id)
+            .with_for_update()
+            .all()
+        )
+        for current in active:
+            # Revoke ownership before requeuing. Late progress/results from the old
+            # subprocess cannot overwrite the next attempt, even for the same task.
+            current.step = DiarizationStep.PENDING.value
+            current.worker_token = None
+            current.lease_expires_at = None
+            current.progress_percent = None
+            current.result_json = None
+            current.error_message = None
+            current.queue_priority = 0
+            current.queued_at = now
+
+        self.session.query(DiarizationModel).filter(
+            DiarizationModel.step == DiarizationStep.PENDING.value,
+            DiarizationModel.queue_priority != 0,
+        ).update({DiarizationModel.queue_priority: 0}, synchronize_session="fetch")
+        model.step = DiarizationStep.PENDING.value
+        model.worker_token = None
+        model.lease_expires_at = None
+        model.progress_percent = None
+        model.result_json = None
+        model.error_message = None
+        model.queue_priority = 1
+        model.queued_at = now
         self.session.flush()
         self.session.refresh(model)
         return DiarizationMapper.to_domain(model)

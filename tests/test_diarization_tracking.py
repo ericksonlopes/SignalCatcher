@@ -69,6 +69,31 @@ class DiarizationTrackingTest(unittest.TestCase):
         self.assertEqual(first.id, second.id)
         self.assertEqual(self.session.query(DiarizationModel).count(), 1)
 
+    def test_start_now_requeues_current_and_prioritizes_selected_video(self):
+        current = DiarizationModel(
+            file_path="current.wav",
+            step="TRANSCRIPTION",
+            worker_token="old-worker",
+            progress_percent=65,
+        )
+        selected = DiarizationModel(file_path="selected.wav", step="PENDING")
+        self.session.add_all([current, selected])
+        self.session.flush()
+        repository = DiarizationRepository(self.session)
+        result = repository.prioritize_task(selected.id)
+        self.assertEqual(result.queue_priority, 1)
+        self.assertEqual(current.step, "PENDING")
+        self.assertIsNone(current.worker_token)
+        self.assertIsNone(current.progress_percent)
+        self.assertEqual(current.queue_priority, 0)
+        rows = self.session.scalars(
+            select(StepTrackingModel)
+            .where(StepTrackingModel.entity_id == current.id)
+            .order_by(StepTrackingModel.id)
+        ).all()
+        self.assertEqual(rows[-1].new_step, "PENDING")
+        self.assertEqual(rows[-1].previous_step, "TRANSCRIPTION")
+
     def test_request_reprocess_cancel_keep_task_identity_and_utc(self):
         before = datetime.now(timezone.utc).replace(tzinfo=None)
         task = DiarizationModel(

@@ -40,6 +40,8 @@ class DiarizationModel(Base):
     progress_percent = Column(Integer, nullable=True)
     worker_token = Column(String, nullable=True)
     lease_expires_at = Column(DateTime, nullable=True)
+    queued_at = Column(DateTime, nullable=True, default=get_utc_now)
+    queue_priority = Column(Integer, nullable=False, default=0, server_default="0")
     language = Column(String, nullable=True)
     num_speakers = Column(Integer, nullable=True)
     min_speakers = Column(Integer, nullable=True)

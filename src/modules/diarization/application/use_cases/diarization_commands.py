@@ -43,3 +43,6 @@ class DiarizationCommands:
 
     def cancel_task(self, task_id: str) -> DiarizationEntity | None:
         return self.repository.cancel_task(task_id)
+
+    def prioritize_task(self, task_id: str) -> DiarizationEntity | None:
+        return self.repository.prioritize_task(task_id)

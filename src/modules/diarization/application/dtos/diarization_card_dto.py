@@ -22,6 +22,7 @@ class DiarizationCardDTO(BaseModel):
     id: str
     step: str
     progress_percent: int | None = None
+    queue_priority: int = 0
     created_at: str | None = None
     entity_id: str | None = None
     entity_type: str | None = None

@@ -19,6 +19,7 @@ class DiarizationCardMapper:
             id=task.id or "",
             step=task.step.value,
             progress_percent=task.progress_percent,
+            queue_priority=task.queue_priority,
             created_at=task.created_at.isoformat() if task.created_at else None,
             entity_id=task.entity_id,
             entity_type=task.entity_type,

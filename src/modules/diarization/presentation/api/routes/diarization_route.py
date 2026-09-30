@@ -35,6 +35,7 @@ CONTENT_NOT_FOUND_DETAIL = "Content not found"
 
 class DiarizationRequest(BaseModel):
     language: str | None = "en"
+    start_now: bool = False
 
 
 class PaginatedDiarizationResponse(BaseModel):
@@ -88,6 +89,11 @@ def trigger_youtube_diarization(
             entity_type="YOUTUBE",
             language=request.language or "en",
         )
+        if request.start_now:
+            prioritized = commands.prioritize_task(task.id or "")
+            if prioritized is None:
+                raise HTTPException(status_code=404, detail=TASK_NOT_FOUND_DETAIL)
+            task = prioritized
 
         return {
             "message": f"Diarization task created for content {external_id}",
@@ -101,6 +107,20 @@ def trigger_youtube_diarization(
     except Exception as e:
         logger.error(f"Failed to create diarization task for {external_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{id}/start-now")
+def start_diarization_now(
+    id: str,
+    commands: Annotated[DiarizationCommands, Depends(get_diarization_commands)],
+):
+    try:
+        task = commands.prioritize_task(id)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    if task is None:
+        raise HTTPException(status_code=404, detail=TASK_NOT_FOUND_DETAIL)
+    return {"task_id": task.id, "step": task.step.value, "queue_priority": task.queue_priority}
 
 
 @router.get(

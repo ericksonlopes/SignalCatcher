@@ -47,3 +47,7 @@ class IDiarizationRepository(Protocol):
         reached a terminal step, so the caller can tell the two cases apart.
         """
         ...
+
+    def prioritize_task(self, task_id: str) -> DiarizationEntity | None:
+        """Prioritize a task and return other running tasks to the end of the queue."""
+        ...

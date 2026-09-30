@@ -13,6 +13,7 @@ class DiarizationEntity(BaseModel):
     file_path: str
     step: DiarizationStep = DiarizationStep.PENDING
     progress_percent: int | None = None
+    queue_priority: int = 0
 
     # Link back to whatever produced the audio (a YouTube content, for instance).
     entity_id: str | None = None

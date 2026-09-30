@@ -15,6 +15,7 @@ class DiarizationMapper:
             # than blowing up the whole listing.
             step=DiarizationMapper._to_step(model.step),
             progress_percent=model.progress_percent,
+            queue_priority=model.queue_priority,
             entity_id=model.entity_id,
             entity_type=model.entity_type,
             language=model.language,
@@ -34,6 +35,7 @@ class DiarizationMapper:
             file_path=entity.file_path,
             step=entity.step.value,
             progress_percent=entity.progress_percent,
+            queue_priority=entity.queue_priority,
             entity_id=entity.entity_id,
             entity_type=entity.entity_type,
             language=entity.language,
