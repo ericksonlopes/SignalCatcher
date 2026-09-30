@@ -47,9 +47,7 @@ class DiarizationTrackingTest(unittest.TestCase):
         repository.reprocess_task(task.id)
         repository.cancel_task(task.id)
         self.session.commit()
-        rows = self.session.scalars(
-            select(StepTrackingModel).order_by(StepTrackingModel.id)
-        ).all()
+        rows = self.session.scalars(select(StepTrackingModel).order_by(StepTrackingModel.id)).all()
         self.assertEqual(
             [row.new_step for row in rows],
             ["PENDING", "DIARIZED", "COMPLETED", "PENDING", "CANCELLED"],
@@ -57,9 +55,7 @@ class DiarizationTrackingTest(unittest.TestCase):
         self.assertTrue(all(row.entity_type == "diarization" for row in rows))
         self.assertTrue(all(row.entity_id == task.id for row in rows))
         self.assertGreaterEqual(rows[0].changed_at, before)
-        self.assertLessEqual(
-            rows[-1].changed_at, datetime.now(timezone.utc).replace(tzinfo=None)
-        )
+        self.assertLessEqual(rows[-1].changed_at, datetime.now(timezone.utc).replace(tzinfo=None))
         self.assertEqual((task.entity_id, task.entity_type), ("video", "YOUTUBE"))
 
     def test_rolled_back_request_does_not_leave_history(self):
