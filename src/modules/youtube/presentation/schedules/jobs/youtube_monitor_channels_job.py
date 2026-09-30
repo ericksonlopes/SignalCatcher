@@ -18,7 +18,8 @@ from src.modules.youtube.infrastructure.unit_of_work import YoutubeUnitOfWork
 def youtube_monitor_channels_job():
     """Detects newly published videos on every active channel.
 
-    Only detection: metadata extraction and downloading are separate scheduled jobs.
+    Each channel discovery also queues the metadata/download job immediately.
+    Detection and media processing remain separate worker jobs.
     They used to be called synchronously from here, which meant one 30-minute slot had
     to fit channel monitoring plus every pending download. Since APScheduler allows a
     single instance per job, a long download run silently swallowed the next monitoring
@@ -39,7 +40,7 @@ def youtube_monitor_channels_job():
 
     global_logger.info(
         f"Channel monitoring finished. Total new videos detected: {total_new_videos}. "
-        f"They will be picked up by the metadata extraction and download jobs.",
+        f"New discoveries have requested immediate metadata extraction and download.",
         context={"total_new_videos": total_new_videos},
     )
 

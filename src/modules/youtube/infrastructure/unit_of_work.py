@@ -5,6 +5,7 @@ from collections.abc import Callable
 from sqlalchemy.orm import Session
 
 from src.core.database.connector import Session as DefaultSessionFactory
+from src.core.database.job_control import JobControlRepository
 from src.core.database.unit_of_work import SqlAlchemyUnitOfWork
 from src.core.logger.interfaces import ILogger
 from src.modules.youtube.domain.interfaces.repositories.youtube_channel_repository import (
@@ -64,3 +65,6 @@ class YoutubeUnitOfWork(SqlAlchemyUnitOfWork):
         )
         self.channels = YouTubeChannelRepository(session=session, logger=self._logger)
         return self
+
+    def request_processing(self) -> None:
+        JobControlRepository(self.session).request("youtube_extract_and_download")

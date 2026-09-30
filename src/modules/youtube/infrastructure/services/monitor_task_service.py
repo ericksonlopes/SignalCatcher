@@ -64,8 +64,17 @@ class MonitorTaskService(IMonitorTaskService):
                 tzinfo=None
             )
             uow.monitored_channels.update(channel)
+            if new_count:
+                # Persist the wake-up with the new content. The dedicated worker
+                # can begin while monitoring continues through the remaining channels.
+                uow.request_processing()
             uow.commit()
 
+        if new_count:
+            self.logger.info(
+                "Requested immediate metadata extraction and download for newly discovered videos.",
+                context={"channel_name": channel.name, "new_count": new_count},
+            )
         return new_count
 
     def daily_capture_routine(self) -> int:

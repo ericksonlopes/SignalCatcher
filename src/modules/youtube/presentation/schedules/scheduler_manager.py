@@ -35,7 +35,7 @@ JOB_DEFINITIONS: dict[str, tuple[Callable[[], None], int | None]] = {
     "youtube_extract_and_download": (extract_and_download_job, 15),
     "youtube_process_errors": (process_errors_job, 30),
     "youtube_promote_scheduled": (promote_scheduled_job, 30),
-    "youtube_delete_contents": (delete_contents_job, 1),
+    "youtube_delete_contents": (delete_contents_job, 30),
     "youtube_extract_metadata": (extract_metadata_job, None),
     "youtube_download_videos": (download_videos_job, None),
 }

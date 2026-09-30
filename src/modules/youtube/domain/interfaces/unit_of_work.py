@@ -30,6 +30,10 @@ class IYoutubeUnitOfWork(Protocol):
     monitored_channels: IYouTubeMonitoredChannelRepository
     channels: IYouTubeChannelRepository
 
+    def request_processing(self) -> None:
+        """Persist a request to process newly discovered content in this transaction."""
+        ...
+
     def commit(self) -> None: ...
 
     def rollback(self) -> None: ...
