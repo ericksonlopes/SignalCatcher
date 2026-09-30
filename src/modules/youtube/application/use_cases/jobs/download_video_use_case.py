@@ -63,7 +63,14 @@ class DownloadVideoUseCase:
                 with self.uow_factory() as uow:
                     uow.contents.update_content(content)
                     uow.commit()
-                self.logger.error(f"Download failed for {content.external_id}: {exc}")
+                if content.step is ContentStep.SCHEDULED:
+                    self.logger.warning(
+                        f"Video {content.external_id} is not available yet; "
+                        "waiting for its premiere or live event. Download deferred.",
+                        context={"reason": str(exc), "step": content.step.value},
+                    )
+                else:
+                    self.logger.error(f"Download failed for {content.external_id}: {exc}")
                 if content.step is ContentStep.ERROR and is_bot_block(str(exc)):
                     raise
         return True

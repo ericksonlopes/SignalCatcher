@@ -23,12 +23,15 @@ def download_videos_job():
     )
 
     try:
-        # execute() processes one pending video per call and returns False when the
-        # queue is empty, so drain it by counting how many were handled.
-        processed = 0
+        # execute() processes one pending video per call and returns False when
+        # no eligible items remain. Count attempts, including deferred/failed ones.
+        attempted = 0
         while use_case.execute():
-            processed += 1
-        global_logger.info(f"No more videos pending download. Finishing. Processed {processed}.")
+            attempted += 1
+        global_logger.info(
+            f"No more videos eligible for download in this run. Handled {attempted} attempts "
+            "(including completed, deferred or failed downloads)."
+        )
     except Exception as e:
         global_logger.error(f"Download job aborted: {e}")
         raise
