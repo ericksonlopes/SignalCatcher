@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import func, or_, text
+from sqlalchemy import case, func, or_, text
 from sqlalchemy.orm import Session
 
 from src.modules.diarization.domain.entities.diarization_entity import DiarizationEntity
@@ -77,7 +77,19 @@ class DiarizationRepository(IDiarizationRepository):
             if step and step.upper() == DiarizationStep.COMPLETED.value
             else DiarizationModel.created_at
         )
-        query = self._current_tasks().order_by(latest.desc(), DiarizationModel.id.desc())
+        query = self._current_tasks()
+        if not step or step.upper() == "ALL":
+            # Rank active work before pagination so it is visible on the first page.
+            query = query.order_by(
+                case(
+                    (
+                        DiarizationModel.step.in_([s.value for s in DiarizationStep.in_progress()]),
+                        0,
+                    ),
+                    else_=1,
+                )
+            )
+        query = query.order_by(latest.desc(), DiarizationModel.id.desc())
 
         if step and step.upper() != "ALL":
             step_upper = step.upper()
