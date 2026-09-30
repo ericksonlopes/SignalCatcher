@@ -1,5 +1,5 @@
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from src.modules.diarization.application.mappers.diarization_card_mapper import (
     DiarizationCardMapper,
 )
+from src.modules.diarization.domain.entities.diarization_entity import DiarizationEntity
 from src.modules.diarization.domain.enums.diarization_step import DiarizationStep
 from src.modules.diarization.infrastructure.repositories.diarization_repository import (
     DiarizationRepository,
@@ -29,6 +30,44 @@ class DiarizationTrackingTest(unittest.TestCase):
     def tearDown(self):
         self.session.close()
         self.engine.dispose()
+
+    def test_library_uses_latest_attempt_before_status_filtering(self):
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        self.session.add_all(
+            [
+                DiarizationModel(
+                    file_path="old.wav",
+                    entity_id="video",
+                    entity_type="YOUTUBE",
+                    step="COMPLETED",
+                    created_at=now - timedelta(days=1),
+                ),
+                DiarizationModel(
+                    file_path="new.wav",
+                    entity_id="video",
+                    entity_type="YOUTUBE",
+                    step="PENDING",
+                    created_at=now,
+                ),
+                DiarizationModel(file_path="upload-one.wav", step="PENDING"),
+                DiarizationModel(file_path="upload-two.wav", step="PENDING"),
+            ]
+        )
+        self.session.flush()
+        repository = DiarizationRepository(self.session)
+        items, total = repository.get_paginated(1, 20)
+        self.assertEqual(total, 3)
+        self.assertEqual(len(items), 3)
+        self.assertEqual(repository.get_paginated(1, 20, step="COMPLETED")[1], 0)
+        self.assertEqual(repository.count_by_step(), {"PENDING": 3})
+
+    def test_repeated_requests_reuse_active_task(self):
+        repository = DiarizationRepository(self.session)
+        request = DiarizationEntity(file_path="audio.wav", entity_id="video", entity_type="YOUTUBE")
+        first = repository.create_task(request)
+        second = repository.create_task(request)
+        self.assertEqual(first.id, second.id)
+        self.assertEqual(self.session.query(DiarizationModel).count(), 1)
 
     def test_request_reprocess_cancel_keep_task_identity_and_utc(self):
         before = datetime.now(timezone.utc).replace(tzinfo=None)

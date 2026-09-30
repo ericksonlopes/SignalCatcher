@@ -1,4 +1,4 @@
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, text
 from sqlalchemy.orm import Session
 
 from src.modules.diarization.domain.entities.diarization_entity import DiarizationEntity
@@ -29,6 +29,27 @@ class DiarizationRepository(IDiarizationRepository):
         self.session = session
 
     def create_task(self, task: DiarizationEntity) -> DiarizationEntity:
+        if task.entity_id:
+            # Serialize concurrent requests for a linked video across API replicas.
+            if self.session.get_bind().dialect.name == "postgresql":
+                self.session.execute(
+                    text("SELECT pg_advisory_xact_lock(hashtext(:key))"),
+                    {"key": f"diarization:{task.entity_type}:{task.entity_id}"},
+                )
+            active = (
+                self.session.query(DiarizationModel)
+                .filter(
+                    DiarizationModel.entity_id == task.entity_id,
+                    DiarizationModel.entity_type == task.entity_type,
+                    DiarizationModel.step.in_(
+                        ["PENDING", *[s.value for s in DiarizationStep.in_progress()]]
+                    ),
+                )
+                .order_by(DiarizationModel.created_at.desc(), DiarizationModel.id.desc())
+                .first()
+            )
+            if active:
+                return DiarizationMapper.to_domain(active)
         model = DiarizationMapper.to_model(task)
         self.session.add(model)
         self.session.flush()
@@ -54,9 +75,7 @@ class DiarizationRepository(IDiarizationRepository):
             if step and step.upper() == DiarizationStep.COMPLETED.value
             else DiarizationModel.created_at
         )
-        query = self.session.query(DiarizationModel).order_by(
-            latest.desc(), DiarizationModel.id.desc()
-        )
+        query = self._current_tasks().order_by(latest.desc(), DiarizationModel.id.desc())
 
         if step and step.upper() != "ALL":
             step_upper = step.upper()
@@ -87,9 +106,32 @@ class DiarizationRepository(IDiarizationRepository):
         models = query.offset(offset).limit(limit).all()
         return [DiarizationMapper.to_domain(m) for m in models], total
 
+    def _current_tasks(self):
+        # Choose the latest request before applying status/search filters. Historical
+        # attempts remain stored, but never create duplicate video rows in the library.
+        ranked = self.session.query(
+            DiarizationModel.id.label("id"),
+            func.row_number()
+            .over(
+                partition_by=(
+                    DiarizationModel.entity_id.is_(None),
+                    func.coalesce(DiarizationModel.entity_type, ""),
+                    func.coalesce(DiarizationModel.entity_id, DiarizationModel.id),
+                ),
+                order_by=(DiarizationModel.created_at.desc(), DiarizationModel.id.desc()),
+            )
+            .label("position"),
+        ).subquery()
+        return (
+            self.session.query(DiarizationModel)
+            .join(ranked, ranked.c.id == DiarizationModel.id)
+            .filter(ranked.c.position == 1)
+        )
+
     def count_by_step(self) -> dict[str, int]:
         counts = (
-            self.session.query(DiarizationModel.step, func.count(DiarizationModel.id))
+            self._current_tasks()
+            .with_entities(DiarizationModel.step, func.count(DiarizationModel.id))
             .group_by(DiarizationModel.step)
             .all()
         )
@@ -127,8 +169,30 @@ class DiarizationRepository(IDiarizationRepository):
         if not model:
             return None
 
+        if model.entity_id:
+            if self.session.get_bind().dialect.name == "postgresql":
+                self.session.execute(
+                    text("SELECT pg_advisory_xact_lock(hashtext(:key))"),
+                    {"key": f"diarization:{model.entity_type}:{model.entity_id}"},
+                )
+            active = (
+                self.session.query(DiarizationModel)
+                .filter(
+                    DiarizationModel.entity_id == model.entity_id,
+                    DiarizationModel.entity_type == model.entity_type,
+                    DiarizationModel.step.in_(
+                        ["PENDING", *[s.value for s in DiarizationStep.in_progress()]]
+                    ),
+                )
+                .order_by(DiarizationModel.created_at.desc(), DiarizationModel.id.desc())
+                .first()
+            )
+            if active:
+                return DiarizationMapper.to_domain(active)
         model.step = DiarizationStep.PENDING.value
         model.progress_percent = None
+        model.worker_token = None
+        model.lease_expires_at = None
         model.error_message = None
         model.result_json = None
         self.session.flush()
@@ -147,6 +211,8 @@ class DiarizationRepository(IDiarizationRepository):
 
         model.step = DiarizationStep.CANCELLED.value
         model.progress_percent = None
+        model.worker_token = None
+        model.lease_expires_at = None
         self.session.flush()
         self.session.refresh(model)
         return DiarizationMapper.to_domain(model)

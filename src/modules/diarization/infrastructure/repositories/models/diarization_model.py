@@ -38,6 +38,8 @@ class DiarizationModel(Base):
 
     # Configuration
     progress_percent = Column(Integer, nullable=True)
+    worker_token = Column(String, nullable=True)
+    lease_expires_at = Column(DateTime, nullable=True)
     language = Column(String, nullable=True)
     num_speakers = Column(Integer, nullable=True)
     min_speakers = Column(Integer, nullable=True)
