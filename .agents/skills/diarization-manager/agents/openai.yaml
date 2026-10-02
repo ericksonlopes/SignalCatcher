@@ -1,0 +1,6 @@
+interface:
+  display_name: "Diarization Manager"
+  short_description: "Evoluir a diarização, o worker e a interface"
+  default_prompt: "Use $diarization-manager para implementar a mudança solicitada no módulo de diarização do SignalCatcher e validar os contratos afetados."
+policy:
+  allow_implicit_invocation: true
