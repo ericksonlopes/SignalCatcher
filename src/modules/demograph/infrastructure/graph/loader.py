@@ -1,6 +1,7 @@
 from pathlib import Path
 from threading import Event
 from typing import Any
+import logging
 
 from neo4j import Driver, GraphDatabase, ManagedTransaction
 
@@ -18,6 +19,8 @@ from src.modules.demograph.infrastructure.storage.files import (
     safe_path,
 )
 from src.modules.demograph.infrastructure.storage.schema import SchemaObserver
+
+logger = logging.getLogger(__name__)
 
 SOURCE = "CAMARA_DOS_DEPUTADOS"
 # Identity constraints are compatible with the concepts used by the PoC.
@@ -62,82 +65,91 @@ class GraphLoader:
         )
 
     def load(self, run: Run) -> None:
+        logger.info(f"Starting load for run {run.id}")
         self.catalog.update(run.id, stage="load", schema_stale=True)
         voting_ids = select_voting_ids(self.guard_adapter, run)
         totals = {"read": 0, "outside_period": 0, "rejected": 0, "processed": 0, "duplicates": 0}
         by_dataset: dict[str, dict[str, int]] = {}
         seen_votes: dict[tuple[str, int], str] = {}
-        with self.driver() as driver:
-            driver.verify_connectivity()
-            with driver.session(database=self.database) as session:
-                for label, prop in KEYS.items():
-                    session.run(
-                        f"CREATE CONSTRAINT demograph_{label.lower()} IF NOT EXISTS "
-                        f"FOR (n:{label}) REQUIRE n.{prop} IS UNIQUE"
-                    ).consume()
-                for artifact in self.catalog.artifacts(run.extraction_id):
-                    self.guard_adapter.guard(run.id)
-                    path = safe_path(self.root, artifact["path"])
-                    if not path.is_file() or checksum(path) != artifact["checksum"]:
-                        raise ValueError("Artifact checksum mismatch.")
-                    dataset = artifact["dataset_id"]
-                    counters = by_dataset.setdefault(dataset, {key: 0 for key in totals})
-                    self.catalog.update(run.id, stage=f"load:{dataset}")
-                    batch: list[dict[str, Any]] = []
-                    batch_number = 0
-                    for index, raw in enumerate(rows(path, artifact["metadata_json"])):
-                        totals["read"] += 1
-                        counters["read"] += 1
-                        if index % 1000 == 0:
-                            self.guard_adapter.guard(run.id)
-                        if (dataset == "votings" and str(raw.get("id")) not in voting_ids) or (
-                            dataset == "votes" and str(raw.get("idVotacao")) not in voting_ids
-                        ):
-                            totals["outside_period"] += 1
-                            counters["outside_period"] += 1
-                            continue
-                        try:
-                            mapped = map_record(dataset, raw, artifact["metadata_json"])
-                            if dataset == "votes":
-                                key = (mapped["voting_id"], mapped["id"])
-                                if key in seen_votes:
-                                    if seen_votes[key] != mapped["choice"]:
-                                        raise ValueError("Conflicting votes in this extraction.")
-                                    totals["duplicates"] += 1
-                                    counters["duplicates"] += 1
-                                    continue
-                                seen_votes[key] = mapped["choice"]
-                        except (ValueError, KeyError, TypeError) as exc:
-                            totals["rejected"] += 1
-                            counters["rejected"] += 1
-                            self.catalog.issue(
-                                run.id,
-                                "Invalid record.",
-                                {
-                                    "artifact_id": artifact["id"],
-                                    "row": index + 1,
-                                    "type": type(exc).__name__,
-                                },
-                            )
-                            continue
-                        batch.append(mapped)
-                        if len(batch) == 500:
-                            session.execute_write(
-                                self.write_batch, run, artifact, batch_number, batch
-                            )
+        try:
+            with self.driver() as driver:
+                logger.info(f"Connecting to Neo4j at {self.uri}")
+                driver.verify_connectivity()
+                with driver.session(database=self.database) as session:
+                    logger.info("Setting up Neo4j constraints")
+                    for label, prop in KEYS.items():
+                        session.run(
+                            f"CREATE CONSTRAINT demograph_{label.lower()} IF NOT EXISTS "
+                            f"FOR (n:{label}) REQUIRE n.{prop} IS UNIQUE"
+                        ).consume()
+                    logger.info(f"Processing artifacts for extraction {run.extraction_id}")
+                    for artifact in self.catalog.artifacts(run.extraction_id):
+                        self.guard_adapter.guard(run.id)
+                        path = safe_path(self.root, artifact["path"])
+                        if not path.is_file() or checksum(path) != artifact["checksum"]:
+                            raise ValueError(f"Artifact checksum mismatch for {path}.")
+                        dataset = artifact["dataset_id"]
+                        counters = by_dataset.setdefault(dataset, {key: 0 for key in totals})
+                        self.catalog.update(run.id, stage=f"load:{dataset}")
+                        batch: list[dict[str, Any]] = []
+                        batch_number = 0
+                        for index, raw in enumerate(rows(path, artifact["metadata_json"])):
+                            totals["read"] += 1
+                            counters["read"] += 1
+                            if index % 1000 == 0:
+                                self.guard_adapter.guard(run.id)
+                            if (dataset == "votings" and str(raw.get("id")) not in voting_ids) or (
+                                dataset == "votes" and str(raw.get("idVotacao")) not in voting_ids
+                            ):
+                                totals["outside_period"] += 1
+                                counters["outside_period"] += 1
+                                continue
+                            try:
+                                mapped = map_record(dataset, raw, artifact["metadata_json"])
+                                if dataset == "votes":
+                                    key = (mapped["voting_id"], mapped["id"])
+                                    if key in seen_votes:
+                                        if seen_votes[key] != mapped["choice"]:
+                                            raise ValueError("Conflicting votes in this extraction.")
+                                        totals["duplicates"] += 1
+                                        counters["duplicates"] += 1
+                                        continue
+                                    seen_votes[key] = mapped["choice"]
+                            except (ValueError, KeyError, TypeError) as exc:
+                                totals["rejected"] += 1
+                                counters["rejected"] += 1
+                                self.catalog.issue(
+                                    run.id,
+                                    "Invalid record.",
+                                    {
+                                        "artifact_id": artifact["id"],
+                                        "row": index + 1,
+                                        "type": type(exc).__name__,
+                                    },
+                                )
+                                continue
+                            batch.append(mapped)
+                            if len(batch) == 500:
+                                session.execute_write(
+                                    self.write_batch, run, artifact, batch_number, batch
+                                )
+                                totals["processed"] += len(batch)
+                                counters["processed"] += len(batch)
+                                self.catalog.progress(run.id, load=totals, load_by_dataset=by_dataset)
+                                batch, batch_number = [], batch_number + 1
+                                self.guard_adapter.guard(run.id)
+                        if batch:
+                            session.execute_write(self.write_batch, run, artifact, batch_number, batch)
                             totals["processed"] += len(batch)
                             counters["processed"] += len(batch)
-                            self.catalog.progress(run.id, load=totals, load_by_dataset=by_dataset)
-                            batch, batch_number = [], batch_number + 1
-                            self.guard_adapter.guard(run.id)
-                    if batch:
-                        session.execute_write(self.write_batch, run, artifact, batch_number, batch)
-                        totals["processed"] += len(batch)
-                        counters["processed"] += len(batch)
-                    elif artifact["records"] == 0:
-                        session.execute_write(self.write_batch, run, artifact, batch_number, [])
-                    self.catalog.progress(run.id, load=totals, load_by_dataset=by_dataset)
-        self.catalog.progress(run.id, load_complete=True)
+                        elif artifact["records"] == 0:
+                            session.execute_write(self.write_batch, run, artifact, batch_number, [])
+                        self.catalog.progress(run.id, load=totals, load_by_dataset=by_dataset)
+            self.catalog.progress(run.id, load_complete=True)
+            logger.info(f"Load complete for run {run.id}")
+        except Exception as exc:
+            logger.error(f"Error during load phase for run {run.id}: {exc}", exc_info=True)
+            raise
 
     @staticmethod
     def write_batch(

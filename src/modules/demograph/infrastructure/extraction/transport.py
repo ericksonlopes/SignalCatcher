@@ -1,4 +1,5 @@
 import json
+import logging
 import time
 from pathlib import Path
 from threading import Event
@@ -15,6 +16,8 @@ from src.modules.demograph.infrastructure.storage.files import (
     safe_path,
 )
 from src.modules.demograph.infrastructure.storage.schema import SchemaObserver
+
+logger = logging.getLogger(__name__)
 
 API = "https://dadosabertos.camara.leg.br/api/v2/"
 FILES = "https://dadosabertos.camara.leg.br/arquivos/"
@@ -47,6 +50,7 @@ class ChamberTransport:
         seen: set[str] = set()
         fingerprints: set[str] = set()
         page = 1
+        logger.info(f"Starting pagination for dataset {dataset} at endpoint {endpoint}")
         while url:
             self.guard(run.id)
             parsed = urlparse(url)
@@ -55,10 +59,13 @@ class ChamberTransport:
                 or parsed.netloc != "dadosabertos.camara.leg.br"
                 or not parsed.path.startswith("/api/v2/")
             ):
+                logger.error(f"Unsafe pagination URL detected: {url}")
                 raise ValueError("Unsafe pagination URL.")
             if url in seen:
+                logger.error(f"Pagination loop detected: {url}")
                 raise ValueError("Pagination loop detected.")
             seen.add(url)
+            logger.debug(f"Fetching page {page} for dataset {dataset}")
             artifact = self.fetch(
                 run,
                 dataset,
@@ -72,17 +79,22 @@ class ChamberTransport:
             )
             data = envelope.get("dados")
             if not isinstance(data, list):
+                logger.error(f"Expected paginated array, got {type(data)} at {url}")
                 raise ValueError("Expected a paginated array.")
             fingerprint = json.dumps(data, sort_keys=True, ensure_ascii=False)
             if data and fingerprint in fingerprints:
+                logger.error(f"Source repeated a page at {url}")
                 raise ValueError("Source repeated a page.")
             fingerprints.add(fingerprint)
             if not data:
+                logger.info(f"Pagination finished for dataset {dataset} at page {page} (no data)")
                 return
             url = next(
                 (link["href"] for link in envelope.get("links", []) if link.get("rel") == "next"),
                 "",
             )
+            if url:
+                logger.debug(f"Next page URL: {url}")
             page += 1
 
     def fetch(
@@ -94,12 +106,15 @@ class ChamberTransport:
         metadata: dict[str, Any],
         allow_missing: bool = False,
     ) -> dict[str, Any]:
+        logger.debug(f"Fetching artifact {name} for dataset {dataset}")
         relative = f"{run.extraction_id}/{dataset}/{name}"
         existing = self.catalog.artifact_at(run.extraction_id, relative)
         target = safe_path(self.root, relative)
         if existing:
             if not target.is_file() or checksum(target) != existing["checksum"]:
+                logger.error(f"Artifact missing or corrupted: {relative}")
                 raise ValueError("A registered artifact is missing or has changed.")
+            logger.debug(f"Returning existing artifact: {relative}")
             return existing
         target.parent.mkdir(parents=True, exist_ok=True)
         temporary = target.with_suffix(target.suffix + ".part")
@@ -107,10 +122,12 @@ class ChamberTransport:
         for attempt in range(4):
             self.guard(run.id)
             try:
+                logger.info(f"Downloading {url} (attempt {attempt + 1})")
                 with self.http.get(
                     url, timeout=(10, 120), stream=True, allow_redirects=False
                 ) as response:
                     if response.status_code == 404 and allow_missing:
+                        logger.warning(f"Resource unavailable (404) for {url}, but allowed.")
                         temporary.write_text(
                             json.dumps({"dados": [], "unavailable": True}), encoding="utf-8"
                         )
@@ -121,6 +138,7 @@ class ChamberTransport:
                         break
                     response.raise_for_status()
                     if 300 <= response.status_code < 400:
+                        logger.error(f"Unexpected redirect for {url}: {response.status_code}")
                         raise ValueError("Unexpected redirect from official source.")
                     received = 0
                     with temporary.open("wb") as handle:
@@ -134,11 +152,15 @@ class ChamberTransport:
                                 bytes_received=received,
                                 bytes_total=response.headers.get("Content-Length"),
                             )
+                    logger.info(f"Download complete: {name} ({received} bytes)")
                     break
             except (requests.Timeout, requests.ConnectionError, requests.HTTPError) as exc:
                 status = getattr(getattr(exc, "response", None), "status_code", None)
+                logger.warning(f"Request failed: {exc} (Status: {status})")
                 if attempt == 3 or (status is not None and status not in {429, 500, 502, 503, 504}):
+                    logger.error(f"Max retries reached or non-retryable status for {url}")
                     raise
+                logger.info(f"Waiting before retry for {url}")
                 for _ in range(2**attempt * 5):
                     self.guard(run.id)
                     time.sleep(0.2)
