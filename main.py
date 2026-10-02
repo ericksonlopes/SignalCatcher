@@ -9,6 +9,7 @@ from src.core.api.metrics import router as metrics_router
 from src.core.api.security import require_admin
 from src.core.config.settings import settings
 from src.core.logger.logger import logger
+from src.modules.demograph.presentation.routes import router as demograph_router
 from src.modules.diarization.presentation.api.routes import diarization_router
 from src.modules.youtube.presentation.api.routes import youtube_router
 
@@ -33,6 +34,7 @@ app.include_router(
     diarization_router, prefix="/api/diarization", dependencies=[Depends(require_admin)]
 )
 app.include_router(metrics_router)
+app.include_router(demograph_router, prefix="/api/demograph", dependencies=[Depends(require_admin)])
 
 
 @app.get("/status", tags=["Health"])

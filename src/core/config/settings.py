@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import URL
@@ -49,6 +51,17 @@ class Settings(BaseSettings):
     DIARIZATION_CONNECT_TIMEOUT: float = Field(default=10, gt=0)
     DIARIZATION_READ_TIMEOUT: float = Field(default=300, gt=0)
     WORKER_HEARTBEAT_MAX_AGE: int = Field(default=60, ge=10)
+    DEMOGRAPH_STORAGE_PATH: str | None = None
+    DEMOGRAPH_NEO4J_URI: str | None = None
+    DEMOGRAPH_NEO4J_USER: str = "neo4j"
+    DEMOGRAPH_NEO4J_PASSWORD: SecretStr | None = None
+    DEMOGRAPH_NEO4J_DATABASE: str = "neo4j"
+
+    @property
+    def demograph_storage_path(self) -> str:
+        return self.DEMOGRAPH_STORAGE_PATH or str(
+            Path(self.DOWNLOAD_YOUTUBE_PATH).with_name("demograph")
+        )
 
     @property
     def database_url(self) -> str:

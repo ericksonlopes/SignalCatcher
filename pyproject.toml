@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "neo4j>=5.26,<6",
     "alembic>=1.18.5",
     "psycopg2-binary>=2.9.12",
     "pydantic>=2.13.4",
@@ -22,6 +23,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "httpx2",
     "mypy>=2.3.0",
     "ruff>=0.16.5",
 ]

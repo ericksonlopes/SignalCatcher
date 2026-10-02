@@ -16,6 +16,7 @@ from src.core.database.job_control import JobControlModel  # noqa: F401
 _package_names = [
     "src.modules.youtube.infrastructure.repositories.models",
     "src.modules.diarization.infrastructure.repositories.models",
+    "src.modules.demograph.infrastructure.models",
 ]
 
 for _package_name in _package_names:
