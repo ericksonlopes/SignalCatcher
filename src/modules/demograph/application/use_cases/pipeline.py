@@ -1,4 +1,5 @@
 import logging
+
 from src.modules.demograph.domain.contracts import Catalog, Extractor, Loader
 
 logger = logging.getLogger(__name__)

@@ -1,7 +1,7 @@
+import logging
 from pathlib import Path
 from threading import Event
 from typing import Any
-import logging
 
 from neo4j import Driver, GraphDatabase, ManagedTransaction
 
@@ -110,7 +110,9 @@ class GraphLoader:
                                     key = (mapped["voting_id"], mapped["id"])
                                     if key in seen_votes:
                                         if seen_votes[key] != mapped["choice"]:
-                                            raise ValueError("Conflicting votes in this extraction.")
+                                            raise ValueError(
+                                                "Conflicting votes in this extraction."
+                                            )
                                         totals["duplicates"] += 1
                                         counters["duplicates"] += 1
                                         continue
@@ -135,11 +137,15 @@ class GraphLoader:
                                 )
                                 totals["processed"] += len(batch)
                                 counters["processed"] += len(batch)
-                                self.catalog.progress(run.id, load=totals, load_by_dataset=by_dataset)
+                                self.catalog.progress(
+                                    run.id, load=totals, load_by_dataset=by_dataset
+                                )
                                 batch, batch_number = [], batch_number + 1
                                 self.guard_adapter.guard(run.id)
                         if batch:
-                            session.execute_write(self.write_batch, run, artifact, batch_number, batch)
+                            session.execute_write(
+                                self.write_batch, run, artifact, batch_number, batch
+                            )
                             totals["processed"] += len(batch)
                             counters["processed"] += len(batch)
                         elif artifact["records"] == 0:
