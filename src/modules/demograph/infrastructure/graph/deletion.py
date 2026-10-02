@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 from neo4j import ManagedTransaction
 
 from src.modules.demograph.domain.mapping import map_record
+from src.modules.demograph.infrastructure.graph.analysis_state import invalidate
 from src.modules.demograph.infrastructure.graph.queries import QUERIES
 from src.modules.demograph.infrastructure.storage.files import checksum, rows, safe_path
 
@@ -104,6 +105,7 @@ def delete_extraction(
                 retained.append(receipt)
             if not deleted_batches:
                 return {"batches": 0}
+            invalidate(tx)
             # Remove only managed edges. Foreign relationships protect their nodes.
             tx.run(
                 "MATCH ()-[r]->() WHERE r.demograph = true AND r.source = $source DELETE r",

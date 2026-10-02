@@ -4,6 +4,7 @@ import io
 import json
 import os
 import tempfile
+import threading
 import unittest
 from datetime import timedelta
 from pathlib import Path
@@ -29,7 +30,9 @@ from src.modules.demograph.domain.contracts import DATASETS, resolve_datasets
 from src.modules.demograph.domain.mapping import map_record
 from src.modules.demograph.infrastructure.catalog import SqlCatalog, now
 from src.modules.demograph.infrastructure.extraction import API, ChamberExtractor
+from src.modules.demograph.infrastructure.extraction.parallel import resources
 from src.modules.demograph.infrastructure.graph import GraphLoader
+from src.modules.demograph.infrastructure.graph.party_similarity import PartySimilarity
 from src.modules.demograph.infrastructure.models import (
     ArtifactModel,
     DatasetModel,
@@ -157,7 +160,13 @@ class DemoGraphTest(unittest.TestCase):
             table.create(self.engine, checkfirst=True)
         self.catalog = SqlCatalog(sessionmaker(self.engine))
         self.source = FakeSource()
-        self.extractor = ChamberExtractor(self.catalog, self.root)
+
+        def session_factory() -> requests.Session:
+            session = requests.Session()
+            session.get = self.source.get
+            return session
+
+        self.extractor = ChamberExtractor(self.catalog, self.root, session_factory=session_factory)
         self.extractor.http.get = self.source.get
 
     def tearDown(self) -> None:
@@ -178,6 +187,133 @@ class DemoGraphTest(unittest.TestCase):
         Pipeline(self.catalog, self.extractor, graph).execute(run_id)
         self.assertEqual(self.catalog.run(run_id).status, "completed")
         return run_id
+
+    def test_topics_parallel_sessions_progress_and_deduplication(self) -> None:
+        self.source.votings = [
+            {"id": f"100-{index}", "data": "2023-02-03", "descricao": "Voting"}
+            for index in range(8)
+        ]
+        voting_barrier = threading.Barrier(4)
+        topic_barrier = threading.Barrier(2)
+        sessions = []
+        active = 0
+        peak = 0
+        mutex = threading.Lock()
+
+        def factory():
+            session = requests.Session()
+            owner = None
+
+            def get(url, **kwargs):
+                nonlocal owner, active, peak
+                ident = threading.get_ident()
+                if owner is None:
+                    owner = ident
+                self.assertEqual(owner, ident)
+                with mutex:
+                    active += 1
+                    peak = max(peak, active)
+                try:
+                    (topic_barrier if url.endswith("/temas") else voting_barrier).wait(5)
+                    response = self.source.get(url, **kwargs)
+                    if "/votacoes/" in url:
+                        data = json.loads(response.content)
+                        data["dados"]["id"] = url.rsplit("/", 1)[1]
+                        response._content = json.dumps(data).encode()
+                    return response
+                finally:
+                    with mutex:
+                        active -= 1
+
+            session.get = get
+            session.close = Mock(wraps=session.close)
+            sessions.append(session)
+            return session
+
+        self.extractor.session_factory = factory
+        run_id = self.extract(["topics"])
+        self.assertEqual(peak, 4)
+        self.assertTrue(all(session.close.call_count == 1 for session in sessions))
+        self.assertEqual(sum(url.endswith("/temas") for url in self.source.calls), 2)
+        progress = self.catalog.run(run_id).progress
+        self.assertEqual(progress["resources_phase"], "proposition_topics")
+        self.assertEqual(progress["resources_done"], 2)
+        self.assertEqual(progress["resources_total"], 2)
+        self.assertEqual(progress["files_saved"], 11)
+
+    def test_parallel_failure_joins_requests_and_resume_reuses_files(self) -> None:
+        run_id = self.create(["topics"])
+        run = self.catalog.run(run_id)
+        published = threading.Event()
+        finished = threading.Event()
+
+        def operation(transport, item):
+            if item == 1:
+                self.assertTrue(published.wait(5))
+                raise ValueError("test failure")
+            try:
+                transport.fetch(run, "topics", "kept.json", f"{API}votacoes/100-1", {})
+                published.set()
+                self.assertTrue(transport.aborted.wait(5))
+                transport.guard(run_id)
+            finally:
+                finished.set()
+
+        with self.assertRaisesRegex(ValueError, "test failure"):
+            list(resources(self.extractor, run_id, [0, 1], operation))
+        self.assertTrue(finished.is_set())
+        calls = len(self.source.calls)
+        self.extractor.fetch(run, "topics", "kept.json", f"{API}votacoes/100-1", {})
+        self.assertEqual(len(self.source.calls), calls)
+        self.assertEqual(self.catalog.artifact_count(run.extraction_id), 1)
+
+    def test_parallel_cancellation_stops_admission_and_joins(self) -> None:
+        from src.modules.demograph.application.use_cases.pipeline import Cancelled
+
+        run_id = self.create(["topics"])
+        barrier = threading.Barrier(4)
+        started = []
+        finished = []
+
+        def operation(transport, item):
+            started.append(item)
+            try:
+                barrier.wait(5)
+                if item == 0:
+                    with transport.catalog_mutex:
+                        self.catalog.cancel(run_id)
+                barrier.wait(5)
+                transport.guard(run_id)
+            finally:
+                finished.append(item)
+
+        with self.assertRaises(Cancelled):
+            list(resources(self.extractor, run_id, range(100), operation))
+        self.assertEqual(len(started), 4)
+        self.assertEqual(sorted(started), sorted(finished))
+
+    def test_rate_limit_retry_after_and_cancellable_backoff(self) -> None:
+        run_id = self.create(["deputies"])
+        run = self.catalog.run(run_id)
+        response = self.source.get(f"{API}deputados")
+        response.status_code = 429
+        response.headers["Retry-After"] = "3"
+        get = Mock(side_effect=[response, self.source.get(f"{API}deputados")])
+        self.extractor.http.get = get
+        with patch("src.modules.demograph.infrastructure.extraction.transport.time.sleep") as sleep:
+            self.extractor.fetch(run, "deputies", "test.json", f"{API}deputados", {})
+        self.assertEqual(get.call_count, 2)
+        self.assertGreaterEqual(sum(call.args[0] for call in sleep.call_args_list), 3)
+        self.extractor.http.get = Mock(return_value=response)
+        with patch(
+            "src.modules.demograph.infrastructure.extraction.transport.time.sleep",
+            side_effect=lambda _: self.catalog.cancel(run_id),
+        ):
+            from src.modules.demograph.application.use_cases.pipeline import Cancelled
+
+            with self.assertRaises(Cancelled):
+                self.extractor.fetch(run, "deputies", "cancel.json", f"{API}deputados", {})
+        self.assertEqual(self.extractor.http.get.call_count, 1)
 
     def test_dependency_resolution_and_all_vote_choices(self) -> None:
         self.assertEqual(
@@ -760,6 +896,189 @@ class DemoGraphTest(unittest.TestCase):
         self.assertEqual(self.catalog.run(extraction).status, "completed")
         self.assertTrue((self.root / extraction).exists())
 
+    def test_analysis_http_dispatch_auth_and_validation(self) -> None:
+        analyzer = Mock()
+        graph = Mock()
+        graph.schema.return_value = {"nodes": [], "relationships": [], "constraints": []}
+        app = self.direct_api()
+        app.dependency_overrides[get_pipeline] = lambda: Pipeline(
+            self.catalog, self.extractor, graph, analyzer
+        )
+        with (
+            patch.object(settings, "ADMIN_API_KEY", SecretStr("test-only")),
+            TestClient(app) as client,
+        ):
+            body = {"start": "2023-02-01", "end": "2026-09-30"}
+            path = "/api/demograph/analyses/party-similarity"
+            self.assertEqual(client.post(path, json=body).status_code, 401)
+            headers = {"X-API-Key": "test-only"}
+            self.assertEqual(
+                client.post(path, json={**body, "min_common": 0}, headers=headers).status_code, 422
+            )
+            self.assertEqual(
+                client.post(
+                    path, json={**body, "start": "2026-10-01"}, headers=headers
+                ).status_code,
+                422,
+            )
+            result = client.post(path, json=body, headers=headers)
+            self.assertEqual(result.status_code, 202, result.text)
+            run = self.catalog.run(result.json()["id"])
+            self.assertEqual(run.operation, "analysis")
+            self.assertEqual(run.status, "completed")
+            self.assertEqual(run.parameters["min_common"], 30)
+            self.assertEqual(run.parameters["datasets"], [])
+            analyzer.analyze.assert_called_once()
+            self.assertEqual(self.source.calls, [])
+
+    @unittest.skipUnless(os.environ.get("DEMOGRAPH_TEST_NEO4J_URI"), "Dedicated Neo4j required")
+    def test_real_graph_party_analysis_query_replay_invalidation_and_delete(self) -> None:
+        from test_demograph_analysis import fixture
+
+        from src.modules.demograph.application.use_cases.pipeline import Cancelled
+
+        votings, votes, histories = fixture()
+        self.source.votings = [
+            {**votings[index % 3], "id": f"100-{index + 1}"} for index in range(45)
+        ]
+        self.source.votes = [
+            {
+                "idVotacao": f"100-{index + 1}",
+                "deputado_id": str(vote["person_id"]),
+                "deputado_uri": f"{API}deputados/{vote['person_id']}",
+                "deputado_nome": "Deputado",
+                "dataHoraVoto": vote["at"],
+                "voto": vote["choice"],
+                "deputado_idLegislatura": vote["deputado_idLegislatura"],
+                "deputado_uriPartido": vote["deputado_uriPartido"],
+            }
+            for index in range(45)
+            for vote in votes[index % 3 * 100 : (index % 3 + 1) * 100]
+        ]
+        original_get = self.source.get
+
+        def get(url, **kwargs):
+            response = original_get(url, **kwargs)
+            if url.endswith("/historico"):
+                person = int(url.split("/")[-2])
+                response._content = json.dumps(
+                    {"dados": [histories[person - 1]], "links": []}
+                ).encode()
+            return response
+
+        self.source.get = get
+        self.extractor.http.get = get
+        graph = GraphLoader(
+            self.catalog,
+            self.root,
+            os.environ["DEMOGRAPH_TEST_NEO4J_URI"],
+            "neo4j",
+            os.environ["DEMOGRAPH_TEST_NEO4J_PASSWORD"],
+            "neo4j",
+        )
+        analyzer = PartySimilarity(graph)
+        with graph.driver() as driver, driver.session() as session:
+            session.run("MATCH (n) DETACH DELETE n").consume()
+        try:
+            extraction = self.extract(["votes", "histories"])
+            load = self.catalog.create("load", {}, extraction)
+            Pipeline(self.catalog, self.extractor, graph).execute(load)
+            self.assertEqual(self.catalog.run(load).status, "completed")
+            app = self.direct_api()
+            app.dependency_overrides[get_pipeline] = lambda: Pipeline(
+                self.catalog, self.extractor, graph, analyzer
+            )
+            body = {"start": "2023-02-01", "end": "2026-09-30"}
+            with (
+                patch.object(settings, "ADMIN_API_KEY", SecretStr("test-only")),
+                TestClient(app) as client,
+            ):
+                response = client.post(
+                    "/api/demograph/analyses/party-similarity",
+                    json=body,
+                    headers={"X-API-Key": "test-only"},
+                )
+            self.assertEqual(response.status_code, 202, response.text)
+            analysis_id = response.json()["id"]
+            run = self.catalog.run(analysis_id)
+            self.assertEqual(run.status, "completed")
+            self.assertEqual(run.progress["analysis"]["included_votes"], 4500)
+            key = "majority_sim_nao_v1:2023-02-01:2026-09-30:1:30"
+            with graph.driver() as driver, driver.session() as session:
+                result = session.run(
+                    "MATCH (:Party {acronym:'PT'})-[r:VOTING_SIMILARITY]-(party:Party) "
+                    "WHERE r.analysis_key = $key AND r.disputed_common_votes >= 30 "
+                    "RETURN party.acronym AS party, "
+                    "round(r.disputed_agreement * 100, 2) AS agreement, "
+                    "r.disputed_common_votes AS votes ORDER BY agreement DESC",
+                    key=key,
+                ).data()
+                self.assertIn({"party": "PSB", "agreement": 50.0, "votes": 30}, result)
+                # Recalculation replaces the same key without duplicate derived edges.
+                analyzer.analyze(run)
+                self.assertEqual(
+                    session.run("MATCH ()-[r:VOTING_SIMILARITY]->() RETURN count(r) AS n").single()[
+                        "n"
+                    ],
+                    3,
+                )
+                # Cancellation while replacing results rolls back the whole publication.
+                data, revision = session.execute_read(analyzer.read, run)
+                checks = 0
+
+                def cancel_during_publish(_):
+                    nonlocal checks
+                    checks += 1
+                    if checks == 3:
+                        raise Cancelled()
+
+                with patch.object(graph.guard_adapter, "guard", side_effect=cancel_during_publish):
+                    with self.assertRaises(Cancelled):
+                        session.execute_write(analyzer.publish, run, data, revision)
+                self.assertEqual(
+                    session.run("MATCH ()-[r:VOTING_SIMILARITY]->() RETURN count(r) AS n").single()[
+                        "n"
+                    ],
+                    3,
+                )
+                # A new committed load invalidates all derived edges and stale publication.
+                new_load = self.catalog.create("load", {}, extraction)
+                Pipeline(self.catalog, self.extractor, graph).execute(new_load)
+                self.assertEqual(self.catalog.run(new_load).status, "completed")
+                self.assertEqual(
+                    session.run("MATCH ()-[r:VOTING_SIMILARITY]->() RETURN count(r) AS n").single()[
+                        "n"
+                    ],
+                    0,
+                )
+                self.assertEqual(
+                    session.run(
+                        "MATCH (a:SimilarityAnalysis {key:$key}) RETURN a.status AS status", key=key
+                    ).single()["status"],
+                    "stale",
+                )
+                with self.assertRaisesRegex(ValueError, "Graph changed"):
+                    session.execute_write(analyzer.publish, run, data, revision)
+                analyzer.analyze(run)
+            DeleteExtraction(self.catalog, graph, ExtractionFiles(self.root)).execute(extraction)
+            with graph.driver() as driver, driver.session() as session:
+                self.assertEqual(
+                    session.run(
+                        "MATCH ()-[r:VOTING_SIMILARITY|VOTING_POSITION|VOTED_IN]->() "
+                        "RETURN count(r) AS n"
+                    ).single()["n"],
+                    0,
+                )
+                self.assertEqual(
+                    session.run(
+                        "MATCH (n) WHERE NOT n:DemoGraphState RETURN count(n) AS n"
+                    ).single()["n"],
+                    0,
+                )
+        finally:
+            with graph.driver() as driver, driver.session() as session:
+                session.run("MATCH (n) DETACH DELETE n").consume()
+
     @unittest.skipUnless(os.environ.get("DEMOGRAPH_TEST_NEO4J_URI"), "Dedicated Neo4j required")
     def test_real_graph_click_pipeline_and_delete_from_http(self) -> None:
         graph = GraphLoader(
@@ -807,7 +1126,12 @@ class DemoGraphTest(unittest.TestCase):
                 self.assertFalse((self.root / run_id).exists())
                 self.assertEqual(client.get("/api/demograph/runs").json()["total"], 0)
                 with graph.driver() as driver, driver.session() as session:
-                    self.assertEqual(session.run("MATCH (n) RETURN count(n) AS n").single()["n"], 0)
+                    self.assertEqual(
+                        session.run(
+                            "MATCH (n) WHERE NOT n:DemoGraphState RETURN count(n) AS n"
+                        ).single()["n"],
+                        0,
+                    )
         finally:
             with graph.driver() as driver, driver.session() as session:
                 session.run("MATCH (n) DETACH DELETE n").consume()

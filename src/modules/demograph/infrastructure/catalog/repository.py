@@ -41,7 +41,7 @@ class SqlCatalog:
     ) -> str:
         run_id = str(uuid4())
         with self.graph_mutation() as session:
-            if operation in {"load", "pipeline", "schema"} and session.scalar(
+            if operation in {"load", "pipeline", "schema", "analysis"} and session.scalar(
                 select(RunModel.id).where(RunModel.status == "deleting").limit(1)
             ):
                 raise ValueError("Wait for the extraction deletion to finish.")
@@ -57,7 +57,7 @@ class SqlCatalog:
                 }:
                     raise ValueError("Only a finished extraction can be loaded separately.")
                 parameters = dict(original.parameters)
-            elif operation != "schema":
+            elif operation not in {"schema", "analysis"}:
                 parameters = {**parameters, "datasets": resolve_datasets(parameters["datasets"])}
                 parameters["snapshot_at"] = now().isoformat()
             for dataset in DATASETS:
@@ -304,7 +304,7 @@ class SqlCatalog:
             original = session.get(RunModel, row.extraction_id)
             if original and original.status in {"deleting", "delete_failed"}:
                 raise ValueError("The extraction is being deleted. Retry its deletion.")
-            if row.operation in {"pipeline", "load", "schema"} and session.scalar(
+            if row.operation in {"pipeline", "load", "schema", "analysis"} and session.scalar(
                 select(RunModel.id).where(RunModel.status == "deleting").limit(1)
             ):
                 raise ValueError("Wait for the extraction deletion to finish.")
@@ -362,7 +362,7 @@ class SqlCatalog:
                 select(RunModel.id)
                 .where(
                     RunModel.status.in_(["running", "deleting"]),
-                    RunModel.operation.in_(["pipeline", "load", "schema"]),
+                    RunModel.operation.in_(["pipeline", "load", "schema", "analysis"]),
                     RunModel.id != extraction_id,
                 )
                 .limit(1)

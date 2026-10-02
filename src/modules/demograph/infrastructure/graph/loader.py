@@ -13,6 +13,7 @@ from src.modules.demograph.infrastructure.extraction import ChamberExtractor
 from src.modules.demograph.infrastructure.extraction.selection import (
     voting_ids as select_voting_ids,
 )
+from src.modules.demograph.infrastructure.graph.analysis_state import invalidate
 from src.modules.demograph.infrastructure.graph.queries import QUERIES
 from src.modules.demograph.infrastructure.storage.files import (
     checksum,
@@ -36,6 +37,8 @@ KEYS = {
     "Topic": "key",
     "DeputyHistory": "key",
     "DemoGraphBatch": "key",
+    "DemoGraphState": "key",
+    "SimilarityAnalysis": "key",
 }
 
 
@@ -172,6 +175,7 @@ class GraphLoader:
         ).single()
         if record:
             return
+        invalidate(tx)
         kind = artifact["metadata_json"].get("kind", artifact["dataset_id"])
         observed = run.parameters.get("snapshot_at", artifact["collected_at"].isoformat())
         if (

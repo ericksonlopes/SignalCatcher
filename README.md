@@ -412,3 +412,70 @@ docker compose -p signalcatcher-demograph-test -f tests/integration/demograph-co
 
 The integration suite creates and drops DemoGraph tables and clears the graph in the explicitly
 configured test databases. Never point these test variables at production or the PoC instance.
+
+### Parallel DemoGraph extraction
+
+Propositions and topics use bounded parallel HTTP extraction. Set
+`DEMOGRAPH_HTTP_CONCURRENCY=4` (default; allowed 1 through 8, per extraction);
+`1` processes resources sequentially. Voting details finish before deduplicated
+proposition-topic requests start. Each thread owns and closes its HTTP session.
+Progress reports `resources_phase` (`voting_details` or `proposition_topics`) and
+completed/total resources for the current phase. Files remain individually
+checksummed and reusable on explicit Resume. Cancellation or failure stops new
+admissions and joins in-flight requests before reporting the terminal status.
+HTTP 429/transient retries use bounded backoff and honor Retry-After (seconds or
+HTTP date, capped at 120 seconds per delay). Cancellation is cooperative; an
+in-flight HTTP request can wait for the configured network timeout. This runs
+inside the API's manual task; it adds no execution service or global run lock.
+Short local synchronization protects catalog updates and directory creation
+between the threads; network requests and file downloads run concurrently.
+
+
+### Party voting agreement (PoC method)
+
+In **DemoGraph → Runs → Agreement between parties**, choose dates and click
+**Calculate agreement**. This executes immediately inside the API against the
+current managed Neo4j graph; it does not download data. Load **Votings, Votes and
+Histories** first. Topics and current-deputy affiliations are not used by this metric.
+The form defaults to 1 Yes/No participant per party and 30 shared disputed votings.
+Use 2023-02-01 through 2026-09-30 to produce
+`majority_sim_nao_v1:2023-02-01:2026-09-30:1:30` for the existing PoC query.
+
+The port preserves the PoC v1 criteria: Plenary, legislature 57, explicit roll-call
+or Yes/No tally evidence without symbolic-voting wording, at least 100 valid binary
+votes before historical resolution. Party affiliation is the last legislature-57
+history entry at or before each vote; unresolved histories are excluded, without
+falling back to the current party. Abstention, obstruction and other non-binary
+choices remain ingested but do not enter this metric. Party ties are excluded from
+comparisons. Disputed votings have a minority of at least 10% of historically
+resolved Yes/No votes. Every comparable voting has the same weight. The metric is
+agreement of recorded majorities, not an ideology or attendance score.
+
+Creates `SimilarityAnalysis`, `(Party)-[:VOTING_POSITION]->(Voting)` and
+`(Party)-[:VOTING_SIMILARITY]->(Party)`. Relations expose `analysis_key`,
+`agreement`, `common_votes`, `disputed_agreement`, `disputed_common_votes`,
+`profile_similarity` and sample status. All compared pairs are stored; apply the
+minimum shared-disputed count when querying. A completed calculation can have
+zero eligible pairs; inspect the period coverage, exclusions and included counts
+in run details. Available first/last voting dates are observed bounds, not proof
+that all intermediate dates or source records were loaded. No data is invented
+for gaps in the graph.
+
+`POST /api/demograph/analyses/party-similarity` accepts
+`{"start":"2023-02-01","end":"2026-09-30","min_party_votes":1,"min_common":30}`,
+requires the administrative API key and returns a run id with HTTP 202. Cancel and
+Resume use the normal run endpoints. The run operation is `analysis`; it creates
+no extraction version or source file. The confirmed report is stored in
+`progress.analysis`; `analysis_complete` indicates graph publication. Schema
+refresh follows publication. No PostgreSQL migration or APOC installation is needed.
+
+Publication atomically replaces the same analysis key, preserves raw vote choices
+and current affiliations, and rolls back all changes on cancellation/failure.
+A source revision detects loading that overlaps computation; retry after it finishes.
+Every new committed load batch or extraction deletion removes managed derived
+edges and invalidates analysis metadata. Recalculate explicitly after changing data.
+The revision is maintained in an internal `DemoGraphState` node, excluded from the
+business schema. It can remain after deleting the last extraction; it is not an
+extracted voting or worker. Normal deletion still removes all corresponding votes,
+files and catalog entries. External writes outside DemoGraph do not advance the
+revision; recalculate after manually changing graph data.

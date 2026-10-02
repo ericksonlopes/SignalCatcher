@@ -51,8 +51,8 @@ API background execution, deployment or tests. Check actual source before relyin
 - Annual CSVs retain full source coverage. The inclusive date interval filters graph
   loads by voting dates, not saved CSV contents. Deputies represent the current
   snapshot; histories retain the official historical records.
-- Preserve all official vote choices, including abstention and obstruction. Do not
-  reintroduce similarity calculations or PoC filters without a user request.
+- Preserve all official vote choices, including abstention and obstruction. PoC v1 similarity is available as an explicitly requested manual analysis;
+  its filters apply only to derived metrics, never raw ingestion.
 - Default artifact storage is a sibling of `DOWNLOAD_YOUTUBE_PATH` named `demograph`.
   Create missing directories automatically. Registered paths stay within this root.
   Keep `.gitignore` storage rules anchored at the repository root so they cannot
@@ -83,6 +83,18 @@ API background execution, deployment or tests. Check actual source before relyin
   ingestion. Preserve pagination and the 50-record preview limit.
 - Keep credentials in backend configuration. Writes use the existing administrative
   API-key dependency. Public errors must not expose driver credentials or payloads.
+
+## Parallel topic extraction
+
+`DEMOGRAPH_HTTP_CONCURRENCY` defaults to 4 and accepts 1 through 8 per extraction.
+Only voting details and deduplicated proposition topics run in bounded thread pools;
+keep dataset ordering and complete the first phase before starting the second.
+Each thread owns its HTTP session. Preserve cancellation, bounded submission,
+joining running tasks on failure/cancel, session cleanup and artifact reuse.
+Local thread synchronization protects SQL catalog updates and directory creation;
+it is not a global run/advisory lock. Keep downloads outside that synchronization.
+Progress includes phase, completed and total resources. Honor bounded Retry-After
+backoff, preserve 404 issues and never add pagination parameters to topic requests.
 
 ## Explicit extraction deletion
 
@@ -139,3 +151,24 @@ architecture, contracts, dataset semantics, persistence, commands or operational
 invariants. Update the repository DemoGraph README and Portainer documentation when
 their instructions change. Describe the final implementation and verification;
 do not preserve abandoned approaches as current architecture.
+
+## Party agreement analysis
+
+The user requested incorporation of PoC `majority_sim_nao_v1`. Preserve the domain
+algorithm in `domain/analysis/party_similarity.py`, analyzer port and graph adapter.
+The standalone `analysis` run reads managed Neo4j votings/votes/histories, writes
+positions/similarity atomically, then refreshes schema. It does not extract or use
+current affiliations. Preserve exact date/minimum analysis keys and original PoC
+selection (Plenary, legislature 57, nominal evidence, 100 binary votes before history
+resolution, party majorities without ties, 10% minority for disputed comparisons).
+Keep report counts/exclusions/observed date bounds; empty results must be explained
+rather than silently altering thresholds. The raw full-vote graph stays intact.
+
+New load batches and deletions invalidate all managed derived edges in the same
+transaction and advance DemoGraphState revision. Publication checks the revision
+atomically and aborts if input changed. Do not add an execution worker/advisory lock.
+Keep revision nodes out of the business schema and preserve revision across deletion.
+Rerun is manual. The HTTP 202 administrative endpoint and PT/EN form use normal
+cancel/retry commands. Run reports describe historical executions, not guaranteed
+current graph results. Tests must verify the original query, PoC criteria, atomic
+replacement/cancellation, revision conflicts and deletion on disposable databases.

@@ -52,6 +52,7 @@ class Settings(BaseSettings):
     DIARIZATION_READ_TIMEOUT: float = Field(default=300, gt=0)
     WORKER_HEARTBEAT_MAX_AGE: int = Field(default=60, ge=10)
     DEMOGRAPH_STORAGE_PATH: str | None = None
+    DEMOGRAPH_HTTP_CONCURRENCY: int = Field(default=4, ge=1, le=8)
     DEMOGRAPH_NEO4J_URI: str | None = None
     DEMOGRAPH_NEO4J_USER: str = "neo4j"
     DEMOGRAPH_NEO4J_PASSWORD: SecretStr | None = None

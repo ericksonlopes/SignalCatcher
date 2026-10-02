@@ -1,8 +1,10 @@
 import json
 import logging
 import time
+from _thread import RLock as RLockType
+from collections.abc import Callable
 from pathlib import Path
-from threading import Event
+from threading import Event, RLock
 from typing import Any
 from urllib.parse import urlparse
 
@@ -24,18 +26,39 @@ FILES = "https://dadosabertos.camara.leg.br/arquivos/"
 
 
 class ChamberTransport:
-    def __init__(self, catalog: SqlCatalog, root: Path, stopped: Event | None = None) -> None:
+    def __init__(
+        self,
+        catalog: SqlCatalog,
+        root: Path,
+        stopped: Event | None = None,
+        *,
+        max_workers: int = 4,
+        session_factory: Callable[[], requests.Session] = requests.Session,
+        catalog_mutex: RLockType | None = None,
+        aborted: Event | None = None,
+    ) -> None:
         self.catalog = catalog
         self.root = root
         self.stopped = stopped or Event()
-        self.http = requests.Session()
+        if not 1 <= max_workers <= 8:
+            raise ValueError("HTTP concurrency must be between 1 and 8.")
+        self.max_workers = max_workers
+        self.session_factory = session_factory
+        self.catalog_mutex = catalog_mutex or RLock()
+        self.aborted = aborted or Event()
+        self.http = session_factory()
         self.http.headers["Accept"] = "application/json"
 
     def guard(self, run_id: str) -> None:
-        if self.stopped.is_set():
-            raise RuntimeError("Worker stopped or lost its lock.")
-        if self.catalog.run(run_id).cancel_requested:
-            raise Cancelled()
+        if self.stopped.is_set() or self.aborted.is_set():
+            raise RuntimeError("Extraction stopped.")
+        with self.catalog_mutex:
+            if self.catalog.run(run_id).cancel_requested:
+                raise Cancelled()
+
+    def progress(self, run_id: str, **values: Any) -> None:
+        with self.catalog_mutex:
+            self.catalog.progress(run_id, **values)
 
     def paged(
         self,
@@ -111,16 +134,19 @@ class ChamberTransport:
         allow_missing: bool = False,
     ) -> dict[str, Any]:
         logger.debug(f"Fetching artifact {name} for dataset {dataset}")
+        self.guard(run.id)
         relative = f"{run.extraction_id}/{dataset}/{name}"
-        existing = self.catalog.artifact_at(run.extraction_id, relative)
-        target = safe_path(self.root, relative)
+        with self.catalog_mutex:
+            existing = self.catalog.artifact_at(run.extraction_id, relative)
+            target = safe_path(self.root, relative)
+            if not existing:
+                target.parent.mkdir(parents=True, exist_ok=True)
         if existing:
             if not target.is_file() or checksum(target) != existing["checksum"]:
                 logger.error(f"Artifact missing or corrupted: {relative}")
                 raise ValueError("A registered artifact is missing or has changed.")
             logger.debug(f"Returning existing artifact: {relative}")
             return existing
-        target.parent.mkdir(parents=True, exist_ok=True)
         temporary = target.with_suffix(target.suffix + ".part")
         collected = now()
         for attempt in range(4):
@@ -136,9 +162,10 @@ class ChamberTransport:
                             json.dumps({"dados": [], "unavailable": True}), encoding="utf-8"
                         )
                         metadata = {**metadata, "unavailable": True}
-                        self.catalog.issue(
-                            run.id, "Source resource unavailable (404).", {"url": url}
-                        )
+                        with self.catalog_mutex:
+                            self.catalog.issue(
+                                run.id, "Source resource unavailable (404).", {"url": url}
+                            )
                         break
                     response.raise_for_status()
                     if 300 <= response.status_code < 400:
@@ -150,7 +177,7 @@ class ChamberTransport:
                             self.guard(run.id)
                             handle.write(chunk)
                             received += len(chunk)
-                            self.catalog.progress(
+                            self.progress(
                                 run.id,
                                 current_file=name,
                                 bytes_received=received,
@@ -165,7 +192,27 @@ class ChamberTransport:
                     logger.error(f"Max retries reached or non-retryable status for {url}")
                     raise
                 logger.info(f"Waiting before retry for {url}")
-                for _ in range(2**attempt * 5):
+                delay = float(2**attempt)
+                retry_after = getattr(getattr(exc, "response", None), "headers", {}).get(
+                    "Retry-After"
+                )
+                if retry_after:
+                    from datetime import datetime, timezone
+                    from email.utils import parsedate_to_datetime
+
+                    try:
+                        delay = max(delay, float(retry_after))
+                    except ValueError:
+                        try:
+                            delay = max(
+                                delay,
+                                (
+                                    parsedate_to_datetime(retry_after) - datetime.now(timezone.utc)
+                                ).total_seconds(),
+                            )
+                        except (ValueError, TypeError, OverflowError):
+                            pass
+                for _ in range(int(min(delay, 120) / 0.2) + 1):
                     self.guard(run.id)
                     time.sleep(0.2)
         # Schema and record counts are derived from the complete file before publication.
@@ -204,8 +251,12 @@ class ChamberTransport:
             "file_schema": observer.result(),
             "metadata_json": {**metadata, "extractor_version": "1"},
         }
-        self.catalog.add_artifact(values)
-        self.catalog.progress(run.id, files_saved=self.catalog.artifact_count(run.extraction_id))
+        with self.catalog_mutex:
+            self.guard(run.id)
+            self.catalog.add_artifact(values)
+            self.catalog.progress(
+                run.id, files_saved=self.catalog.artifact_count(run.extraction_id)
+            )
         return values
 
     def scan_csv(self, path: Path, observer: SchemaObserver, encoding: str, run_id: str) -> None:

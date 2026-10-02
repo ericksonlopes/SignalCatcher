@@ -63,7 +63,7 @@ Run from the backend root with its existing environment:
 uv run ruff check src/modules/demograph tests/test_demograph.py
 uv run ruff format --check src/modules/demograph tests/test_demograph.py
 uv run mypy src
-uv run python -m unittest discover -s tests -p test_demograph.py -v
+uv run python -m unittest discover -s tests -p "test_demograph*.py" -v
 ```
 
 For frontend changes, run `npm run lint` and `npm run build` in the frontend root.
@@ -128,3 +128,32 @@ starting a load while deletion is being admitted; no worker/advisory lock is add
 DemoGraph frontend preserves endpoint conflict reasons and translates deletion errors.
 HTTP integration verifies starting a pipeline and deleting its files/catalog/graph;
 PostgreSQL integration verifies overlapping start/delete cannot both be admitted.
+
+## Parallel topic extraction
+
+Set `DEMOGRAPH_HTTP_CONCURRENCY=4` in backend environment (default; range 1..8,
+per extraction; use 1 for sequential requests). Recreate the API container to apply
+configuration/code updates. No SQL migration or Neo4j stack change is required.
+Voting details finish before deduplicated topic requests. Own sessions are closed
+when pools finish. Cancellation/failure joins running requests; network timeouts can
+delay termination. Registered artifacts remain reusable. Retry-After seconds/date
+are honored up to 120 seconds per retry. Resource phase/counts appear in PT/EN UI.
+Tests use HTTP fixtures with barriers to prove four simultaneous requests, own
+sessions, deduplication, joined cancellation/failure, retained files and 429 backoff.
+
+## Party analysis operations
+
+Deploy API/frontend together; no SQL migration, configuration or Neo4j plugin change.
+Load Votings, Votes and Histories, then manually calculate party agreement from Runs.
+Dates and minima form the PoC-compatible key. The computation uses the currently
+loaded graph, not a chosen extraction version or guaranteed complete source coverage.
+Review exclusions and observed date bounds. New loads/deletions remove old derived
+relations; rerun explicitly. A revision conflict requires retry after loading finishes.
+Cancellation/failure rolls back publication; an earlier committed result is preserved.
+Report source_revision records provenance; DemoGraphState is an internal persistent
+revision node. External/manual graph writes do not advance it.
+
+Use `test_demograph*.py` to include the separate pure algorithm suite. Integration
+verifies a known party score with the original query, idempotence, atomic cancelled
+publication, invalidation/stale revision rejection and deletion. All graph tests use
+only dedicated disposable databases; do not initiate production analysis as a test.

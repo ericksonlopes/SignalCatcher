@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from src.modules.demograph.presentation.routes import (
+    analyses,
     artifacts,
     catalog,
     extractions,
@@ -10,5 +11,5 @@ from src.modules.demograph.presentation.routes import (
 )
 
 router = APIRouter(tags=["DemoGraph"])
-for resource in (catalog, runs, artifacts, schema, health, extractions):
+for resource in (catalog, runs, artifacts, schema, health, extractions, analyses):
     router.include_router(resource.router)

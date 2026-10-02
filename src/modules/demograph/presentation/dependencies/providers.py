@@ -6,6 +6,7 @@ from src.modules.demograph.application.use_cases.pipeline import Pipeline
 from src.modules.demograph.infrastructure.catalog import SqlCatalog
 from src.modules.demograph.infrastructure.extraction import ChamberExtractor
 from src.modules.demograph.infrastructure.graph import GraphLoader
+from src.modules.demograph.infrastructure.graph.party_similarity import PartySimilarity
 from src.modules.demograph.infrastructure.storage.deletion import ExtractionFiles
 
 
@@ -29,7 +30,13 @@ def get_graph() -> GraphLoader:
 def get_pipeline() -> Pipeline:
     catalog = SqlCatalog()
     root = Path(settings.demograph_storage_path)
-    return Pipeline(catalog, ChamberExtractor(catalog, root), get_graph())
+    graph = get_graph()
+    return Pipeline(
+        catalog,
+        ChamberExtractor(catalog, root, max_workers=settings.DEMOGRAPH_HTTP_CONCURRENCY),
+        graph,
+        PartySimilarity(graph),
+    )
 
 
 def get_deletion() -> DeleteExtraction:

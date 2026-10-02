@@ -1,6 +1,7 @@
 import logging
 
 from src.modules.demograph.domain.contracts import Catalog, Extractor, Loader
+from src.modules.demograph.domain.interfaces.analyzer import Analyzer
 
 logger = logging.getLogger(__name__)
 
@@ -10,10 +11,17 @@ class Cancelled(Exception):
 
 
 class Pipeline:
-    def __init__(self, catalog: Catalog, extractor: Extractor, loader: Loader) -> None:
+    def __init__(
+        self,
+        catalog: Catalog,
+        extractor: Extractor,
+        loader: Loader,
+        analyzer: Analyzer | None = None,
+    ) -> None:
         self.catalog = catalog
         self.extractor = extractor
         self.loader = loader
+        self.analyzer = analyzer
 
     def execute(self, run_id: str) -> None:
         logger.info(f"Starting execution for run_id: {run_id}")
@@ -29,6 +37,29 @@ class Pipeline:
                 self.catalog.save_schema(run_id, self.loader.schema(run_id))
                 self.catalog.update(run_id, status="completed", stage="finished", finished=True)
                 logger.info(f"Schema operation completed for run {run_id}.")
+                return
+            if run.operation == "analysis":
+                if self.analyzer is None:
+                    raise ValueError("Party analysis is not configured.")
+                self.analyzer.analyze(run)
+                try:
+                    self.catalog.save_schema(run_id, self.loader.schema(run_id))
+                    self.catalog.update(run_id, schema_stale=False)
+                except Cancelled:
+                    raise
+                except Exception as exc:
+                    self.catalog.issue(
+                        run_id, "Schema refresh failed.", {"type": type(exc).__name__}
+                    )
+                current = self.catalog.run(run_id)
+                self.catalog.update(
+                    run_id,
+                    status="completed_with_errors"
+                    if current.progress.get("issues", 0)
+                    else "completed",
+                    stage="finished",
+                    finished=True,
+                )
                 return
             if run.operation != "load":
                 logger.info(f"Starting extraction for run {run_id}.")

@@ -128,3 +128,30 @@ only `/data/databases/neo4j` and `/data/transactions/neo4j`. It restarts the con
 preserving `system` (users/passwords), extraction files and unrelated volumes.
 Wait for healthy status, reconnect Neo4j Browser and verify empty nodes, labels,
 property keys and constraints. The next DemoGraph load recreates its identity constraints.
+
+### Parallel DemoGraph extraction
+
+Propositions and topics use bounded parallel HTTP extraction. Set
+`DEMOGRAPH_HTTP_CONCURRENCY=4` (default; allowed 1 through 8, per extraction);
+`1` processes resources sequentially. Voting details finish before deduplicated
+proposition-topic requests start. Each thread owns and closes its HTTP session.
+Progress reports `resources_phase` (`voting_details` or `proposition_topics`) and
+completed/total resources for the current phase. Files remain individually
+checksummed and reusable on explicit Resume. Cancellation or failure stops new
+admissions and joins in-flight requests before reporting the terminal status.
+HTTP 429/transient retries use bounded backoff and honor Retry-After (seconds or
+HTTP date, capped at 120 seconds per delay). Cancellation is cooperative; an
+in-flight HTTP request can wait for the configured network timeout. This runs
+inside the API's manual task; it adds no execution service or global run lock.
+Short local synchronization protects catalog updates and directory creation
+between the threads; network requests and file downloads run concurrently.
+
+### Party agreement analysis upgrade
+
+Deploy backend and frontend together. This feature adds no environment variable,
+SQL migration or Neo4j plugin. After Votings, Votes and Histories are loaded, run
+Agreement between parties from DemoGraph's Runs tab. New loads and deletions
+invalidate managed derived relationships; recalculate after changing source data.
+The internal DemoGraphState revision node may remain after deleting the last
+extraction. It stores no worker heartbeat or business records. See the repository
+README for PoC v1 criteria, coverage limits and the analysis-key query contract.

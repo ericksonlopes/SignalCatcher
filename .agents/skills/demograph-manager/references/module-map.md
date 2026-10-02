@@ -15,6 +15,7 @@ Paths below are relative to the backend root unless prefixed with `frontend:`.
 | `infrastructure/models/` | One SQLAlchemy model per table and discovery exports |
 | `infrastructure/catalog/repository.py` | SQL catalog, runs, artifacts, issues, cached schema |
 | `infrastructure/catalog/serialization.py` | Timestamp and ORM serialization helpers |
+| `infrastructure/extraction/parallel.py` | Bounded per-thread HTTP sessions, cancellation and joined cleanup |
 | `infrastructure/extraction/transport.py` | HTTP, retries, pagination, publication and cancellation |
 | `infrastructure/extraction/extractor.py` | Dataset dispatch and extraction checkpoints |
 | `infrastructure/extraction/annual.py` | Shared annual CSV extraction |
@@ -92,3 +93,24 @@ pagination when extending the UI.
   no new SQL table or migration is required. Receipt `payload_json` and `extraction_id`
   are stored in Neo4j alongside batch writes.
 - Frontend version details offer Delete extraction/Retry deletion with PT/EN confirmation.
+
+Topic extraction progress adds `resources_phase` (`voting_details`, `proposition_topics`),
+`resources_done` and `resources_total` per phase; frontend types/translations/mocks match.
+
+## Party agreement analysis
+
+- `domain/analysis/party_similarity.py`: PoC v1 pure selection/history/majority scoring.
+- `domain/interfaces/analyzer.py`: application analysis port.
+- `infrastructure/graph/party_similarity.py`: reads current managed graph, report and
+  atomic publication with a source revision check.
+- `infrastructure/graph/analysis_state.py`: revision advancement and invalidation
+  invoked inside source batch/deletion transactions. DemoGraphState is internal.
+- `presentation/dtos/analysis_request.py`, `presentation/routes/analyses.py`:
+  administrative POST `/analyses/party-similarity`, date/minimum validation, HTTP 202.
+- Pipeline operation `analysis`: no extraction/files; saves confirmed
+  `progress.analysis`, `analysis_complete` and refreshed schema.
+- Frontend `src/components/apps/demograph/PartySimilarity.tsx`: manual form and
+  report with exclusions/coverage. Types, PT/EN labels and development mock match.
+- Neo4j `SimilarityAnalysis`, `VOTING_POSITION`, `VOTING_SIMILARITY` use the exact
+  PoC analysis key. Normal deletion invalidates/removes derived results; never replay
+  analytical edges as raw source batches. No new SQL model/migration is required.
