@@ -1,1 +1,1 @@
-"""HTTP and dedicated worker entrypoints."""
+"""HTTP execution and storage initialization entrypoints."""

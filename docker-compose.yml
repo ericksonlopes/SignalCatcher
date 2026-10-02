@@ -52,6 +52,8 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+      demograph-storage-init:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8000/ready"]
       interval: 30s
@@ -73,17 +75,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
-
-  demograph-worker:
-    <<: *backend
-    command: ["python", "-m", "src.modules.demograph.presentation.workers.pipeline"]
-    restart: unless-stopped
-    stop_grace_period: 150s
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      demograph-storage-init:
-        condition: service_completed_successfully
 
 networks:
   shared_postgres_network:

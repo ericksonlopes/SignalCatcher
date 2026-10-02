@@ -27,12 +27,12 @@ Paths below are relative to the backend root unless prefixed with `frontend:`.
 | `presentation/routes/` | Catalog, runs, artifacts, schema and health routers |
 | `presentation/dtos/run_request.py` | Run selection/date validation |
 | `presentation/dependencies/` | SQL catalog and graph dependency factories |
-| `presentation/workers/pipeline.py` | Dedicated queue consumer, heartbeat and singleton lock |
 | `presentation/workers/prepare_storage.py` | Missing directory creation and mount ownership preparation |
 
 `main.py` registers the router at `/api/demograph` with the existing administrative
 security dependency. `alembic/env.py` imports the ORM facade. The initial migration
-is `alembic/versions/da2026100201_demograph_catalog.py`; add later migrations rather
+is `alembic/versions/da2026100201_demograph_catalog.py`; the follow-up `da2026100202_demograph_api_execution.py` removes the obsolete
+worker heartbeat table. Add later migrations rather
 than rewriting a migration that has already been applied.
 
 ## PostgreSQL catalog
@@ -44,7 +44,6 @@ than rewriting a migration that has already been applied.
 | `demograph_artifacts` / `ArtifactModel` | Version/dataset, registered path, format, checksum, size/count, origin, timestamp, observed fields and metadata |
 | `demograph_issues` / `IssueModel` | Sanitized run issues and context |
 | `demograph_schemas` / `SchemaModel` | Timestamped observed graph schema linked to a run |
-| `demograph_worker` / `WorkerModel` | Dedicated worker heartbeat |
 
 Graph concepts include Person, Party, Voting, Legislature, State, PublicOffice,
 DeputyHistory, Proposition and Topic. `DemoGraphBatch` is an internal transaction
@@ -55,12 +54,12 @@ receipt. Check current `KEYS` and dataset Cypher for identity/relationship behav
 All paths use `/api/demograph`:
 
 - `GET /datasets`, `GET /datasets/{dataset_id}`: catalog and paginated versions.
-- `GET /runs`, `POST /runs`, `GET /runs/{run_id}`: queue and run details.
+- `GET /runs`, `POST /runs`, `GET /runs/{run_id}`: immediate background dispatch and run details.
 - `POST /runs/{run_id}/retry`, `POST /runs/{run_id}/cancel`: lifecycle commands.
 - `POST /extractions/{extraction_id}/load`: load retained source files separately.
 - `GET /artifacts/{artifact_id}/schema`, `/preview`, `/download`: registered files.
-- `GET /schema`, `POST /schema/refresh`: cached observation and queued refresh.
-- `GET /health`: storage availability, worker freshness and Neo4j connectivity.
+- `GET /schema`, `POST /schema/refresh`: cached observation and immediate background refresh.
+- `GET /health`: API execution mode, storage availability and Neo4j connectivity.
 
 Operations are `extract`, `pipeline`, `load` and `schema`; the public run request
 accepts `extract` or `pipeline`. Outcomes include `completed_with_errors`, not only

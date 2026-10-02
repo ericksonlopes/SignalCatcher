@@ -22,7 +22,12 @@ class SqlCatalog:
         self.sessions = sessions
 
     def create(
-        self, operation: str, parameters: dict[str, Any], extraction_id: str | None = None
+        self,
+        operation: str,
+        parameters: dict[str, Any],
+        extraction_id: str | None = None,
+        *,
+        status: str = "queued",
     ) -> str:
         run_id = str(uuid4())
         with self.sessions.begin() as session:
@@ -48,13 +53,14 @@ class SqlCatalog:
                     extraction_id=extraction_id or run_id,
                     operation=operation,
                     parameters=parameters,
-                    status="queued",
-                    stage="queued",
+                    status=status,
+                    stage="starting" if status == "running" else "queued",
                     progress={},
                     completed_stages=[],
                     cancel_requested=False,
                     schema_stale=False,
                     created_at=now(),
+                    started_at=now() if status == "running" else None,
                 )
             )
         return run_id
@@ -272,14 +278,15 @@ class SqlCatalog:
                 )
             return items
 
-    def retry(self, run_id: str) -> None:
+    def retry(self, run_id: str, *, status: str = "queued") -> None:
         with self.sessions.begin() as session:
             row = session.get(RunModel, run_id, with_for_update=True)
             if row is None:
                 raise LookupError("Run not found.")
-            if row.status not in {"failed", "cancelled"}:
-                raise ValueError("Only failed or cancelled runs can be resumed.")
-            row.status, row.cancel_requested, row.error = "queued", False, None
+            if row.status not in {"failed", "cancelled", "queued"}:
+                raise ValueError("Only pending, failed or cancelled runs can be resumed.")
+            row.status, row.cancel_requested, row.error = status, False, None
+            row.stage = "starting" if status == "running" else "queued"
             row.finished_at = None
 
     def cancel(self, run_id: str) -> None:

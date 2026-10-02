@@ -287,7 +287,7 @@ src/modules/demograph/
     dependencies/              # Dependency injection
     dtos/                      # HTTP request validation
     routes/                    # Catalog, runs, artifacts, schema and health routers
-    workers/                   # Queue processing and storage initialization
+    workers/                   # Storage initialization only; no execution worker
 ```
 
 To add a dataset, declare its dependencies in `domain/rules/datasets.py`, implement its
@@ -298,7 +298,7 @@ The extracted files use the same storage parent as YouTube, with a sibling direc
 `demograph`. In production Compose the host path is `/media/eriberry/SSD_1/demograph`, mounted
 at `/demograph` in the API and workers. The local overlay uses `./demograph` alongside
 `./youtube`. For a native process, an empty `DEMOGRAPH_STORAGE_PATH` derives this sibling from
-`DOWNLOAD_YOUTUBE_PATH`; an explicit setting overrides it. The worker creates a missing
+`DOWNLOAD_YOUTUBE_PATH`; an explicit setting overrides it. The extractor creates a missing
 directory automatically. Compose additionally runs `demograph-storage-init` to prepare the
 bind mount and assign a root-owned mount directory to application UID/GID 1000,
 without recursively changing existing files.
@@ -321,17 +321,22 @@ Credentials stay in the backend. Use Neo4j 5.26 Community or compatible Neo4j 5.
 not required. The graph database should be dedicated to DemoGraph; legacy PoC files and
 graph records are not imported. Persist the external Neo4j `/data` directory in its own stack.
 
-Install dependencies and apply the catalog migration, then start the API and dedicated worker:
+Install dependencies and apply the catalog migrations, then start the API:
 
 ```powershell
 uv sync
 uv run alembic upgrade head
-uv run python -m src.modules.demograph.presentation.workers.pipeline
+uv run uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
-Compose automatically runs migrations and includes the `demograph-worker` service. Extraction
-and catalog browsing work without Neo4j; only graph loads and graph schema refresh need its
-connection. The existing YouTube worker remains independent.
+Compose automatically runs migrations and prepares storage before starting the API.
+DemoGraph has no dedicated worker or advisory lock: clicking Start, Resume, Load or
+Refresh schema begins a background task in the API immediately. The response returns
+`running`, while catalog progress remains available. Extraction and catalog browsing
+work without Neo4j; only loads and graph schema refresh need its connection.
+The existing YouTube worker remains independent. When upgrading an existing Portainer
+stack, remove its old `demograph-worker` service/container and update backend and frontend.
+Legacy pending executions can be started explicitly with Resume; nothing drains a queue.
 
 In **Runs**, select datasets and a date interval, then choose extract-only or extract-and-load.
 The interval is inclusive and applies to voting dates across every organ in the annual source
@@ -346,12 +351,12 @@ the source envelope and pagination links. A 404 topic resource is explicitly cat
 unavailable, with an issue; it does not mean the proposition has no topics. Successful extraction
 files survive load failures and can be loaded separately. No automatic file deletion occurs.
 
-The PostgreSQL queue survives restarts. One dedicated worker holds an advisory lock, updates
-its heartbeat and processes one run at a time. Extra worker instances wait for the
-database lock instead of crashing;
-they take over when the current owner releases it. A waiting instance does not reset runs
-or update the active worker's heartbeat. Cancellation is checked between streamed chunks,
-pages and batches. Resume reuses completed source artifacts after verifying their checksums.
+Executions and artifacts remain cataloged in PostgreSQL, while processing runs as a
+background task owned by the API request. There is no global execution lock and no
+separate consumer process. Keep the API running while an extraction/load is active;
+restarts do not automatically resume interrupted tasks. Cancellation is checked between
+streamed chunks, pages and batches. Resume reuses completed artifacts after verifying
+their checksums.
 Each Neo4j batch stores a receipt in the same transaction as its data, so a lost PostgreSQL
 checkpoint does not duplicate writes. Load errors can leave confirmed batches in the graph;
 the execution remains failed/partial until resumed. Older source snapshots do not replace

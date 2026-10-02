@@ -4,7 +4,6 @@ import io
 import json
 import os
 import tempfile
-import threading
 import unittest
 from datetime import timedelta
 from pathlib import Path
@@ -16,6 +15,7 @@ from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -34,16 +34,14 @@ from src.modules.demograph.infrastructure.models import (
     IssueModel,
     RunModel,
     SchemaModel,
-    WorkerModel,
 )
 from src.modules.demograph.infrastructure.storage.files import rows, safe_path
 from src.modules.demograph.infrastructure.storage.schema import SchemaObserver
-from src.modules.demograph.presentation.dependencies.providers import get_catalog
+from src.modules.demograph.presentation.dependencies.providers import get_catalog, get_pipeline
 from src.modules.demograph.presentation.routes import router
 
 TABLES = [
-    model.__table__
-    for model in (DatasetModel, RunModel, ArtifactModel, IssueModel, SchemaModel, WorkerModel)
+    model.__table__ for model in (DatasetModel, RunModel, ArtifactModel, IssueModel, SchemaModel)
 ]
 
 
@@ -206,18 +204,28 @@ class DemoGraphTest(unittest.TestCase):
         assert spec is not None and spec.loader is not None
         migration = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(migration)
+        api_spec = importlib.util.spec_from_file_location(
+            "demograph_api_migration",
+            migration_path.with_name("da2026100202_demograph_api_execution.py"),
+        )
+        assert api_spec is not None and api_spec.loader is not None
+        api_migration = importlib.util.module_from_spec(api_spec)
+        api_spec.loader.exec_module(api_migration)
         for table in reversed(TABLES):
             table.drop(self.engine)
         with self.engine.begin() as connection:
             with Operations.context(MigrationContext.configure(connection)):
                 migration.upgrade()
+                api_migration.upgrade()
             inspector = inspect(connection)
+            self.assertNotIn("demograph_worker", inspector.get_table_names())
             for table in TABLES:
                 self.assertEqual(
                     {column.name for column in table.columns},
                     {column["name"] for column in inspector.get_columns(table.name)},
                 )
             with Operations.context(MigrationContext.configure(connection)):
+                api_migration.downgrade()
                 migration.downgrade()
         for table in TABLES:
             table.create(self.engine)
@@ -254,100 +262,6 @@ class DemoGraphTest(unittest.TestCase):
         ).execute(another)
         self.assertEqual(self.catalog.run(another).status, "cancelled")
         self.assertEqual(self.catalog.artifacts(another), [])
-
-    @unittest.skipUnless(os.environ.get("DEMOGRAPH_TEST_SQL_URL"), "Dedicated PostgreSQL required")
-    def test_worker_runs_queue_and_releases_singleton_lock(self) -> None:
-        from src.modules.demograph.presentation.workers import pipeline as worker
-
-        run_id = self.create(["deputies"])
-        stopped = threading.Event()
-        graph = GraphLoader(self.catalog, self.root, None, "neo4j", None, "neo4j", stopped)
-        self.extractor.stopped = stopped
-
-        def monitor() -> None:
-            for _ in range(100):
-                if self.catalog.run(run_id).status in {"completed", "failed"}:
-                    stopped.set()
-                    return
-                if stopped.wait(0.1):
-                    return
-            stopped.set()
-
-        observer = threading.Thread(target=monitor)
-        with (
-            patch.object(worker, "engine", self.engine),
-            patch.object(worker, "Session", self.catalog.sessions),
-            patch.object(worker, "SqlCatalog", return_value=self.catalog),
-            patch.object(worker, "get_graph", return_value=graph),
-            patch.object(worker, "ChamberExtractor", return_value=self.extractor),
-            patch.object(worker, "Event", return_value=stopped),
-            patch.object(worker.signal, "signal"),
-            patch.object(settings, "DEMOGRAPH_STORAGE_PATH", str(self.root)),
-        ):
-            observer.start()
-            worker.main()
-            observer.join()
-        self.assertEqual(self.catalog.run(run_id).status, "completed")
-        with self.engine.connect() as connection:
-            self.assertTrue(
-                connection.execute(
-                    text("SELECT pg_try_advisory_lock(:key)"), {"key": worker.LOCK_ID}
-                ).scalar()
-            )
-            connection.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": worker.LOCK_ID})
-
-    @unittest.skipUnless(os.environ.get("DEMOGRAPH_TEST_SQL_URL"), "Dedicated PostgreSQL required")
-    def test_worker_waits_for_lock_then_takes_over_and_can_stop_waiting(self) -> None:
-        from src.modules.demograph.presentation.workers import pipeline as worker
-
-        waiting = threading.Event()
-        stopped = threading.Event()
-        acquired: list[bool] = []
-        failures: list[Exception] = []
-
-        def contender() -> None:
-            try:
-                with self.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
-                    acquired.append(worker.wait_for_lock(conn, stopped, interval=0.05))
-                    conn.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": worker.LOCK_ID})
-            except Exception as exc:
-                failures.append(exc)
-
-        with self.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as owner:
-            self.assertTrue(
-                owner.execute(
-                    text("SELECT pg_try_advisory_lock(:key)"), {"key": worker.LOCK_ID}
-                ).scalar()
-            )
-            thread = threading.Thread(target=contender)
-            with patch.object(worker.logger, "warning", side_effect=lambda *_: waiting.set()):
-                try:
-                    thread.start()
-                    self.assertTrue(waiting.wait(3), "Contender did not enter standby")
-                    self.assertEqual(acquired, [])
-                    owner.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": worker.LOCK_ID})
-                    thread.join(3)
-                    self.assertFalse(thread.is_alive())
-                    self.assertEqual(failures, [])
-                    self.assertEqual(acquired, [True])
-                finally:
-                    stopped.set()
-                    thread.join(3)
-                    owner.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": worker.LOCK_ID})
-
-        cancellation = threading.Event()
-        with self.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as owner:
-            owner.execute(text("SELECT pg_advisory_lock(:key)"), {"key": worker.LOCK_ID})
-            try:
-                with (
-                    self.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn,
-                    patch.object(
-                        worker.logger, "warning", side_effect=lambda *_: cancellation.set()
-                    ),
-                ):
-                    self.assertFalse(worker.wait_for_lock(conn, cancellation))
-            finally:
-                owner.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": worker.LOCK_ID})
 
     def test_extraction_publishes_full_files_schema_and_does_not_require_neo4j(self) -> None:
         run_id = self.extract()
@@ -433,6 +347,93 @@ class DemoGraphTest(unittest.TestCase):
         self.assertTrue(self.catalog.artifacts(run_id))
         load_id = self.catalog.create("load", {}, run_id)
         self.assertEqual(self.catalog.run(load_id).extraction_id, run_id)
+
+    def direct_api(self) -> FastAPI:
+        catalog = self.catalog
+
+        class FixtureLoader:
+            def load(self, run) -> None:
+                catalog.progress(run.id, load_complete=True)
+
+            def schema(self, run_id=None) -> dict:
+                return {"nodes": [], "relationships": [], "constraints": []}
+
+        app = FastAPI()
+        app.include_router(router, prefix="/api/demograph", dependencies=[Depends(require_admin)])
+        pipeline = Pipeline(self.catalog, self.extractor, FixtureLoader())
+        app.dependency_overrides[get_catalog] = lambda: self.catalog
+        app.dependency_overrides[get_pipeline] = lambda: pipeline
+        return app
+
+    def test_click_starts_and_completes_extraction_without_worker(self) -> None:
+        with (
+            patch.object(settings, "ADMIN_API_KEY", SecretStr("test-only")),
+            TestClient(self.direct_api()) as client,
+        ):
+            response = client.post(
+                "/api/demograph/runs",
+                headers={"X-API-Key": "test-only"},
+                json={
+                    "operation": "extract",
+                    "datasets": ["deputies"],
+                    "start": "2023-02-01",
+                    "end": "2023-02-28",
+                },
+            )
+            self.assertEqual(response.status_code, 202)
+            self.assertEqual(response.json()["status"], "running")
+            run_id = response.json()["id"]
+            self.assertEqual(self.catalog.run(run_id).status, "completed")
+            self.assertEqual(len(self.catalog.artifacts(run_id)), 1)
+            health = client.get("/api/demograph/health").json()
+            self.assertEqual(health["execution"], "api")
+            self.assertNotIn("worker", health)
+
+    def test_pipeline_load_and_schema_refresh_execute_from_click(self) -> None:
+        with (
+            patch.object(settings, "ADMIN_API_KEY", SecretStr("test-only")),
+            TestClient(self.direct_api()) as client,
+        ):
+            headers = {"X-API-Key": "test-only"}
+            response = client.post(
+                "/api/demograph/runs",
+                headers=headers,
+                json={"datasets": ["deputies"], "start": "2023-02-01", "end": "2023-02-28"},
+            )
+            run_id = response.json()["id"]
+            self.assertEqual(self.catalog.run(run_id).status, "completed")
+            self.assertTrue(self.catalog.run(run_id).progress["load_complete"])
+            for path in (f"/extractions/{run_id}/load", "/schema/refresh"):
+                response = client.post(f"/api/demograph{path}", headers=headers)
+                self.assertEqual(response.status_code, 202)
+                self.assertEqual(response.json()["status"], "running")
+                self.assertEqual(self.catalog.run(response.json()["id"]).status, "completed")
+            self.assertIsNotNone(self.catalog.schema()["observed_at"])
+
+    def test_legacy_pending_run_can_be_started_and_active_run_cannot_be_restarted(self) -> None:
+        run_id = self.create(["deputies"])
+        with (
+            patch.object(settings, "ADMIN_API_KEY", SecretStr("test-only")),
+            TestClient(self.direct_api()) as client,
+        ):
+            headers = {"X-API-Key": "test-only"}
+            response = client.post(f"/api/demograph/runs/{run_id}/retry", headers=headers)
+            self.assertEqual(response.status_code, 202)
+            self.assertEqual(response.json()["status"], "running")
+            self.assertEqual(self.catalog.run(run_id).status, "completed")
+            self.catalog.update(run_id, status="running")
+            self.assertEqual(
+                client.post(f"/api/demograph/runs/{run_id}/retry", headers=headers).status_code, 409
+            )
+
+    @unittest.skipUnless(os.environ.get("DEMOGRAPH_TEST_SQL_URL"), "Dedicated PostgreSQL required")
+    def test_click_executes_while_diarization_holds_its_lock(self) -> None:
+        with self.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as owner:
+            owner.execute(text("SELECT pg_advisory_lock(:key)"), {"key": 73401953})
+            try:
+                self.test_click_starts_and_completes_extraction_without_worker()
+            finally:
+                owner.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": 73401953})
 
     def test_http_contracts_auth_catalog_download_and_unknown_ids(self) -> None:
         app = FastAPI()

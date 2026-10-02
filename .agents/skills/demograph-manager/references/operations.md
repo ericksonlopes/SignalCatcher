@@ -11,19 +11,17 @@ Read `src/core/config/settings.py`, `.env.example`, `docker-compose.yml` and
   `DEMOGRAPH_NEO4J_DATABASE`: external graph connection; no frontend credentials.
 - Production extraction files: `/media/eriberry/SSD_1/demograph`, mounted at
   `/demograph` in the backend containers. Local overlay: `./demograph`.
-- Run worker: `uv run python -m src.modules.demograph.presentation.workers.pipeline`.
-- Compose services: `demograph-worker`, `demograph-storage-init` and shared
-  migration service. Storage initialization creates the missing directory and,
-  when running as root, assigns a root-owned mount directory to UID/GID 1000.
-  It does not recursively change existing artifacts.
-
-The worker owns a dedicated PostgreSQL advisory lock (currently `73401953`),
-processes one run at a time and maintains heartbeat independently of the long
-task. Extra instances wait cooperatively for the lock instead of exiting, and
-start processing only after acquisition; waiting instances must not reset runs
-or update/clear the active heartbeat. Its dedicated lock connection must stay alive. Stop processing on lock loss;
-finish/shut down the executor before releasing the lock. Preserve cancellation
-checks during long downloads, scans and graph batches.
+- Execution starts from HTTP commands via FastAPI BackgroundTasks, returning `running`.
+  No DemoGraph worker, global advisory lock or queue consumer exists. Keep the API
+  active during tasks; process restarts do not automatically resume them.
+- Compose includes `demograph-storage-init` and the shared migration service. The API
+  depends on storage initialization. It creates the missing directory and assigns
+  a root-owned mount directory to UID/GID 1000 when running as root; it does not
+  recursively change existing artifacts.
+- Upgrades remove the old `demograph-worker` service/container and apply catalog
+  migration `da2026100202`, which drops its obsolete heartbeat table. Legacy queued
+  runs can be started manually with Resume. Pending statuses remain readable for
+  compatibility but new HTTP submissions never wait for a consumer.
 
 ## External Neo4j / Portainer
 
@@ -75,9 +73,9 @@ or the real backend. Build success alone does not confirm ingestion.
 The test suite covers dependencies, official vote choices, full-file schemas,
 encoding, cancellation, safe paths, checksum resume/tampering, pagination failures,
 404 topics, retained extraction, API authorization, reversible migrations, worker
-singleton behavior and Neo4j receipt replay/newer-snapshot protection.
+direct API execution, legacy pending-run resume and Neo4j receipt replay/newer-snapshot protection.
 
-By default tests use isolated SQLite and HTTP fixtures; PostgreSQL worker and
+By default tests use isolated SQLite and HTTP fixtures; PostgreSQL coexistence and
 Neo4j integration cases require explicit test environment variables. **The suite
 drops its catalog tables and deletes every node in the supplied graph database.**
 Never point `DEMOGRAPH_TEST_SQL_URL` or `DEMOGRAPH_TEST_NEO4J_URI` at production

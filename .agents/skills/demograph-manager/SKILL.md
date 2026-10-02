@@ -11,6 +11,9 @@ description: >-
 
 Work within the user's requested change. DemoGraph is a manual pipeline:
 **extract official source data -> publish durable files -> load Neo4j**.
+Clicking Start, Resume, Load or Refresh schema dispatches the task immediately
+through FastAPI BackgroundTasks. Do not add a queue consumer, global advisory lock
+or separate DemoGraph worker unless the user explicitly requests that architecture.
 The catalog tracks both extracted versions and confirmed loads. Extraction works
 without Neo4j. Current scope is Camara dos Deputados; the legacy PoC is a reference,
 not an automatic source of files, graph records or analytical filtering.
@@ -25,7 +28,7 @@ Read the applicable repository instructions before editing.
 Read [references/module-map.md](references/module-map.md) for affected backend
 packages, frontend contracts, database tables and endpoints. Read
 [references/operations.md](references/operations.md) when changing persistence,
-worker behavior, deployment or tests. Check actual source before relying on this map.
+API background execution, deployment or tests. Check actual source before relying on this map.
 
 ## Preserve architecture
 
@@ -35,11 +38,11 @@ worker behavior, deployment or tests. Check actual source before relying on this
 - Preserve the granular folders. Each ORM table has its own file under
   `infrastructure/models/`. Each dataset has an extractor, mapper and graph query
   in the appropriate package. Shared transport, storage and schema observation stay
-  reusable. HTTP routes, DTOs, dependency injection and workers stay separate.
+  reusable. HTTP routes, DTOs, dependency injection and storage initialization stay separate. DemoGraph has no execution worker.
 - Export ORM models through `infrastructure/models/__init__.py` for Alembic discovery.
   Keep the shared `src.core.database.connector.Base`; add migrations when database
   structure changes. Use absolute `src.` imports, and update runtime module commands
-  when moving worker entrypoints.
+  when moving bootstrap entrypoints.
 
 ## Pipeline invariants
 
@@ -89,7 +92,7 @@ English translations, and matching development mocks together. Use the user's
 chosen data source; an in-memory mock success is not proof of a real Neo4j ingestion.
 
 For diagnosis, inspect the run's stage, progress, issues, checkpoints, artifact
-availability/checksum, worker heartbeat and Neo4j health before choosing a retry.
+availability/checksum, API availability and Neo4j health before choosing a retry.
 Avoid restarting unrelated YouTube services to resolve a DemoGraph issue.
 
 Validate the behavior affected by the change with the existing tests and relevant

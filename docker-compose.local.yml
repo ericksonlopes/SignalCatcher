@@ -23,11 +23,6 @@ services:
     ports: !override
       - "8000:8000"
 
-  demograph-worker:
-    volumes: !override
-      - ./youtube:/youtube
-      - ./demograph:/demograph
-
   frontend:
     build:
       context: ../SignalCatcherFrontend

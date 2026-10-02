@@ -1,7 +1,7 @@
 # DemoGraph Neo4j on Raspberry Pi / Portainer
 
 This stack deploys the external graph database used by DemoGraph. The API, PostgreSQL
-catalog, extraction worker and frontend continue to run in their existing stacks.
+catalog and frontend continue to run in their existing stacks.
 Use a Raspberry Pi with a 64-bit operating system and Docker ARM64. The official
 `neo4j:5.26-community` image supports ARM64; Docker selects the host architecture.
 Reserve at least 2 GB of available RAM for this configuration, in addition to other services.
@@ -49,13 +49,13 @@ Keep the stack name stable, and preserve the named volumes when redeploying.
 
 The stack stores the database under `/media/eriberry/SSD_1/demograph-neo4j/data`.
 Logs and import files use sibling folders. Extracted source files remain under
-`/media/eriberry/SSD_1/demograph`; they are managed by the DemoGraph worker.
+`/media/eriberry/SSD_1/demograph`; they are managed by the DemoGraph API.
 Ports 7474 (Browser) and 7687 (Bolt) must be available on the Raspberry.
 
 ## Connect SignalCatcher
 
 Set these environment variables in the existing SignalCatcher stack and redeploy its API
-and DemoGraph worker:
+service:
 
 ```dotenv
 DEMOGRAPH_NEO4J_URI=bolt://demograph-neo4j:7687
