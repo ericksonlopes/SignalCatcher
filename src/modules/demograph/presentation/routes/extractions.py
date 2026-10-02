@@ -17,8 +17,15 @@ def delete_extraction(
     except LookupError as exc:
         raise HTTPException(404, str(exc)) from exc
     except ValueError as exc:
+        busy = {
+            "Wait for execution or cancellation to finish before deleting.",
+            "Wait for the current graph operation to finish before deleting.",
+        }
         raise HTTPException(
-            409, "Deletion unavailable. Wait for active runs or check artifact integrity."
+            409,
+            str(exc)
+            if str(exc) in busy
+            else "Cannot delete: a retained artifact is missing, changed or unsafe.",
         ) from exc
     except Exception as exc:
         raise HTTPException(

@@ -110,3 +110,21 @@ Deletion tests cover authorization, active runs, path isolation, files/catalog r
 graph and filesystem failures, retry checkpoints, interrupted deletion, preserving
 other versions, legacy tamper checks, restoration of shared snapshots and foreign
 relationship protection. Integration tests use only disposable PostgreSQL/Neo4j.
+
+## Full reset and metadata
+
+Normal extraction deletion removes data but Neo4j label/property tokens remain in
+the store. Community 5.26 needs an offline user-database reset to clear those tokens.
+With explicit user authorization, use `deploy/portainer/reset-demograph-neo4j.sh`
+on the Raspberry Docker host; the argument is the stack/project name (currently
+`neo4j`). Verify the installed image, `/data` persistence and resolved directories.
+The script stops the selected service and deletes only its `neo4j` store and
+transaction log directories, preserving `system` authentication and extracted files.
+Reconnection must confirm zero labels/property keys/constraints, not merely zero nodes.
+This procedure was verified in a disposable container with a persistent volume.
+
+Graph operation admission uses short serializable SQL transactions to prevent
+starting a load while deletion is being admitted; no worker/advisory lock is added.
+DemoGraph frontend preserves endpoint conflict reasons and translates deletion errors.
+HTTP integration verifies starting a pipeline and deleting its files/catalog/graph;
+PostgreSQL integration verifies overlapping start/delete cannot both be admitted.

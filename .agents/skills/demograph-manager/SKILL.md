@@ -105,6 +105,11 @@ receipts need checksum-verified source files for recovery before mutation. Missi
 legacy files must abort without modifying the graph. Reconstructing large graphs
 can take time and memory; avoid overlapping graph operations during deletion. Do not
 replace this with blanket `DETACH DELETE` or filesystem removal outside the UUID root.
+Operation admission uses short serializable SQL transactions; retain specific PT/EN
+conflict reasons instead of masking all HTTP 409 responses. For an explicitly requested
+full reset of Neo4j metadata, follow the offline procedure in the operations reference
+and `deploy/portainer/reset-demograph-neo4j.sh`; it requires Docker-host access and
+preserves the system/authentication database.
 
 ## Implement a change
 

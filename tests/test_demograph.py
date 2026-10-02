@@ -17,6 +17,7 @@ from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -733,6 +734,80 @@ class DemoGraphTest(unittest.TestCase):
             self.assertIn("Person", [node["label"] for node in schema["nodes"]])
             self.assertIn("VOTED_IN", [relation["type"] for relation in schema["relationships"]])
             self.assertFalse(schema["stale"])
+        finally:
+            with graph.driver() as driver, driver.session() as session:
+                session.run("MATCH (n) DETACH DELETE n").consume()
+
+    @unittest.skipUnless(os.environ.get("DEMOGRAPH_TEST_SQL_URL"), "Dedicated PostgreSQL required")
+    def test_graph_admission_rejects_concurrent_start_and_delete(self) -> None:
+        extraction = self.extract(["deputies"])
+        artifacts = self.catalog.artifacts
+
+        def overlapping_start(extraction_id):
+            # A second connection starts after deletion read active runs but
+            # before its status change commits: serializable isolation aborts it.
+            self.catalog.create(
+                "pipeline",
+                {"datasets": ["deputies"], "start": "2023-02-01", "end": "2023-02-28"},
+                status="running",
+            )
+            return artifacts(extraction_id)
+
+        with patch.object(self.catalog, "artifacts", side_effect=overlapping_start):
+            with self.assertRaises(OperationalError) as caught:
+                self.catalog.begin_delete(extraction)
+        self.assertEqual(getattr(caught.exception.orig, "pgcode", None), "40001")
+        self.assertEqual(self.catalog.run(extraction).status, "completed")
+        self.assertTrue((self.root / extraction).exists())
+
+    @unittest.skipUnless(os.environ.get("DEMOGRAPH_TEST_NEO4J_URI"), "Dedicated Neo4j required")
+    def test_real_graph_click_pipeline_and_delete_from_http(self) -> None:
+        graph = GraphLoader(
+            self.catalog,
+            self.root,
+            os.environ["DEMOGRAPH_TEST_NEO4J_URI"],
+            "neo4j",
+            os.environ["DEMOGRAPH_TEST_NEO4J_PASSWORD"],
+            "neo4j",
+        )
+        with graph.driver() as driver, driver.session() as session:
+            session.run("MATCH (n) DETACH DELETE n").consume()
+        app = self.direct_api()
+        app.dependency_overrides[get_pipeline] = lambda: Pipeline(
+            self.catalog, self.extractor, graph
+        )
+        app.dependency_overrides[get_deletion] = lambda: DeleteExtraction(
+            self.catalog, graph, ExtractionFiles(self.root)
+        )
+        try:
+            with (
+                patch.object(settings, "ADMIN_API_KEY", SecretStr("test-only")),
+                TestClient(app) as client,
+            ):
+                headers = {"X-API-Key": "test-only"}
+                result = client.post(
+                    "/api/demograph/runs",
+                    headers=headers,
+                    json={
+                        "operation": "pipeline",
+                        "datasets": ["deputies"],
+                        "start": "2023-02-01",
+                        "end": "2023-02-28",
+                    },
+                )
+                self.assertEqual(result.status_code, 202, result.text)
+                run_id = result.json()["id"]
+                self.assertEqual(self.catalog.run(run_id).status, "completed")
+                with graph.driver() as driver, driver.session() as session:
+                    self.assertGreater(
+                        session.run("MATCH (n) RETURN count(n) AS n").single()["n"], 0
+                    )
+                result = client.delete(f"/api/demograph/extractions/{run_id}", headers=headers)
+                self.assertEqual(result.status_code, 200, result.text)
+                self.assertFalse((self.root / run_id).exists())
+                self.assertEqual(client.get("/api/demograph/runs").json()["total"], 0)
+                with graph.driver() as driver, driver.session() as session:
+                    self.assertEqual(session.run("MATCH (n) RETURN count(n) AS n").single()["n"], 0)
         finally:
             with graph.driver() as driver, driver.session() as session:
                 session.run("MATCH (n) DETACH DELETE n").consume()

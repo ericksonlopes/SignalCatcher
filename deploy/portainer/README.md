@@ -113,3 +113,18 @@ was overridden. Do not apply these commands to the entire SSD or unrelated modul
 files. For NTFS/exFAT, a read-only mount, ACLs or Docker user-namespace remapping,
 first inspect the actual mount/identity configuration; host `chown` alone may not
 resolve the error. Do not format the disk or remove the data directory as a repair.
+# Reset all graph metadata
+
+Deleting nodes/relationships leaves Neo4j's label/property tokens and identity
+constraints in the store. On Community Edition, removing these tokens requires an
+offline reset of the user database. With explicit authorization to discard the
+graph, run `sudo bash reset-demograph-neo4j.sh neo4j` on the Raspberry Docker host
+using [reset-demograph-neo4j.sh](reset-demograph-neo4j.sh). The argument is the
+Portainer stack/Compose project name.
+
+The script verifies a single `demograph-neo4j` service and persistent `/data` mount,
+stops it, reuses its exact image without networking, checks resolved paths and removes
+only `/data/databases/neo4j` and `/data/transactions/neo4j`. It restarts the container,
+preserving `system` (users/passwords), extraction files and unrelated volumes.
+Wait for healthy status, reconnect Neo4j Browser and verify empty nodes, labels,
+property keys and constraints. The next DemoGraph load recreates its identity constraints.
