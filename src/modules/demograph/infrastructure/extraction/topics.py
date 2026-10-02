@@ -37,4 +37,5 @@ def extract(source: "ChamberTransport", run: Run, dataset: str) -> None:
             f"proposition-{proposition_id}",
             {"kind": "proposition_topics", "proposition_id": proposition_id},
             allow_missing=True,
+            pagination=False,
         )

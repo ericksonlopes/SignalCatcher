@@ -61,6 +61,11 @@ API background execution, deployment or tests. Check actual source before relyin
   and observed fields. Verify registered checksums on resume and before loading.
   Preserve complete JSON envelopes, pagination-loop detection, bounded transient
   retries and cooperative cancellation during streaming and batches.
+- Respect endpoint-specific collection contracts: current deputies accept
+  `pagina`/`itens`; deputy histories and proposition topics reject those parameters.
+  Their extractors call the shared transport with `pagination=False`, retaining the
+  complete response and registered checkpoint. Do not infer pagination from an
+  array-shaped response or silently suppress HTTP 400.
 - A 404 proposition-topic response is an explicit unavailable resource with an
   issue, not evidence that the proposition has no themes. Do not delete known graph
   theme relations based on an unavailable response.
@@ -78,6 +83,28 @@ API background execution, deployment or tests. Check actual source before relyin
   ingestion. Preserve pagination and the 50-record preview limit.
 - Keep credentials in backend configuration. Writes use the existing administrative
   API-key dependency. Public errors must not expose driver credentials or payloads.
+
+## Explicit extraction deletion
+
+The catalog offers deletion per extraction version, including all its datasets/files
+and associated load runs. `DELETE /api/demograph/extractions/{id}` runs synchronously
+in the API with the existing administrative API-key dependency and a frontend
+confirmation. Active executions must finish or complete cancellation first. There
+is still no DemoGraph worker or advisory lock.
+
+Preserve the recoverable sequence: validate the UUID directory and registered paths,
+commit graph deletion, checkpoint `graph_deleted`, remove only that extraction
+folder (including partial downloads), then remove its SQL catalog entries and refresh
+schema. Failures retain `delete_failed`; explicit retry resumes it and interrupted
+`deleting` stages. Never allow a load/resume to reuse an extraction pending deletion.
+
+Batch receipts retain mapped rows and metadata. Graph deletion replays all remaining
+confirmed batches in snapshot/path/batch order in a single transaction, restoring
+shared records and retaining foreign relationships and connected nodes. Legacy
+receipts need checksum-verified source files for recovery before mutation. Missing
+legacy files must abort without modifying the graph. Reconstructing large graphs
+can take time and memory; avoid overlapping graph operations during deletion. Do not
+replace this with blanket `DETACH DELETE` or filesystem removal outside the UUID root.
 
 ## Implement a change
 

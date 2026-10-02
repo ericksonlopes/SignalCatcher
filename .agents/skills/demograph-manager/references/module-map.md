@@ -7,7 +7,7 @@ Paths below are relative to the backend root unless prefixed with `frontend:`.
 | Path | Responsibility |
 | --- | --- |
 | `src/modules/demograph/domain/entities/run.py` | Pure run entity |
-| `domain/interfaces/{catalog,extractor,loader}.py` | Pipeline ports; paths under the module |
+| `domain/interfaces/{catalog,extractor,loader,storage}.py` | Pipeline ports; paths under the module |
 | `domain/contracts.py` | Public domain facade |
 | `domain/rules/datasets.py` | Dataset ordering, dependency resolver, terminal statuses |
 | `domain/mapping/` | Dispatcher, shared identities and one mapper per dataset |
@@ -81,3 +81,14 @@ Resolve the sibling `SignalCatcherFrontend` root. Important files:
 The catalog is the default DemoGraph screen. Run polling occurs while visible;
 health polling has its own interval. Preserve bounded file lists and version/run
 pagination when extending the UI.
+
+## Deletion contracts
+
+- `application/use_cases/delete_extraction.py`: recoverable graph -> files -> catalog sequence.
+- `infrastructure/storage/deletion.py`: UUID-scoped directory validation and removal.
+- `infrastructure/graph/deletion.py`: legacy receipt recovery and atomic reconstruction.
+- `presentation/routes/extractions.py`: administrative `DELETE /extractions/{id}`.
+- Run statuses `deleting` and `delete_failed` describe recoverable deletion stages;
+  no new SQL table or migration is required. Receipt `payload_json` and `extraction_id`
+  are stored in Neo4j alongside batch writes.
+- Frontend version details offer Delete extraction/Retry deletion with PT/EN confirmation.

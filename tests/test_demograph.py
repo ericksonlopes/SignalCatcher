@@ -7,8 +7,8 @@ import tempfile
 import unittest
 from datetime import timedelta
 from pathlib import Path
-from unittest.mock import patch
-from urllib.parse import urlparse
+from unittest.mock import Mock, patch
+from urllib.parse import parse_qs, urlparse
 
 import requests
 from alembic.migration import MigrationContext
@@ -22,6 +22,7 @@ from sqlalchemy.pool import StaticPool
 
 from src.core.api.security import require_admin
 from src.core.config.settings import settings
+from src.modules.demograph.application.use_cases.delete_extraction import DeleteExtraction
 from src.modules.demograph.application.use_cases.pipeline import Pipeline
 from src.modules.demograph.domain.contracts import DATASETS, resolve_datasets
 from src.modules.demograph.domain.mapping import map_record
@@ -35,9 +36,14 @@ from src.modules.demograph.infrastructure.models import (
     RunModel,
     SchemaModel,
 )
+from src.modules.demograph.infrastructure.storage.deletion import ExtractionFiles
 from src.modules.demograph.infrastructure.storage.files import rows, safe_path
 from src.modules.demograph.infrastructure.storage.schema import SchemaObserver
-from src.modules.demograph.presentation.dependencies.providers import get_catalog, get_pipeline
+from src.modules.demograph.presentation.dependencies.providers import (
+    get_catalog,
+    get_deletion,
+    get_pipeline,
+)
 from src.modules.demograph.presentation.routes import router
 
 TABLES = [
@@ -93,6 +99,13 @@ class FakeSource:
         response = requests.Response()
         response.url, response.status_code = url, 200
         path = urlparse(url).path
+        if path.endswith(("/historico", "/temas")) and parse_qs(urlparse(url).query):
+            response.status_code = 400
+            response._content = json.dumps(
+                {"status": 400, "detail": "Invalid parameters.", "instance": "pagina, itens"}
+            ).encode()
+            response._content_consumed = True
+            return response
         if "votacoesVotos" in path:
             content = csv_bytes(self.votes)
         elif path.endswith(".csv"):
@@ -173,6 +186,86 @@ class DemoGraphTest(unittest.TestCase):
             resolve_datasets(["unknown"])
         for raw in self.source.votes[:3]:
             self.assertEqual(map_record("votes", raw, {})["choice"], raw["voto"])
+
+    def test_delete_files_catalog_and_http_authorization(self) -> None:
+        first, other = self.extract(["deputies"]), self.extract(["deputies"])
+        self.catalog.save_schema(
+            None, {"nodes": [{"label": "Person", "count": 1}], "relationships": []}
+        )
+        graph = Mock()
+        app = self.direct_api()
+        app.dependency_overrides[get_deletion] = lambda: DeleteExtraction(
+            self.catalog, graph, ExtractionFiles(self.root)
+        )
+        file_id = self.catalog.artifacts(first)[0]["id"]
+        with (
+            patch.object(settings, "ADMIN_API_KEY", SecretStr("test-only")),
+            TestClient(app) as client,
+        ):
+            path = f"/api/demograph/extractions/{first}"
+            self.assertEqual(client.delete(path).status_code, 401)
+            result = client.delete(path, headers={"X-API-Key": "test-only"})
+            self.assertEqual(result.status_code, 200, result.text)
+            self.assertEqual(result.json()["status"], "deleted")
+            self.assertEqual(
+                client.get(f"/api/demograph/artifacts/{file_id}/preview").status_code, 404
+            )
+            self.assertEqual(
+                client.delete(path, headers={"X-API-Key": "test-only"}).status_code, 404
+            )
+        self.assertFalse((self.root / first).exists())
+        self.assertTrue((self.root / other).exists())
+        self.assertEqual(self.catalog.datasets()[0]["total_versions"], 1)
+        self.assertEqual(self.catalog.schema()["nodes"][0]["label"], "Person")
+        graph.delete_extraction.assert_not_called()
+
+    def test_delete_failures_resume_after_graph_commit_and_protect_paths(self) -> None:
+        extraction = self.extract(["deputies"])
+        load_id = self.catalog.create("load", {}, extraction)
+        self.catalog.update(load_id, status="completed", finished=True)
+        graph = Mock()
+        graph.schema.return_value = {"nodes": [], "relationships": [], "constraints": []}
+        storage = ExtractionFiles(self.root)
+        deletion = DeleteExtraction(self.catalog, graph, storage)
+        with patch.object(storage, "delete_extraction", side_effect=PermissionError("test")):
+            with self.assertRaises(PermissionError):
+                deletion.execute(extraction)
+        self.assertEqual(self.catalog.run(extraction).status, "delete_failed")
+        self.assertTrue(self.catalog.run(extraction).progress["graph_deleted"])
+        with self.assertRaises(ValueError):
+            self.catalog.create("load", {}, extraction)
+        deletion.execute(extraction)
+        graph.delete_extraction.assert_called_once()
+        with self.assertRaises(LookupError):
+            self.catalog.run(load_id)
+        with self.assertRaises(ValueError):
+            storage.validate_deletion("..", [])
+        with self.assertRaises(ValueError):
+            storage.validate_deletion(extraction, [{"path": "../youtube/video.mp4"}])
+        with self.assertRaises(ValueError):
+            storage.validate_deletion(extraction, [{"path": "another-extraction/file.json"}])
+
+    def test_delete_refuses_active_runs_and_retains_files_on_graph_failure(self) -> None:
+        extraction = self.extract(["deputies"])
+        load_id = self.catalog.create("load", {}, extraction, status="running")
+        graph = Mock()
+        deletion = DeleteExtraction(self.catalog, graph, ExtractionFiles(self.root))
+        with self.assertRaises(ValueError):
+            deletion.execute(extraction)
+        graph.delete_extraction.assert_not_called()
+        self.catalog.update(load_id, status="failed")
+        graph.delete_extraction.side_effect = RuntimeError("Neo4j unavailable")
+        with self.assertRaises(RuntimeError):
+            deletion.execute(extraction)
+        self.assertTrue((self.root / extraction).exists())
+        self.assertEqual(self.catalog.run(extraction).status, "delete_failed")
+        self.assertFalse(self.catalog.run(extraction).progress.get("graph_deleted", False))
+        # An API restart can leave this stage; explicit deletion may resume it.
+        self.catalog.update(extraction, status="deleting")
+        graph.delete_extraction.side_effect = None
+        graph.schema.return_value = {"nodes": [], "relationships": [], "constraints": []}
+        deletion.execute(extraction)
+        self.assertFalse((self.root / extraction).exists())
 
     def test_storage_is_sibling_of_youtube(self) -> None:
         with (
@@ -278,6 +371,19 @@ class DemoGraphTest(unittest.TestCase):
         self.assertEqual(schema["records"], 4)
         self.assertFalse(any(self.root.rglob("*.part")))
         self.assertFalse(self.catalog.datasets()[0]["versions"][0]["last_load"])
+
+    def test_histories_and_topics_use_unpaginated_source_contracts(self) -> None:
+        run_id = self.extract(["histories", "topics"])
+        urls = [urlparse(url) for url in self.source.calls]
+        histories = [url for url in urls if url.path.endswith("/historico")]
+        topics = [url for url in urls if url.path.endswith("/temas")]
+        self.assertTrue(histories)
+        self.assertTrue(topics)
+        self.assertTrue(all(not url.query for url in [*histories, *topics]))
+        deputies = next(url for url in urls if url.path.endswith("/deputados"))
+        self.assertEqual(parse_qs(deputies.query), {"pagina": ["1"], "itens": ["100"]})
+        self.assertEqual(len(self.catalog.artifacts(run_id, "histories")), 1)
+        self.assertEqual(len(self.catalog.artifacts(run_id, "topics")), 3)
 
     def test_resume_reuses_registered_artifacts_and_detects_tampering(self) -> None:
         run_id = self.extract(["deputies"])
@@ -466,6 +572,109 @@ class DemoGraphTest(unittest.TestCase):
             self.assertEqual(
                 client.get("/api/demograph/datasets/deputies").json()["total_versions"], 1
             )
+
+    @unittest.skipUnless(
+        os.environ.get("DEMOGRAPH_TEST_NEO4J_URI"), "Dedicated Neo4j test database required"
+    )
+    def test_real_graph_delete_restores_shared_legacy_version_and_protects_foreign_edges(
+        self,
+    ) -> None:
+        graph = GraphLoader(
+            self.catalog,
+            self.root,
+            os.environ["DEMOGRAPH_TEST_NEO4J_URI"],
+            "neo4j",
+            os.environ["DEMOGRAPH_TEST_NEO4J_PASSWORD"],
+            "neo4j",
+        )
+        with graph.driver() as driver, driver.session() as session:
+            session.run("MATCH (n) DETACH DELETE n").consume()
+        try:
+            old = self.extract()
+            old_load = self.catalog.create("load", {}, old)
+            pipeline = Pipeline(self.catalog, self.extractor, graph)
+            pipeline.execute(old_load)
+            with patch(f"{__name__}.deputy", return_value=deputy(name="New version", party_id=20)):
+                newer = self.extract(["deputies"])
+            newer_load = self.catalog.create("load", {}, newer)
+            pipeline.execute(newer_load)
+            self.assertEqual(self.catalog.run(newer_load).status, "completed")
+            with graph.driver() as driver, driver.session() as session:
+                session.run(
+                    "MATCH (b:DemoGraphBatch {run_id: $id}) REMOVE b.payload_json, b.extraction_id",
+                    id=old_load,
+                ).consume()
+                session.run(
+                    "MATCH (p:Person {camara_id: 1}) MERGE (x:External {key: 'keep'}) "
+                    "MERGE (x)-[:KEEP]->(p)"
+                ).consume()
+                before = session.run("MATCH (b:DemoGraphBatch) RETURN count(b) AS n").single()["n"]
+            old_file = safe_path(self.root, self.catalog.artifacts(old)[0]["path"])
+            original_bytes = old_file.read_bytes()
+            old_file.write_bytes(b"tampered")
+            deletion = DeleteExtraction(self.catalog, graph, ExtractionFiles(self.root))
+            with self.assertRaises(ValueError):
+                deletion.execute(newer)
+            self.assertTrue((self.root / newer).exists())
+            with graph.driver() as driver, driver.session() as session:
+                self.assertEqual(
+                    session.run("MATCH (b:DemoGraphBatch) RETURN count(b) AS n").single()["n"],
+                    before,
+                )
+                self.assertEqual(
+                    session.run("MATCH (p:Person {camara_id: 1}) RETURN p.name AS name").single()[
+                        "name"
+                    ],
+                    "New version",
+                )
+            old_file.write_bytes(original_bytes)
+            deletion.execute(newer)
+            self.assertTrue((self.root / old).exists())
+            self.assertFalse((self.root / newer).exists())
+            with graph.driver() as driver, driver.session() as session:
+                self.assertEqual(
+                    session.run("MATCH (p:Person {camara_id: 1}) RETURN p.name AS name").single()[
+                        "name"
+                    ],
+                    "Deputado",
+                )
+                self.assertEqual(
+                    session.run(
+                        "MATCH (p:Person)-[:AFFILIATED_WITH]->(party) RETURN party.camara_id AS id"
+                    ).single()["id"],
+                    10,
+                )
+                self.assertEqual(
+                    session.run("MATCH ()-[r:VOTED_IN]->() RETURN count(r) AS n").single()["n"], 3
+                )
+                self.assertEqual(
+                    session.run(
+                        "MATCH (b:DemoGraphBatch) WHERE b.payload_json IS NULL RETURN count(b) AS n"
+                    ).single()["n"],
+                    0,
+                )
+            self.assertFalse(self.catalog.schema()["stale"])
+            deletion.execute(old)
+            self.assertEqual(self.catalog.schema()["nodes"], [])
+            with graph.driver() as driver, driver.session() as session:
+                self.assertEqual(
+                    session.run("MATCH (b:DemoGraphBatch) RETURN count(b) AS n").single()["n"], 0
+                )
+                self.assertEqual(
+                    session.run("MATCH ()-[r:VOTED_IN]->() RETURN count(r) AS n").single()["n"], 0
+                )
+                self.assertEqual(
+                    session.run(
+                        "MATCH (:External)-[r:KEEP]->(:Person) RETURN count(r) AS n"
+                    ).single()["n"],
+                    1,
+                )
+                self.assertEqual(
+                    session.run("MATCH (p:Party) RETURN count(p) AS n").single()["n"], 0
+                )
+        finally:
+            with graph.driver() as driver, driver.session() as session:
+                session.run("MATCH (n) DETACH DELETE n").consume()
 
     @unittest.skipUnless(
         os.environ.get("DEMOGRAPH_TEST_NEO4J_URI"), "Dedicated Neo4j test database required"

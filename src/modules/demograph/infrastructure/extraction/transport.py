@@ -45,8 +45,12 @@ class ChamberTransport:
         name: str,
         metadata: dict[str, Any],
         allow_missing: bool = False,
+        *,
+        pagination: bool = True,
     ) -> None:
-        url = f"{API}{endpoint}?pagina=1&itens=100"
+        url = f"{API}{endpoint}"
+        if pagination:
+            url += "?pagina=1&itens=100"
         seen: set[str] = set()
         fingerprints: set[str] = set()
         page = 1

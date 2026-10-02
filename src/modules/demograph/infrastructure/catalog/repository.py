@@ -1,7 +1,9 @@
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session as SqlSession
 from sqlalchemy.orm import sessionmaker
 
@@ -21,6 +23,14 @@ class SqlCatalog:
     def __init__(self, sessions: sessionmaker[SqlSession] = Session) -> None:
         self.sessions = sessions
 
+    @contextmanager
+    def graph_mutation(self) -> Iterator[SqlSession]:
+        # Serializable admission prevents write skew between starting a graph run
+        # and deleting an extraction. No advisory lock or execution worker is used.
+        with self.sessions.begin() as session:
+            session.connection(execution_options={"isolation_level": "SERIALIZABLE"})
+            yield session
+
     def create(
         self,
         operation: str,
@@ -30,7 +40,11 @@ class SqlCatalog:
         status: str = "queued",
     ) -> str:
         run_id = str(uuid4())
-        with self.sessions.begin() as session:
+        with self.graph_mutation() as session:
+            if operation in {"load", "pipeline", "schema"} and session.scalar(
+                select(RunModel.id).where(RunModel.status == "deleting").limit(1)
+            ):
+                raise ValueError("Wait for the extraction deletion to finish.")
             if operation == "load":
                 original = session.get(RunModel, extraction_id)
                 if original is None or original.operation not in {"extract", "pipeline"}:
@@ -38,6 +52,8 @@ class SqlCatalog:
                 if not original.progress.get("extraction_complete") or original.status in {
                     "queued",
                     "running",
+                    "deleting",
+                    "delete_failed",
                 }:
                     raise ValueError("Only a finished extraction can be loaded separately.")
                 parameters = dict(original.parameters)
@@ -279,12 +295,19 @@ class SqlCatalog:
             return items
 
     def retry(self, run_id: str, *, status: str = "queued") -> None:
-        with self.sessions.begin() as session:
+        with self.graph_mutation() as session:
             row = session.get(RunModel, run_id, with_for_update=True)
             if row is None:
                 raise LookupError("Run not found.")
             if row.status not in {"failed", "cancelled", "queued"}:
                 raise ValueError("Only pending, failed or cancelled runs can be resumed.")
+            original = session.get(RunModel, row.extraction_id)
+            if original and original.status in {"deleting", "delete_failed"}:
+                raise ValueError("The extraction is being deleted. Retry its deletion.")
+            if row.operation in {"pipeline", "load", "schema"} and session.scalar(
+                select(RunModel.id).where(RunModel.status == "deleting").limit(1)
+            ):
+                raise ValueError("Wait for the extraction deletion to finish.")
             row.status, row.cancel_requested, row.error = status, False, None
             row.stage = "starting" if status == "running" else "queued"
             row.finished_at = None
@@ -324,3 +347,58 @@ class SqlCatalog:
                 "relationships": row.schema_json["relationships"] if row else [],
                 "constraints": row.schema_json.get("constraints", []) if row else [],
             }
+
+    def begin_delete(self, extraction_id: str) -> dict[str, Any]:
+        with self.graph_mutation() as session:
+            original = session.get(RunModel, extraction_id, with_for_update=True)
+            if original is None or original.operation not in {"extract", "pipeline"}:
+                raise LookupError("Extraction not found.")
+            associated = list(
+                session.scalars(select(RunModel).where(RunModel.extraction_id == extraction_id))
+            )
+            if any(row.status == "running" for row in associated):
+                raise ValueError("Wait for execution or cancellation to finish before deleting.")
+            if session.scalar(
+                select(RunModel.id)
+                .where(
+                    RunModel.status.in_(["running", "deleting"]),
+                    RunModel.operation.in_(["pipeline", "load", "schema"]),
+                    RunModel.id != extraction_id,
+                )
+                .limit(1)
+            ):
+                raise ValueError("Wait for the current graph operation to finish before deleting.")
+            original.status, original.stage, original.schema_stale = "deleting", "delete", True
+            return {
+                "run_ids": [row.id for row in associated],
+                "artifacts": self.artifacts(extraction_id),
+                "graph_deleted": original.progress.get("graph_deleted", False),
+                "may_have_graph": any(row.operation in {"pipeline", "load"} for row in associated),
+            }
+
+    def finish_delete(self, extraction_id: str) -> None:
+        with self.sessions.begin() as session:
+            graph_changed = bool(
+                session.scalar(
+                    select(RunModel.id)
+                    .where(
+                        RunModel.extraction_id == extraction_id,
+                        RunModel.operation.in_(["pipeline", "load"]),
+                    )
+                    .limit(1)
+                )
+            )
+            ids = select(RunModel.id).where(RunModel.extraction_id == extraction_id)
+            session.execute(delete(IssueModel).where(IssueModel.run_id.in_(ids)))
+            # Observations describe the whole graph and become invalid after deletion.
+            if graph_changed:
+                session.execute(delete(SchemaModel))
+            else:
+                session.execute(delete(SchemaModel).where(SchemaModel.run_id.in_(ids)))
+            session.execute(
+                delete(ArtifactModel).where(ArtifactModel.extraction_id == extraction_id)
+            )
+            session.execute(delete(RunModel).where(RunModel.extraction_id == extraction_id))
+            if graph_changed:
+                for row in session.scalars(select(RunModel)):
+                    row.schema_stale = True

@@ -1,3 +1,4 @@
+import json
 import logging
 from pathlib import Path
 from threading import Event
@@ -197,13 +198,29 @@ class GraphLoader:
         ).consume()
         tx.run(
             "CREATE (b:DemoGraphBatch {key: $key, run_id: $run, artifact_id: $artifact, "
-            "records: $records, observed_at: $observed})",
+            "records: $records, observed_at: $observed, extraction_id: $extraction, "
+            "payload_json: $payload})",
             key=token,
             run=run.id,
             artifact=artifact["id"],
             records=len(batch),
             observed=observed,
+            extraction=run.extraction_id,
+            payload=json.dumps(
+                {
+                    "kind": kind,
+                    "number": number,
+                    "metadata": artifact["metadata_json"],
+                    "path": artifact["path"],
+                    "rows": batch,
+                }
+            ),
         ).consume()
+
+    def delete_extraction(self, extraction_id: str, run_ids: list[str]) -> dict[str, int]:
+        from src.modules.demograph.infrastructure.graph.deletion import delete_extraction
+
+        return delete_extraction(self, extraction_id, run_ids)
 
     def schema(self, run_id: str | None = None) -> dict[str, Any]:
         nodes: dict[str, SchemaObserver] = {}

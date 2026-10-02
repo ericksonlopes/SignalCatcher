@@ -348,8 +348,33 @@ out-of-period, duplicate, invalid and processed records, including per-dataset c
 Files are published atomically beneath `<storage>/<extraction-id>/<dataset>/`, with SHA-256,
 source URL, collection time, encoding and extractor version in PostgreSQL. JSON artifacts retain
 the source envelope and pagination links. A 404 topic resource is explicitly cataloged as
-unavailable, with an issue; it does not mean the proposition has no topics. Successful extraction
+unavailable, with an issue. Current deputy lists use `pagina`/`itens`, while deputy
+histories and proposition topics are requested without those unsupported parameters;
+these endpoints return their complete collections. A 404 topic resource does not mean
+the proposition has no topics. Successful extraction
 files survive load failures and can be loaded separately. No automatic file deletion occurs.
+
+To remove data, open a version in the DemoGraph catalog and click **Delete extraction**.
+The confirmation identifies the entire extraction: all its datasets/files, its related
+load runs and corresponding graph data. `DELETE /api/demograph/extractions/{id}` uses
+the administrative API key. Active executions must finish (or finish cancellation) first.
+The deletion runs directly in the API, without a worker or advisory lock.
+
+Neo4j batches now retain their mapped rows and source metadata. Deleting a version
+replays the remaining confirmed batches in snapshot order in one Neo4j transaction,
+restoring older shared records instead of deleting records required by other versions.
+Foreign relationships and the nodes they protect remain intact. This reconstruction
+can take time on large graphs; do not start another graph operation during deletion.
+Older receipts are recovered from their original checksum-verified files before mutation;
+missing or modified files abort deletion without changing the graph.
+
+Graph deletion commits before filesystem removal. Only the selected UUID directory
+under DemoGraph storage is removed (including unfinished downloads), followed by its
+catalog artifacts, issues and runs. A filesystem/Neo4j failure keeps the catalog entry
+as **Deletion pending**; click **Retry deletion** after correcting the problem. Retrying
+also recovers an interrupted deletion and skips graph work already confirmed. Refresh
+the graph schema if its observation failed after deletion. No SQL migration is required
+for this feature; deploy the updated backend and frontend together.
 
 Executions and artifacts remain cataloged in PostgreSQL, while processing runs as a
 background task owned by the API request. There is no global execution lock and no

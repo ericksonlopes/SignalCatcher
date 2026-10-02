@@ -22,6 +22,8 @@ def create_run(
         logger.info(f"Created run {run_id} with operation {body.operation}")
         background.add_task(pipeline.execute, run_id)
         return {"id": run_id, "status": "running"}
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
     except Exception as exc:
         logger.error(f"Failed to create run: {exc}", exc_info=True)
         raise HTTPException(500, "Internal server error") from exc

@@ -89,3 +89,24 @@ Validate Compose syntax with `docker compose -f <file> config --quiet`, using
 dummy values for required interpolation variables. Do not print resolved config
 containing real credentials. A successful config check does not prove Raspberry
 deployment, external network existence or available memory.
+
+## Extraction deletion
+
+Deploy backend and frontend together; this feature needs no SQL migration. Deletion
+is manual per version, including all files/datasets and associated load runs. Finish
+active executions first. Keep the API alive while the synchronous request reconstructs
+remaining Neo4j batches in one transaction. Foreign edges and their nodes survive.
+Large graphs require time/memory for reconstruction.
+
+Legacy receipts are recovered from verified original artifacts before changing the
+graph. If recovery fails, retain files and catalog, repair the source artifacts and
+retry. `delete_failed` and an interrupted `deleting` stage can both be resumed through
+the same DELETE endpoint/button. A successful graph checkpoint prevents repeated
+graph work when physical directory removal needs retry. Schema observation failure
+requires manual Refresh schema after successful removal. Never purge the SQL catalog
+before Neo4j and files have been handled.
+
+Deletion tests cover authorization, active runs, path isolation, files/catalog removal,
+graph and filesystem failures, retry checkpoints, interrupted deletion, preserving
+other versions, legacy tamper checks, restoration of shared snapshots and foreign
+relationship protection. Integration tests use only disposable PostgreSQL/Neo4j.

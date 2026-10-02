@@ -1,6 +1,6 @@
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 
 from src.modules.demograph.presentation.dependencies.catalog import CatalogDep
 from src.modules.demograph.presentation.dependencies.pipeline import PipelineDep
@@ -17,6 +17,9 @@ def schema(catalog: CatalogDep) -> dict[str, Any]:
 def refresh_schema(
     catalog: CatalogDep, pipeline: PipelineDep, background: BackgroundTasks
 ) -> dict[str, str]:
-    run_id = catalog.create("schema", {"datasets": []}, status="running")
+    try:
+        run_id = catalog.create("schema", {"datasets": []}, status="running")
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
     background.add_task(pipeline.execute, run_id)
     return {"id": run_id, "status": "running"}

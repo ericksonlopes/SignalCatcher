@@ -16,5 +16,6 @@ def extract(source: "ChamberTransport", run: Run, dataset: str) -> None:
             f"deputados/{person_id}/historico",
             str(person_id),
             {"person_id": person_id},
+            pagination=False,
         )
         source.catalog.progress(run.id, resources_done=index + 1, resources_total=len(ids))
