@@ -1,9 +1,10 @@
+import logging
 import signal
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 from threading import Event
 
-from sqlalchemy import select, text
+from sqlalchemy import Connection, select, text
 
 from src.core.config.settings import settings
 from src.core.database.connector import Session, engine
@@ -14,6 +15,21 @@ from src.modules.demograph.infrastructure.models import RunModel, WorkerModel
 from src.modules.demograph.presentation.dependencies.providers import get_graph
 
 LOCK_ID = 73401953
+logger = logging.getLogger(__name__)
+
+
+def wait_for_lock(connection: Connection, stopped: Event, interval: float = 5) -> bool:
+    waiting = False
+    while not stopped.is_set():
+        if connection.execute(text("SELECT pg_try_advisory_lock(:key)"), {"key": LOCK_ID}).scalar():
+            if waiting:
+                logger.warning("DemoGraph worker acquired the lock; processing the queue.")
+            return True
+        if not waiting:
+            logger.warning("Another DemoGraph worker is active; waiting for its database lock.")
+            waiting = True
+        stopped.wait(interval)
+    return False
 
 
 def main() -> None:
@@ -27,18 +43,18 @@ def main() -> None:
     graph.guard_adapter.stopped = stopped
     pipeline = Pipeline(catalog, ChamberExtractor(catalog, root, stopped), graph)
     with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as connection:
-        if not connection.execute(
-            text("SELECT pg_try_advisory_lock(:key)"), {"key": LOCK_ID}
-        ).scalar():
-            raise RuntimeError("Another DemoGraph worker owns this database.")
-        with Session.begin() as session:
-            for row in session.scalars(select(RunModel).where(RunModel.status == "running")):
-                row.status = "queued"
-            if session.get(WorkerModel, "worker") is None:
-                session.add(WorkerModel(id="worker"))
+        if not wait_for_lock(connection, stopped):
+            return
         future: Future[None] | None = None
         with ThreadPoolExecutor(max_workers=1) as executor:
             try:
+                with Session.begin() as session:
+                    for row in session.scalars(
+                        select(RunModel).where(RunModel.status == "running")
+                    ):
+                        row.status = "queued"
+                    if session.get(WorkerModel, "worker") is None:
+                        session.add(WorkerModel(id="worker"))
                 while not stopped.is_set():
                     # This dedicated connection must keep the session-level advisory lock.
                     owns_lock = connection.execute(

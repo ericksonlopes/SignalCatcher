@@ -296,6 +296,59 @@ class DemoGraphTest(unittest.TestCase):
             )
             connection.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": worker.LOCK_ID})
 
+    @unittest.skipUnless(os.environ.get("DEMOGRAPH_TEST_SQL_URL"), "Dedicated PostgreSQL required")
+    def test_worker_waits_for_lock_then_takes_over_and_can_stop_waiting(self) -> None:
+        from src.modules.demograph.presentation.workers import pipeline as worker
+
+        waiting = threading.Event()
+        stopped = threading.Event()
+        acquired: list[bool] = []
+        failures: list[Exception] = []
+
+        def contender() -> None:
+            try:
+                with self.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+                    acquired.append(worker.wait_for_lock(conn, stopped, interval=0.05))
+                    conn.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": worker.LOCK_ID})
+            except Exception as exc:
+                failures.append(exc)
+
+        with self.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as owner:
+            self.assertTrue(
+                owner.execute(
+                    text("SELECT pg_try_advisory_lock(:key)"), {"key": worker.LOCK_ID}
+                ).scalar()
+            )
+            thread = threading.Thread(target=contender)
+            with patch.object(worker.logger, "warning", side_effect=lambda *_: waiting.set()):
+                try:
+                    thread.start()
+                    self.assertTrue(waiting.wait(3), "Contender did not enter standby")
+                    self.assertEqual(acquired, [])
+                    owner.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": worker.LOCK_ID})
+                    thread.join(3)
+                    self.assertFalse(thread.is_alive())
+                    self.assertEqual(failures, [])
+                    self.assertEqual(acquired, [True])
+                finally:
+                    stopped.set()
+                    thread.join(3)
+                    owner.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": worker.LOCK_ID})
+
+        cancellation = threading.Event()
+        with self.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as owner:
+            owner.execute(text("SELECT pg_advisory_lock(:key)"), {"key": worker.LOCK_ID})
+            try:
+                with (
+                    self.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn,
+                    patch.object(
+                        worker.logger, "warning", side_effect=lambda *_: cancellation.set()
+                    ),
+                ):
+                    self.assertFalse(worker.wait_for_lock(conn, cancellation))
+            finally:
+                owner.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": worker.LOCK_ID})
+
     def test_extraction_publishes_full_files_schema_and_does_not_require_neo4j(self) -> None:
         run_id = self.extract()
         artifacts = self.catalog.artifacts(run_id)

@@ -347,7 +347,10 @@ unavailable, with an issue; it does not mean the proposition has no topics. Succ
 files survive load failures and can be loaded separately. No automatic file deletion occurs.
 
 The PostgreSQL queue survives restarts. One dedicated worker holds an advisory lock, updates
-its heartbeat and processes one run at a time. Cancellation is checked between streamed chunks,
+its heartbeat and processes one run at a time. Extra worker instances wait for the
+database lock instead of crashing;
+they take over when the current owner releases it. A waiting instance does not reset runs
+or update the active worker's heartbeat. Cancellation is checked between streamed chunks,
 pages and batches. Resume reuses completed source artifacts after verifying their checksums.
 Each Neo4j batch stores a receipt in the same transaction as its data, so a lost PostgreSQL
 checkpoint does not duplicate writes. Load errors can leave confirmed batches in the graph;
