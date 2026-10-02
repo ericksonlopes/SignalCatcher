@@ -19,7 +19,9 @@ Read `src/core/config/settings.py`, `.env.example`, `docker-compose.yml` and
 
 The worker owns a dedicated PostgreSQL advisory lock (currently `73401953`),
 processes one run at a time and maintains heartbeat independently of the long
-task. Its dedicated lock connection must stay alive. Stop processing on lock loss;
+task. Extra instances wait cooperatively for the lock instead of exiting, and
+start processing only after acquisition; waiting instances must not reset runs
+or update/clear the active heartbeat. Its dedicated lock connection must stay alive. Stop processing on lock loss;
 finish/shut down the executor before releasing the lock. Preserve cancellation
 checks during long downloads, scans and graph batches.
 
