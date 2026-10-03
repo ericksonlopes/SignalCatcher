@@ -1,25 +1,17 @@
 # Overlay: docker compose -f docker-compose.yml -f docker-compose.local.yml up --build -d
 # Requires Docker Compose >= 2.24.4 for !override.
 services:
-  demograph-storage-init:
-    volumes: !override
-      - ./youtube:/youtube
-      - ./demograph:/demograph
-
   migrate:
     volumes: !override
       - ./youtube:/youtube
-      - ./demograph:/demograph
 
   worker:
     volumes: !override
       - ./youtube:/youtube
-      - ./demograph:/demograph
 
   app:
     volumes: !override
       - ./youtube:/youtube
-      - ./demograph:/demograph
     ports: !override
       - "8000:8000"
 

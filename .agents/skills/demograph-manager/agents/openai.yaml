@@ -1,4 +1,0 @@
-interface:
-  display_name: "DemoGraph Manager"
-  short_description: "Gerencie mudanças no DemoGraph e suas integrações"
-  default_prompt: "Use $demograph-manager para implementar a mudança solicitada no módulo DemoGraph."

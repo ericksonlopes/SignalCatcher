@@ -19,27 +19,14 @@ x-backend: &backend
     RETRY_MAX_SECONDS: ${RETRY_MAX_SECONDS:-86400}
     WORKER_HEARTBEAT_MAX_AGE: ${WORKER_HEARTBEAT_MAX_AGE:-60}
     FFMPEG_LOCATION: ${FFMPEG_LOCATION:-}
-    DEMOGRAPH_STORAGE_PATH: /demograph
-    DEMOGRAPH_HTTP_CONCURRENCY: ${DEMOGRAPH_HTTP_CONCURRENCY:-4}
-    DEMOGRAPH_NEO4J_URI: ${DEMOGRAPH_NEO4J_URI:-}
-    DEMOGRAPH_NEO4J_USER: ${DEMOGRAPH_NEO4J_USER:-neo4j}
-    DEMOGRAPH_NEO4J_PASSWORD: ${DEMOGRAPH_NEO4J_PASSWORD:-}
-    DEMOGRAPH_NEO4J_DATABASE: ${DEMOGRAPH_NEO4J_DATABASE:-neo4j}
     VOICE_MONKEY_API_TOKEN: ${VOICE_MONKEY_API_TOKEN:-}
     VOICE_MONKEY_NEW_VIDEO_FOR_DOWNLOAD_MONKEY_ID: ${VOICE_MONKEY_NEW_VIDEO_FOR_DOWNLOAD_MONKEY_ID:-}
   volumes:
     - /media/eriberry/SSD_1/youtube:/youtube
-    - /media/eriberry/SSD_1/demograph:/demograph
   networks:
     - shared_postgres_network
 
 services:
-  demograph-storage-init:
-    <<: *backend
-    user: "0:0"
-    command: ["python", "-m", "src.modules.demograph.presentation.workers.prepare_storage"]
-    restart: "no"
-
   migrate:
     <<: *backend
     command: ["alembic", "upgrade", "head"]
@@ -52,8 +39,6 @@ services:
       - "5001:8000"
     depends_on:
       migrate:
-        condition: service_completed_successfully
-      demograph-storage-init:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8000/ready"]

@@ -1,1 +1,0 @@
-"""Framework-independent DemoGraph contracts."""

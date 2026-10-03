@@ -1,6 +1,0 @@
-from typing import Any, Protocol
-
-
-class ExtractionStorage(Protocol):
-    def validate_deletion(self, extraction_id: str, artifacts: list[dict[str, Any]]) -> None: ...
-    def delete_extraction(self, extraction_id: str) -> None: ...
