@@ -1,4 +1,4 @@
-from pydantic import Field, SecretStr
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import URL
 
@@ -41,7 +41,6 @@ class Settings(BaseSettings):
     # The default only covers local development. Deployments that serve a frontend from
     # another host have to set this explicitly.
     CORS_ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
-    ADMIN_API_KEY: SecretStr | None = None
     PROCESSING_LEASE_SECONDS: int = Field(default=300, ge=60)
     MAX_PROCESSING_ATTEMPTS: int = Field(default=5, ge=1, le=100)
     RETRY_BASE_SECONDS: int = Field(default=300, ge=1)

@@ -1,10 +1,9 @@
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from sqlalchemy import func
 
-from src.core.api.security import require_metrics_admin
 from src.core.config.settings import settings
 from src.core.database.connector import Session
 from src.core.database.job_control import WORKER_ID, JobControlModel
@@ -13,7 +12,7 @@ from src.modules.youtube.infrastructure.repositories.models.youtube_content_mode
     YoutubeContentModel,
 )
 
-router = APIRouter(dependencies=[Depends(require_metrics_admin)])
+router = APIRouter()
 
 
 @router.get("/metrics", tags=["Operations"])

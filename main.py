@@ -1,12 +1,11 @@
 import logging
 
-from fastapi import Depends, FastAPI
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 
 from src.core.api.health import readiness
 from src.core.api.metrics import router as metrics_router
-from src.core.api.security import require_admin
 from src.core.config.settings import settings
 from src.core.logger.logger import logger
 from src.modules.diarization.presentation.api.routes import diarization_router
@@ -28,9 +27,9 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "X-API-Key"],
 )
-app.include_router(youtube_router, prefix="/api/youtube", dependencies=[Depends(require_admin)])
+app.include_router(youtube_router, prefix="/api/youtube")
 app.include_router(
-    diarization_router, prefix="/api/diarization", dependencies=[Depends(require_admin)]
+    diarization_router, prefix="/api/diarization"
 )
 app.include_router(metrics_router)
 
