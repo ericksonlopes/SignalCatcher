@@ -4,8 +4,6 @@ from typing import Annotated
 from fastapi import HTTPException, Request, Security
 from fastapi.security import APIKeyHeader
 
-from src.core.config.settings import settings
-
 admin_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
