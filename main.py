@@ -28,9 +28,7 @@ app.add_middleware(
     allow_headers=["Content-Type", "X-API-Key"],
 )
 app.include_router(youtube_router, prefix="/api/youtube")
-app.include_router(
-    diarization_router, prefix="/api/diarization"
-)
+app.include_router(diarization_router, prefix="/api/diarization")
 app.include_router(metrics_router)
 
 
