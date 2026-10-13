@@ -4,11 +4,11 @@ import sys
 from logging.config import fileConfig
 from pathlib import Path
 
-from alembic import context
 from alembic.autogenerate import rewriter
 from alembic.operations import ops
 from sqlalchemy import engine_from_config, pool, text
 
+from alembic import context
 from src.core.config.settings import settings
 from src.core.database.connector import Base
 from src.core.database.job_control import JobControlModel  # noqa: F401
@@ -40,7 +40,7 @@ def _import_models_from_package(package_name: str) -> None:
 # 1. Models from core/shared repositories
 _import_models_from_package("src.core.database")
 
-# 2. Models exclusively from modular repositories: src.modules.<module>.infrastructure.repositories.models
+# 2. Modular models: src.modules.<module>.infrastructure.repositories.models
 modules_dir = project_root / "src" / "modules"
 if modules_dir.exists():
     for module_path in modules_dir.iterdir():
@@ -92,7 +92,9 @@ def _heal_orphaned_revisions(connection) -> None:
     """If the database alembic_version points to a removed revision (e.g. removed module),
     reset it to the current available head to avoid 'Can't locate revision' errors."""
     try:
-        result = connection.execute(text("SELECT version_num FROM alembic_version LIMIT 1")).scalar()
+        result = connection.execute(
+            text("SELECT version_num FROM alembic_version LIMIT 1")
+        ).scalar()
         if not result:
             return
 
@@ -132,7 +134,9 @@ def run_migrations_offline() -> None:
     Calls to context.execute() here emit the given string to the
     script output.
     """
-    tracker = MigrationModelTracker(target_metadata=target_metadata, database_url=settings.database_url)
+    tracker = MigrationModelTracker(
+        target_metadata=target_metadata, database_url=settings.database_url
+    )
     tracker.print_offline_report()
 
     context.configure(
