@@ -51,6 +51,8 @@ class MigrationModelTracker:
 
     def _capture_tables_before(self) -> None:
         """Capture database table names prior to running migrations."""
+        if self.connection is None:
+            return
         try:
             inspector = inspect(self.connection)
             self.tables_before = set(inspector.get_table_names())
@@ -111,13 +113,13 @@ class MigrationModelTracker:
                 logger.info(f"Dropping table '{table_name}'{clause}")
             return orig_drop_table(op_self, *args, **kwargs)
 
-        Operations.create_table = wrapped_create_table
-        Operations.drop_table = wrapped_drop_table
+        setattr(Operations, "create_table", wrapped_create_table)
+        setattr(Operations, "drop_table", wrapped_drop_table)
         try:
             yield
         finally:
-            Operations.create_table = orig_create_table
-            Operations.drop_table = orig_drop_table
+            setattr(Operations, "create_table", orig_create_table)
+            setattr(Operations, "drop_table", orig_drop_table)
 
     def _extract_module_origin(self, model_cls: type) -> str:
         """Extract a readable origin/module name from the model class module path."""
