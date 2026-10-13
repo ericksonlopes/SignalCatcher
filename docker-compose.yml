@@ -7,7 +7,6 @@ x-backend: &backend
     POSTGRES_HOST: ${POSTGRES_HOST:-postgresql}
     POSTGRES_DATABASE: ${POSTGRES_DATABASE:-signalcatcher}
     DOWNLOAD_YOUTUBE_PATH: /youtube
-    ADMIN_API_KEY: ${ADMIN_API_KEY:?Configure ADMIN_API_KEY}
     LIST_LOG_LEVELS: ${LIST_LOG_LEVELS:-ERROR,WARNING,INFO}
     CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
     DIARIZATION_API_URL: ${DIARIZATION_API_URL:-http://diarization:8001}

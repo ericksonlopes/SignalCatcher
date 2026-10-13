@@ -25,7 +25,7 @@ app.add_middleware(
     allow_origins=settings.cors_origin_list,
     allow_credentials=False,
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "X-API-Key"],
+    allow_headers=["Content-Type"],
 )
 app.include_router(youtube_router, prefix="/api/youtube")
 app.include_router(diarization_router, prefix="/api/diarization")

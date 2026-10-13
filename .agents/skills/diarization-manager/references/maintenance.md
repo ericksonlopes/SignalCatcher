@@ -27,7 +27,6 @@ Sob `src/modules/diarization/`:
 
 Fora do módulo:
 - `main.py` monta `/api/diarization` com `require_admin`.
-- `src/core/api/security.py` exige `X-API-Key` nas mutações; chave vem de `ADMIN_API_KEY`.
 - `src/modules/youtube/infrastructure/repositories/models/step_tracking_model.py`
   implementa o helper usado pelos listeners do model da API.
 - `alembic/versions/`: procure as revisões de progress, worker lease e queue priority;

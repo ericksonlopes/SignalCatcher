@@ -41,11 +41,7 @@ POSTGRES_PASSWORD=your_password
 POSTGRES_HOST=localhost
 POSTGRES_DATABASE=signalcatcher
 DOWNLOAD_YOUTUBE_PATH=./youtube
-ADMIN_API_KEY=your_long_random_key
 ```
-
-Generate the administrative key locally, for example with
-`python -c "import secrets; print(secrets.token_urlsafe(32))"`. Keep `.env` untracked.
 
 Install dependencies and apply migrations:
 
@@ -67,23 +63,14 @@ uv run uvicorn main:app --host 127.0.0.1 --port 8000
 Swagger is at `http://127.0.0.1:8000/docs`. The API can serve read requests without a
 worker, but `/ready` returns 503 and queued media requests wait until a worker is ready.
 
-### Administrative access
+### Access
 
-POST, PATCH and DELETE operations under `/api/youtube` and `/api/diarization` require
-`X-API-Key`, compared against `ADMIN_API_KEY`. `/metrics` requires the same key.
-Reads remain available without an administrative key. Missing server configuration
-returns 503 for administrative operations; a missing/incorrect request key returns 401.
-Use HTTPS when accessing the API over an untrusted network.
-
-The sibling `SignalCatcherFrontend` project lets users enter the key in **Settings**.
-It stores the key for that browser tab and attaches the header to administrative calls.
-Never set the key as a `VITE_*` variable or embed it in frontend source/builds.
-Set `VITE_API_BASE_URL` to the API URL. The frontend **Operations** tab shows live
+The API does not require an API key. Restrict network access (reverse proxy/firewall)
+as needed. Set `VITE_API_BASE_URL` to the API URL. The frontend **Operations** tab shows live
 worker/queue/job telemetry and queues manual runs through the API.
 
 ```sh
-curl -X POST http://localhost:8000/api/youtube/scheduler/jobs/youtube_extract_and_download/run \
-  -H "X-API-Key: YOUR_KEY"
+curl -X POST http://localhost:8000/api/youtube/scheduler/jobs/youtube_extract_and_download/run
 ```
 
 ## Docker
@@ -210,7 +197,6 @@ All settings are documented in `.env.example` and validated by Pydantic Settings
 | --- | --- |
 | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST`, `POSTGRES_DATABASE` | Required database connection |
 | `DOWNLOAD_YOUTUBE_PATH` | Required download root |
-| `ADMIN_API_KEY` | Administrative writes and telemetry; no default credential |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:3000,http://localhost:5173` |
 | `PROCESSING_LEASE_SECONDS` | 300; minimum 60 |
 | `MAX_PROCESSING_ATTEMPTS` | 5 |
