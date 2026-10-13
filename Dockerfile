@@ -31,7 +31,8 @@ RUN uv sync --frozen
 ENV PATH="/app/.venv/bin:$PATH"
 
 RUN groupadd --gid 1000 appuser \
-    && useradd --uid 1000 --gid 1000 --no-create-home appuser \    && chown -R appuser:appuser /app
+    && useradd --uid 1000 --gid 1000 --no-create-home appuser \
+    && chown -R appuser:appuser /app
 
 USER appuser
 
