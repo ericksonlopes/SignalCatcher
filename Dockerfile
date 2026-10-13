@@ -3,6 +3,9 @@ FROM python:3.12-slim
 ENV PYTHONUNBUFFERED=1 \
     DEBIAN_FRONTEND=noninteractive \
     UV_COMPILE_BYTECODE=1 \
+    UV_CACHE_DIR=/tmp/uv-cache \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never \
     PATH="/app/.venv/bin:$PATH"
 
 # Copy pre-built fast uv binary directly from official image (avoids pip install overhead)
