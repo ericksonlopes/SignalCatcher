@@ -156,7 +156,7 @@ stateDiagram-v2
 - **Orphan Cleanup:** The worker checks reservations every 30 seconds. Expired leases without active heartbeats are immediately reset to pending.
 - **Partial Downloads:** Interrupted downloads in `nopart` mode are detected and cleanly replaced on subsequent attempts.
 - **Exponential Backoff:** Failures trigger backoff starting at 300 seconds up to 86,400 seconds (24 hours), with a hard limit of 5 automatic retry attempts per cycle.
-- **Restricted Classifications:** Videos with special restrictions are classified into terminal or dormant states (`MEMBERS_ONLY`, `AGE_RESTRICTED`, `PRIVATE_VIDEO`, `COPYRIGHT_REMOVED`, `ACCOUNT_TERMINATED`, `VIDEO_REMOVED`).
+- **Restricted Classifications:** Videos with special restrictions are classified into terminal or dormant states (`MEMBERS_ONLY`, `AGE_RESTRICTED`, `PRIVATE_VIDEO`, `COPYRIGHT_REMOVED`, `ACCOUNT_TERMINATED`, `VIDEO_REMOVED`, `COURT_ORDER`).
 
 ---
 

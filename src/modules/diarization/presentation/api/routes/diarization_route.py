@@ -2,12 +2,8 @@ import math
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
 
 from src.core.logger.logger import logger
-from src.modules.diarization.application.dtos.diarization_card_dto import (
-    DiarizationCardDTO,
-)
 from src.modules.diarization.application.use_cases.diarization_commands import (
     DiarizationCommands,
 )
@@ -18,6 +14,12 @@ from src.modules.diarization.domain.enums.diarization_step import DiarizationSte
 from src.modules.diarization.presentation.api.dependencies import (
     get_diarization_commands,
     get_diarization_queries,
+)
+from src.modules.diarization.presentation.api.models.requests.diarization_request import (
+    DiarizationRequest,
+)
+from src.modules.diarization.presentation.api.models.responses.paginated_diarization_response import (
+    PaginatedDiarizationResponse,
 )
 from src.modules.youtube.application.use_cases.content.content_queries import (
     ContentQueries,
@@ -31,23 +33,6 @@ router = APIRouter()
 # handlers.
 TASK_NOT_FOUND_DETAIL = "Diarization task not found"
 CONTENT_NOT_FOUND_DETAIL = "Content not found"
-
-
-class DiarizationRequest(BaseModel):
-    language: str | None = "en"
-    start_now: bool = False
-
-
-class PaginatedDiarizationResponse(BaseModel):
-    items: list[DiarizationCardDTO]
-    # Same payload under two keys, kept for backwards compatibility with the frontend.
-    diarizations: list[DiarizationCardDTO]
-    total: int
-    page: int
-    limit: int
-    total_pages: int
-    status_counts: dict[str, int] | None = None
-    total_status_count: int | None = None
 
 
 @router.post(

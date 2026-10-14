@@ -32,6 +32,7 @@ Qualquer estado pode transicionar para os seguintes estados de erro:
 | `COPYRIGHT_REMOVED` | Removido por reclamação de copyright | Não |
 | `ACCOUNT_TERMINATED` | Conta do canal encerrada pelo YouTube | Não |
 | `VIDEO_REMOVED` | Removido pelo uploader | Não |
+| `COURT_ORDER` | Bloqueado no domínio do país por ordem judicial | Não |
 | `DELETED` | Deletado manualmente pelo usuário | N/A |
 | `ERROR` | Erro genérico de execução | Sim |
 | `REPROCESSING` | Vídeo em fila de retry manual | Sim |

@@ -21,6 +21,8 @@ def classify_youtube_error(error_msg: str) -> ContentStep:
         return ContentStep.COPYRIGHT_REMOVED
     elif "account associated with this video has been terminated" in error_lower:
         return ContentStep.ACCOUNT_TERMINATED
+    elif "due to a court order" in error_lower or "court order" in error_lower:
+        return ContentStep.COURT_ORDER
     elif (
         "premieres in" in error_lower
         or "premiere will begin" in error_lower
