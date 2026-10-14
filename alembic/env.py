@@ -109,15 +109,6 @@ def _heal_orphaned_revisions(connection) -> None:
                     text("UPDATE alembic_version SET version_num = :head"),
                     {"head": target_head},
                 )
-                for table in (
-                    "demograph_worker",
-                    "demograph_schemas",
-                    "demograph_issues",
-                    "demograph_artifacts",
-                    "demograph_runs",
-                    "demograph_datasets",
-                ):
-                    connection.execute(text(f"DROP TABLE IF EXISTS {table} CASCADE"))
                 connection.commit()
     except Exception:
         pass
