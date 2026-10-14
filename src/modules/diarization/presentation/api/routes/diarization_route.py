@@ -15,10 +15,8 @@ from src.modules.diarization.presentation.api.dependencies import (
     get_diarization_commands,
     get_diarization_queries,
 )
-from src.modules.diarization.presentation.api.models.requests.diarization_request import (
+from src.modules.diarization.presentation.api.models import (
     DiarizationRequest,
-)
-from src.modules.diarization.presentation.api.models.responses.paginated_diarization_response import (
     PaginatedDiarizationResponse,
 )
 from src.modules.youtube.application.use_cases.content.content_queries import (
