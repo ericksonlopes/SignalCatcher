@@ -12,14 +12,13 @@ ENV PYTHONUNBUFFERED=1 \
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # ffmpeg is required for yt-dlp stream merging. curl for container healthcheck.
+# Application user and working directory created in the same layer.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
     ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
-
-# Create application user and working directory early
-RUN groupadd --gid 1000 appuser \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 1000 appuser \
     && useradd --uid 1000 --gid 1000 --no-create-home appuser \
     && mkdir -p /app \
     && chown -R appuser:appuser /app
@@ -32,13 +31,13 @@ WORKDIR /app
 USER appuser
 
 # Dependencies layer (cached unless pyproject.toml / uv.lock changes)
-COPY --chown=appuser:appuser pyproject.toml uv.lock README.md ./
+COPY --chown=root:root --chmod=644 pyproject.toml uv.lock README.md ./
 RUN uv sync --frozen --no-install-project
 
 # Application code layer
-COPY --chown=appuser:appuser src ./src
-COPY --chown=appuser:appuser alembic ./alembic
-COPY --chown=appuser:appuser alembic.ini main.py worker.py ./
+COPY --chown=root:root --chmod=755 src ./src
+COPY --chown=root:root --chmod=755 alembic ./alembic
+COPY --chown=root:root --chmod=644 alembic.ini main.py worker.py ./
 
 RUN uv sync --frozen
 

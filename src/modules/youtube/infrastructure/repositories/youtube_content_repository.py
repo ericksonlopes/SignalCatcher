@@ -198,6 +198,37 @@ class YoutubeContentRepository(IYoutubeContentRepository):
             )
             raise
 
+    @staticmethod
+    def _validate_lease(model: YoutubeContentModel, token: str | None) -> None:
+        if token:
+            if (
+                model.lease_token != token
+                or model.lease_expires_at is None
+                or model.lease_expires_at <= datetime.now(timezone.utc)
+            ):
+                raise LeaseLostError("Content reservation no longer belongs to this executor.")
+        elif model.lease_token or model.deletion_requested:
+            raise ContentBusyError("Content is reserved or awaiting deletion.")
+
+    @staticmethod
+    def _update_step_state(model: YoutubeContentModel) -> None:
+        if model.step is ContentStep.ERROR or (model.deletion_requested and model.error_info):
+            attempts = (
+                model.deletion_attempt_count if model.deletion_requested else model.attempt_count
+            )
+            delay = min(
+                settings.RETRY_BASE_SECONDS * 2 ** max(0, min(int(attempts) - 1, 30)),
+                settings.RETRY_MAX_SECONDS,
+            )
+            model.next_retry_at = datetime.now(timezone.utc) + timedelta(seconds=delay)
+        if model.step is ContentStep.COMPLETED and not model.deletion_requested:
+            model.attempt_count = 0
+            model.next_retry_at = None
+        if model.step is ContentStep.DELETED:
+            model.deletion_requested = False
+            model.file_path = None
+            model.next_retry_at = None
+
     def update(self, youtube_content_entity: YoutubeContentEntity) -> YoutubeContentEntity:
         try:
             # Find the existing model
@@ -211,16 +242,7 @@ class YoutubeContentRepository(IYoutubeContentRepository):
             if not model:
                 raise ValueError(f"Content with id {youtube_content_entity.id} not found.")
 
-            token = youtube_content_entity.lease_token
-            if token:
-                if (
-                    model.lease_token != token
-                    or model.lease_expires_at is None
-                    or model.lease_expires_at <= datetime.now(timezone.utc)
-                ):
-                    raise LeaseLostError("Content reservation no longer belongs to this executor.")
-            elif model.lease_token or model.deletion_requested:
-                raise ContentBusyError("Content is reserved or awaiting deletion.")
+            self._validate_lease(model, youtube_content_entity.lease_token)
 
             # Update the model fields
             model.title = youtube_content_entity.title
@@ -236,24 +258,8 @@ class YoutubeContentRepository(IYoutubeContentRepository):
             model.file_path = youtube_content_entity.file_path
             model.error_info = youtube_content_entity.error_info
             model.published_at = youtube_content_entity.published_at
-            if model.step is ContentStep.ERROR or (model.deletion_requested and model.error_info):
-                attempts = (
-                    model.deletion_attempt_count
-                    if model.deletion_requested
-                    else model.attempt_count
-                )
-                delay = min(
-                    settings.RETRY_BASE_SECONDS * 2 ** max(0, min(int(attempts) - 1, 30)),
-                    settings.RETRY_MAX_SECONDS,
-                )
-                model.next_retry_at = datetime.now(timezone.utc) + timedelta(seconds=delay)
-            if model.step is ContentStep.COMPLETED and not model.deletion_requested:
-                model.attempt_count = 0
-                model.next_retry_at = None
-            if model.step is ContentStep.DELETED:
-                model.deletion_requested = False
-                model.file_path = None
-                model.next_retry_at = None
+
+            self._update_step_state(model)
 
             self.session.flush()
             self.session.refresh(model)

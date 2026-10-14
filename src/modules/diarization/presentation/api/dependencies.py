@@ -33,7 +33,7 @@ def get_diarization_unit_of_work() -> Iterator[DiarizationUnitOfWork]:
 
 
 def get_diarization_repository(
-    uow: DiarizationUnitOfWork = Depends(get_diarization_unit_of_work, scope="function"),
+    uow: DiarizationUnitOfWork = Depends(get_diarization_unit_of_work),
 ) -> IDiarizationRepository:
     return uow.diarizations
 

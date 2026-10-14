@@ -61,19 +61,19 @@ def get_unit_of_work(
 
 
 def get_youtube_monitored_channel_repository(
-    uow: YoutubeUnitOfWork = Depends(get_unit_of_work, scope="function"),
+    uow: YoutubeUnitOfWork = Depends(get_unit_of_work),
 ) -> IYouTubeMonitoredChannelRepository:
     return uow.monitored_channels
 
 
 def get_youtube_channel_repository(
-    uow: YoutubeUnitOfWork = Depends(get_unit_of_work, scope="function"),
+    uow: YoutubeUnitOfWork = Depends(get_unit_of_work),
 ) -> IYouTubeChannelRepository:
     return uow.channels
 
 
 def get_youtube_content_service(
-    uow: YoutubeUnitOfWork = Depends(get_unit_of_work, scope="function"),
+    uow: YoutubeUnitOfWork = Depends(get_unit_of_work),
 ) -> IYoutubeContentService:
     return uow.contents
 
@@ -116,7 +116,6 @@ def get_channel_queries(
 
 def get_content_commands(
     service: IYoutubeContentService = Depends(get_youtube_content_service),
-    logger: ILogger = Depends(get_logger),
 ) -> ContentCommands:
     return ContentCommands(service=service)
 
@@ -156,6 +155,6 @@ def get_add_content_from_playlist_use_case(
 
 
 def get_job_control(
-    uow: YoutubeUnitOfWork = Depends(get_unit_of_work, scope="function"),
+    uow: YoutubeUnitOfWork = Depends(get_unit_of_work),
 ) -> JobControlRepository:
     return JobControlRepository(uow.session)

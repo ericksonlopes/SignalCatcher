@@ -10,8 +10,6 @@ JobControl = Annotated[JobControlRepository, Depends(get_job_control)]
 
 
 def _queue(control: JobControlRepository, job_id: str) -> dict[str, str]:
-    if job_id not in JOB_IDS:
-        raise HTTPException(404, "Job not found.")
     control.request(job_id)
     return {"message": "Job execution queued.", "job_id": job_id}
 
@@ -41,6 +39,12 @@ def execute_daily_youtube_capture(control: JobControl):
     return _queue(control, "youtube_monitor_channels")
 
 
-@router.post("/jobs/{job_id}/run", status_code=202)
+@router.post(
+    "/jobs/{job_id}/run",
+    status_code=202,
+    responses={404: {"description": "Job not found"}},
+)
 def trigger_job(job_id: str, control: JobControl):
+    if job_id not in JOB_IDS:
+        raise HTTPException(status_code=404, detail="Job not found.")
     return _queue(control, job_id)

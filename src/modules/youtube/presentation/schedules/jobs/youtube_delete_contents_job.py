@@ -13,5 +13,6 @@ def delete_contents_job() -> None:
         ContentStorage(settings.DOWNLOAD_YOUTUBE_PATH),
         logger,
     )
-    while use_case.execute():
-        pass
+    has_more = True
+    while has_more:
+        has_more = use_case.execute()

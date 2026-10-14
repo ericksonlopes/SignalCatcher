@@ -36,6 +36,10 @@ class IDiarizationRepository(Protocol):
         """Returns the most recent step per linked entity id."""
         ...
 
+    def get_info_by_entity_ids(self, entity_ids: list[str]) -> dict[str, dict]:
+        """Returns the most recent step and progress per linked entity id."""
+        ...
+
     def reprocess_task(self, task_id: str) -> DiarizationEntity | None:
         """Resets a task back to PENDING, clearing its previous result and error."""
         ...

@@ -37,6 +37,7 @@ from src.modules.youtube.presentation.api.models.responses.youtube_video_card_re
 
 router = APIRouter()
 CONTENT_NOT_FOUND_DETAIL = "Content not found"
+INTERNAL_SERVER_ERROR_DETAIL = "Internal Server Error"
 JobControl = Annotated[JobControlRepository, Depends(get_job_control)]
 
 
@@ -58,7 +59,14 @@ def trigger_downloads(control: JobControl):
     return {"message": "Download request queued."}
 
 
-@router.post("/content/{external_id}/retry", status_code=202)
+@router.post(
+    "/content/{external_id}/retry",
+    status_code=202,
+    responses={
+        404: {"description": "Content not found"},
+        409: {"description": "Content is currently being processed"},
+    },
+)
 def retry_single_content(
     external_id: str,
     use_case: Annotated[ContentCommands, Depends(get_content_commands)],
@@ -73,7 +81,14 @@ def retry_single_content(
         raise HTTPException(409, str(exc)) from exc
 
 
-@router.delete("/content/{external_id}", status_code=202)
+@router.delete(
+    "/content/{external_id}",
+    status_code=202,
+    responses={
+        404: {"description": "Content not found"},
+        409: {"description": "Content is currently being processed"},
+    },
+)
 def delete_single_content(
     external_id: str,
     use_case: Annotated[ContentCommands, Depends(get_content_commands)],
@@ -88,7 +103,12 @@ def delete_single_content(
         raise HTTPException(409, str(exc)) from exc
 
 
-@router.post("/content")
+@router.post(
+    "/content",
+    responses={
+        400: {"description": "Bad Request"},
+    },
+)
 def add_youtube_content_from_link(
     request: YouTubeVideoAddRequest,
     use_case: Annotated[AddContentFromLinkUseCase, Depends(get_add_content_from_link_use_case)],
@@ -104,7 +124,7 @@ def add_youtube_content_from_link(
 
 @router.get(
     "/content/status-count",
-    responses={500: {"description": "Internal Server Error"}},
+    responses={500: {"description": INTERNAL_SERVER_ERROR_DETAIL}},
 )
 def get_content_status_count(
     use_case: Annotated[ContentQueries, Depends(get_content_queries)],
@@ -128,13 +148,13 @@ def get_content_status_count(
         }
     except Exception as e:
         logger.error(f"Failed to get content status count: {e}")
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+        raise HTTPException(status_code=500, detail=INTERNAL_SERVER_ERROR_DETAIL)
 
 
 @router.get(
     "/content",
     response_model=PaginatedResponse[YoutubeVideoCardResponse],
-    responses={500: {"description": "Internal Server Error"}},
+    responses={500: {"description": INTERNAL_SERVER_ERROR_DETAIL}},
 )
 def get_youtube_contents(
     use_case: Annotated[ContentQueries, Depends(get_content_queries)],
@@ -162,14 +182,16 @@ def get_youtube_contents(
         diarization_map = {}
         if external_ids:
             try:
-                diarization_map = diarization.get_steps_by_entity_ids(external_ids)
+                diarization_map = diarization.get_info_by_entity_ids(external_ids)
             except Exception as ex:
-                logger.warning(f"Could not fetch diarization statuses: {ex}")
+                logger.warning(f"Could not fetch diarization info: {ex}")
 
         # Mapping to Video Card Response
         mapped_items = []
         for item in items:
-            d_status = diarization_map.get(item.external_id)
+            d_info = diarization_map.get(item.external_id, {})
+            d_status = d_info.get("step")
+            d_progress = d_info.get("progress_percent")
             mapped_items.append(
                 YoutubeVideoCardResponse(
                     id=item.external_id,
@@ -193,6 +215,7 @@ def get_youtube_contents(
                     error_info=item.error_info,
                     is_diarized=(d_status == "COMPLETED"),
                     diarization_status=d_status,
+                    diarization_progress=d_progress,
                 )
             )
 
@@ -209,7 +232,7 @@ def get_youtube_contents(
         )
     except Exception as e:
         logger.error(f"Failed to get paginated contents: {e}")
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+        raise HTTPException(status_code=500, detail=INTERNAL_SERVER_ERROR_DETAIL)
 
 
 @router.get(
@@ -217,7 +240,7 @@ def get_youtube_contents(
     response_model=list[StepTrackingResponse],
     responses={
         404: {"description": "Content not found"},
-        500: {"description": "Internal Server Error"},
+        500: {"description": INTERNAL_SERVER_ERROR_DETAIL},
     },
 )
 def get_content_tracking(
@@ -246,4 +269,4 @@ def get_content_tracking(
         raise
     except Exception as e:
         logger.error(f"Failed to get tracking for {external_id}: {e}")
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+        raise HTTPException(status_code=500, detail=INTERNAL_SERVER_ERROR_DETAIL)

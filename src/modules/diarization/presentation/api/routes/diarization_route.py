@@ -53,8 +53,9 @@ class PaginatedDiarizationResponse(BaseModel):
 @router.post(
     "/youtube/{external_id}",
     responses={
-        404: {"description": "Content not found"},
         400: {"description": "Bad Request"},
+        404: {"description": "Content not found"},
+        409: {"description": "Content is awaiting file deletion"},
         500: {"description": "Internal server error"},
     },
 )
@@ -109,7 +110,13 @@ def trigger_youtube_diarization(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/{id}/start-now")
+@router.post(
+    "/{id}/start-now",
+    responses={
+        400: {"description": "Bad Request"},
+        404: {"description": "Diarization task not found"},
+    },
+)
 def start_diarization_now(
     id: str,
     commands: Annotated[DiarizationCommands, Depends(get_diarization_commands)],

@@ -62,6 +62,32 @@ class DiarizationRepository(IDiarizationRepository):
         model = self.session.query(DiarizationModel).filter(DiarizationModel.id == task_id).first()
         return DiarizationMapper.to_domain(model) if model else None
 
+    @staticmethod
+    def _apply_step_filter(query, step: str | None):
+        if not step or step.upper() == "ALL":
+            return query
+        step_upper = step.upper()
+        if step_upper == DiarizationStep.PROCESSING.value:
+            # "PROCESSING" is a UI bucket covering every in-flight step.
+            return query.filter(
+                DiarizationModel.step.in_([s.value for s in DiarizationStep.in_progress()])
+            )
+        return query.filter(DiarizationModel.step == step_upper)
+
+    @staticmethod
+    def _build_entity_conditions(
+        entity_ids: list[str] | None,
+        entity_id_search: str | None,
+    ) -> list | None:
+        if entity_ids is None and entity_id_search is None:
+            return None
+        conditions = []
+        if entity_ids:
+            conditions.append(DiarizationModel.entity_id.in_(entity_ids))
+        if entity_id_search:
+            conditions.append(DiarizationModel.entity_id.ilike(f"%{entity_id_search}%"))
+        return conditions
+
     def get_paginated(
         self,
         page: int,
@@ -72,9 +98,10 @@ class DiarizationRepository(IDiarizationRepository):
     ) -> tuple[list[DiarizationEntity], int]:
         # Completed tasks are ordered by their last processing update, so a task
         # requested earlier but finished now appears among the latest results.
+        is_completed = bool(step and step.upper() == DiarizationStep.COMPLETED.value)
         latest = (
             func.coalesce(DiarizationModel.updated_at, DiarizationModel.created_at)
-            if step and step.upper() == DiarizationStep.COMPLETED.value
+            if is_completed
             else DiarizationModel.created_at
         )
         query = self._current_tasks()
@@ -90,30 +117,14 @@ class DiarizationRepository(IDiarizationRepository):
                 )
             )
         query = query.order_by(latest.desc(), DiarizationModel.id.desc())
+        query = self._apply_step_filter(query, step)
 
-        if step and step.upper() != "ALL":
-            step_upper = step.upper()
-            if step_upper == DiarizationStep.PROCESSING.value:
-                # "PROCESSING" is a UI bucket covering every in-flight step.
-                query = query.filter(
-                    DiarizationModel.step.in_([s.value for s in DiarizationStep.in_progress()])
-                )
-            else:
-                query = query.filter(DiarizationModel.step == step_upper)
-
-        if entity_ids is not None or entity_id_search is not None:
-            # A search term can match either the linked entity (resolved by the caller,
-            # which is the only side that can look at video titles) or the raw id.
-            conditions = []
-            if entity_ids:
-                conditions.append(DiarizationModel.entity_id.in_(entity_ids))
-            if entity_id_search:
-                conditions.append(DiarizationModel.entity_id.ilike(f"%{entity_id_search}%"))
-            if conditions:
-                query = query.filter(or_(*conditions))
-            else:
+        conditions = self._build_entity_conditions(entity_ids, entity_id_search)
+        if conditions is not None:
+            if not conditions:
                 # A search was requested and nothing could possibly match.
                 return [], 0
+            query = query.filter(or_(*conditions))
 
         total = query.count()
         offset = (page - 1) * limit
@@ -152,18 +163,26 @@ class DiarizationRepository(IDiarizationRepository):
         return {step: count for step, count in counts if step}
 
     def get_steps_by_entity_ids(self, entity_ids: list[str]) -> dict[str, str]:
+        info = self.get_info_by_entity_ids(entity_ids)
+        return {eid: data["step"] for eid, data in info.items() if data.get("step")}
+
+    def get_info_by_entity_ids(self, entity_ids: list[str]) -> dict[str, dict]:
         if not entity_ids:
             return {}
         records = (
-            self.session.query(DiarizationModel.entity_id, DiarizationModel.step)
+            self.session.query(
+                DiarizationModel.entity_id,
+                DiarizationModel.step,
+                DiarizationModel.progress_percent,
+            )
             .filter(DiarizationModel.entity_id.in_(entity_ids))
             .order_by(DiarizationModel.created_at.desc())
             .all()
         )
-        result: dict[str, str] = {}
-        for entity_id, step in records:
+        result: dict[str, dict] = {}
+        for entity_id, step, progress in records:
             if entity_id and entity_id not in result:
-                result[entity_id] = step
+                result[entity_id] = {"step": step, "progress_percent": progress}
         return result
 
     def _find_model(self, task_id: str) -> DiarizationModel | None:

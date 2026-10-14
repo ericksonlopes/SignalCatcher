@@ -21,6 +21,7 @@ class YoutubeVideoCardResponse(BaseModel):
     language: str | None = None
     is_diarized: bool = False
     diarization_status: str | None = None
+    diarization_progress: int | None = None
     deletion_requested: bool = False
     attempt_count: int = 0
     next_retry_at: datetime | None = None

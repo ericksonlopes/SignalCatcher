@@ -65,3 +65,6 @@ class DiarizationQueries:
 
     def get_steps_by_entity_ids(self, entity_ids: list[str]) -> dict[str, str]:
         return self.repository.get_steps_by_entity_ids(entity_ids)
+
+    def get_info_by_entity_ids(self, entity_ids: list[str]) -> dict[str, dict]:
+        return self.repository.get_info_by_entity_ids(entity_ids)
