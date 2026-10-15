@@ -9,6 +9,10 @@ from src.core.api.metrics import router as metrics_router
 from src.core.config.settings import settings
 from src.core.logger.logger import logger
 from src.modules.diarization.presentation.api.routes import diarization_router
+from src.modules.vectorization.presentation.api.routes import (
+    search_router,
+    vectorization_router,
+)
 from src.modules.youtube.presentation.api.routes import youtube_router
 
 logging.basicConfig(handlers=[logger.get_intercept_handler()], level=logging.INFO, force=True)
@@ -17,7 +21,7 @@ for name in ["uvicorn", "uvicorn.error", "uvicorn.access", "fastapi"]:
 
 app = FastAPI(
     title="SignalCatcher API",
-    description="Content capture, monitoring and diarization management",
+    description="Content capture, monitoring, diarization and semantic search",
     version="1.0.0",
 )
 app.add_middleware(
@@ -29,6 +33,8 @@ app.add_middleware(
 )
 app.include_router(youtube_router, prefix="/api/youtube")
 app.include_router(diarization_router, prefix="/api/diarization")
+app.include_router(search_router, prefix="/api/search")
+app.include_router(vectorization_router, prefix="/api/vectorization")
 app.include_router(metrics_router)
 
 

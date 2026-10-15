@@ -169,9 +169,10 @@ Run the module unit test suite and the global test suite to ensure 100% pass rat
 .venv\Scripts\pytest -q
 ```
 
-### Step 7: Create Module Skill (MANDATORY)
-Every new module MUST have a specialized skill created for it in the `.agents/skills/` directory.
-1. Create a new directory: `.agents/skills/<module_name>/`
-2. Create the file `.agents/skills/<module_name>/SKILL.md` written in English.
-3. The skill must document the module's architecture, core business logic, database schema, and API endpoints, following the exact structure seen in other skills (e.g., `csat` or `feature-highlights`).
-4. Include a "Mandatory Living Documentation Policy" section to ensure the skill is updated alongside the code.
+### Step 7: Create Module Manager Skill (MANDATORY)
+Every new module MUST have a dedicated manager skill created for it in the `.agents/skills/` directory.
+1. Create a new directory: `.agents/skills/<module_name>-manager/`
+2. Create the file `.agents/skills/<module_name>-manager/SKILL.md`.
+3. The skill must document the module's architecture, core domain entities, database schema/migrations, services, REST endpoints, and frontend integration (following the pattern of `youtube-manager`, `diarization-manager`, and `vectorization-manager`).
+4. Include testing procedures and a "Mandatory Living Documentation Policy" section to ensure the skill is updated alongside code evolutions.
+
