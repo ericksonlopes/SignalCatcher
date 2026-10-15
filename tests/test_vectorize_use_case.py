@@ -46,9 +46,7 @@ class VectorizeDiarizationUseCaseTest(unittest.TestCase):
             id="d1",
             entity_id="video-123",
             file_path="test.mp4",
-            result_json={
-                "segments": [{"start": 0.0, "end": 10.0, "text": "Fala teste"}]
-            },
+            result_json={"segments": [{"start": 0.0, "end": 10.0, "text": "Fala teste"}]},
         )
         self.chunking_strategy.create_chunks.return_value = [
             VectorChunkEntity(

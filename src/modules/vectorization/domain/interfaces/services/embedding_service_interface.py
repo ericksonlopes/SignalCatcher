@@ -4,9 +4,7 @@ from typing import Any
 
 class IEmbeddingService(ABC):
     @abstractmethod
-    def get_embeddings(
-        self, texts: list[str], is_query: bool = False
-    ) -> list[list[float]]:
+    def get_embeddings(self, texts: list[str], is_query: bool = False) -> list[list[float]]:
         """Generates embedding vectors for a list of texts via TEI."""
         pass
 

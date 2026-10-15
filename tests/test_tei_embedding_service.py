@@ -29,9 +29,7 @@ class TeiEmbeddingServiceTest(unittest.TestCase):
         # Verify prefix 'passage: ' was sent in payload
         call_kwargs = mock_post.call_args.kwargs
         sent_inputs = call_kwargs["json"]["inputs"]
-        self.assertEqual(
-            sent_inputs, ["passage: Primeiro texto", "passage: Segundo texto"]
-        )
+        self.assertEqual(sent_inputs, ["passage: Primeiro texto", "passage: Segundo texto"])
 
     @patch("httpx.Client.post")
     def test_get_embeddings_with_e5_query_prefix(self, mock_post):

@@ -51,9 +51,7 @@ def vectorize_diarization(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
         logger.error(f"Failed to vectorize diarization {diarization_id}: {exc}")
-        raise HTTPException(
-            status_code=500, detail=f"Vectorization failed: {exc}"
-        ) from exc
+        raise HTTPException(status_code=500, detail=f"Vectorization failed: {exc}") from exc
 
 
 @router.get(
@@ -66,9 +64,7 @@ def vectorize_diarization(
 def get_vectorization_status(
     diarization_id: str,
     chunk_repository: Annotated[IChunkRepository, Depends(get_chunk_repository)],
-    diarization_repository: Annotated[
-        IDiarizationRepository, Depends(get_diarization_repository)
-    ],
+    diarization_repository: Annotated[IDiarizationRepository, Depends(get_diarization_repository)],
 ) -> VectorizationStatusDTO:
     task = diarization_repository.get_task(diarization_id)
     if not task:
@@ -111,9 +107,7 @@ def get_vectorization_stats(
 def batch_vectorize(
     use_case: Annotated[VectorizeDiarizationUseCase, Depends(get_vectorize_use_case)],
     chunk_repository: Annotated[IChunkRepository, Depends(get_chunk_repository)],
-    diarization_repository: Annotated[
-        IDiarizationRepository, Depends(get_diarization_repository)
-    ],
+    diarization_repository: Annotated[IDiarizationRepository, Depends(get_diarization_repository)],
 ) -> list[VectorizationStatusDTO]:
     """Finds COMPLETED tasks with result_json that don't have indexed chunks
     yet and vectorizes them.

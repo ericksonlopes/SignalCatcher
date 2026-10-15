@@ -64,9 +64,7 @@ class SemanticSearchUseCase:
         ]
 
     def _get_query_vector(self, query_text: str) -> list[float] | None:
-        query_vectors = self.embedding_service.get_embeddings(
-            [query_text], is_query=True
-        )
+        query_vectors = self.embedding_service.get_embeddings([query_text], is_query=True)
         if not query_vectors:
             return None
         return query_vectors[0]
@@ -89,18 +87,12 @@ class SemanticSearchUseCase:
         content = contents_map.get(chunk.parent_id or "")
         title = content.title if content else chunk.metadata.get("video_title")
         subtitle = content.origin if content else chunk.metadata.get("channel_name")
-        thumbnail_url = (
-            content.thumbnail if content else chunk.metadata.get("thumbnail")
-        )
+        thumbnail_url = content.thumbnail if content else chunk.metadata.get("thumbnail")
 
         deep_link = None
         if chunk.parent_id:
-            start_sec = (
-                int(round(chunk.start_time)) if chunk.start_time is not None else 0
-            )
-            deep_link = (
-                f"https://www.youtube.com/watch?v={chunk.parent_id}&t={start_sec}s"
-            )
+            start_sec = int(round(chunk.start_time)) if chunk.start_time is not None else 0
+            deep_link = f"https://www.youtube.com/watch?v={chunk.parent_id}&t={start_sec}s"
 
         return title, subtitle, thumbnail_url, deep_link
 
@@ -157,14 +149,10 @@ class SemanticSearchUseCase:
             start_time=chunk.start_time,
             end_time=chunk.end_time,
             formatted_start_time=(
-                format_timestamp(chunk.start_time)
-                if chunk.start_time is not None
-                else None
+                format_timestamp(chunk.start_time) if chunk.start_time is not None else None
             ),
             formatted_end_time=(
-                format_timestamp(chunk.end_time)
-                if chunk.end_time is not None
-                else None
+                format_timestamp(chunk.end_time) if chunk.end_time is not None else None
             ),
             speaker=chunk.speaker,
             video_title=title,

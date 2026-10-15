@@ -76,9 +76,7 @@ def get_vectorize_use_case(
     chunk_repository: IChunkRepository = Depends(get_chunk_repository),
     embedding_service: IEmbeddingService = Depends(get_tei_embedding_service),
     chunking_strategy: IChunkingStrategy = Depends(get_audio_chunking_strategy),
-    diarization_repository: IDiarizationRepository = Depends(
-        get_diarization_repository
-    ),
+    diarization_repository: IDiarizationRepository = Depends(get_diarization_repository),
 ) -> VectorizeDiarizationUseCase:
     return VectorizeDiarizationUseCase(
         chunk_repository=chunk_repository,

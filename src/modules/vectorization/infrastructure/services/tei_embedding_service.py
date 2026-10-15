@@ -24,9 +24,7 @@ class TeiEmbeddingService(IEmbeddingService):
         self.timeout = timeout_seconds or settings.TEI_TIMEOUT_SECONDS
         self.batch_size = batch_size or settings.EMBEDDING_BATCH_SIZE
 
-    def get_embeddings(
-        self, texts: list[str], is_query: bool = False
-    ) -> list[list[float]]:
+    def get_embeddings(self, texts: list[str], is_query: bool = False) -> list[list[float]]:
         if not texts:
             return []
 

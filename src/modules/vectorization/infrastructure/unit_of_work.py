@@ -19,9 +19,7 @@ class VectorizationUnitOfWork(SqlAlchemyUnitOfWork):
 
     chunks: IChunkRepository
 
-    def __init__(
-        self, session_factory: Callable[[], Session] = DefaultSessionFactory
-    ) -> None:
+    def __init__(self, session_factory: Callable[[], Session] = DefaultSessionFactory) -> None:
         super().__init__(session_factory=session_factory)
 
     def __enter__(self) -> VectorizationUnitOfWork:

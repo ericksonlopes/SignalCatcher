@@ -164,9 +164,7 @@ class AudioTranscriptChunkingStrategy(IChunkingStrategy):
             return current_start + 1
         return next_i
 
-    def _format_chunk_dialogue(
-        self, segments: list[dict[str, Any]]
-    ) -> tuple[str, list[str]]:
+    def _format_chunk_dialogue(self, segments: list[dict[str, Any]]) -> tuple[str, list[str]]:
         lines: list[str] = []
         unique_speakers: list[str] = []
 

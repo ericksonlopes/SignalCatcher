@@ -39,6 +39,4 @@ def semantic_search(
         return use_case.execute(query)
     except Exception as exc:
         logger.error(f"Error during semantic search query '{query.query}': {exc}")
-        raise HTTPException(
-            status_code=500, detail=f"Semantic search failed: {exc}"
-        ) from exc
+        raise HTTPException(status_code=500, detail=f"Semantic search failed: {exc}") from exc

@@ -67,9 +67,7 @@ class VectorizeDiarizationUseCase:
 
         # 3. Generate embeddings via TEI
         texts_to_embed = [chunk.text for chunk in chunks]
-        embeddings = self.embedding_service.get_embeddings(
-            texts_to_embed, is_query=False
-        )
+        embeddings = self.embedding_service.get_embeddings(texts_to_embed, is_query=False)
 
         if len(embeddings) != len(chunks):
             raise RuntimeError(
@@ -81,9 +79,7 @@ class VectorizeDiarizationUseCase:
             chunk.embedding = embedding
 
         # 4. Atomic replace: remove existing chunks for this task and persist new ones
-        self.chunk_repository.delete_by_source(
-            SourceType.YOUTUBE_TRANSCRIPT.value, diarization_id
-        )
+        self.chunk_repository.delete_by_source(SourceType.YOUTUBE_TRANSCRIPT.value, diarization_id)
         self.chunk_repository.save_chunks(chunks)
 
         logger.info(

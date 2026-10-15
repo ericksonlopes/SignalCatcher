@@ -17,9 +17,7 @@ class IChunkRepository(ABC):
         pass
 
     @abstractmethod
-    def get_chunks_by_source(
-        self, source_type: str, source_id: str
-    ) -> list[VectorChunkEntity]:
+    def get_chunks_by_source(self, source_type: str, source_id: str) -> list[VectorChunkEntity]:
         """Returns all chunks for a source ordered by chunk_index."""
         pass
 

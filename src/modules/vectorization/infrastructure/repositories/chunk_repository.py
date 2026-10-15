@@ -38,9 +38,7 @@ class ChunkRepository(IChunkRepository):
         self.session.flush()
         return deleted
 
-    def get_chunks_by_source(
-        self, source_type: str, source_id: str
-    ) -> list[VectorChunkEntity]:
+    def get_chunks_by_source(self, source_type: str, source_id: str) -> list[VectorChunkEntity]:
         models = (
             self.session.query(VectorChunkModel)
             .filter(
@@ -93,7 +91,4 @@ class ChunkRepository(IChunkRepository):
 
         results = query.order_by(distance_expr.asc()).limit(top_k).all()
 
-        return [
-            (ChunkMapper.to_entity(model), float(similarity))
-            for model, similarity in results
-        ]
+        return [(ChunkMapper.to_entity(model), float(similarity)) for model, similarity in results]

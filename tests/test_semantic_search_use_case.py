@@ -54,9 +54,7 @@ class SemanticSearchUseCaseTest(unittest.TestCase):
         content_mock.origin = "Podcast Tech"
         content_mock.thumbnail = "https://thumb.url/1.jpg"
 
-        self.youtube_contents.get_many_by_external_ids.return_value = {
-            "ext-video-1": content_mock
-        }
+        self.youtube_contents.get_many_by_external_ids.return_value = {"ext-video-1": content_mock}
 
         query = SemanticSearchQueryDTO(query="inteligência artificial", limit=5)
         results = self.use_case.execute(query)
