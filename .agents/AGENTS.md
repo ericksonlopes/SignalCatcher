@@ -33,3 +33,5 @@ src/modules/youtube/
 5. **Pydantic Settings**: Configurações vêm do `.env` via `src/core/config/settings.py`.
 6. **Testes**: Mantenha testes para use cases e services.
 7. **Linguagem**: Responda em português brasileiro. Código e comentários técnicos em inglês.
+8. **Criação de Módulos & Skills**: Toda vez que um novo módulo de negócio for criado em `src/modules/`, deve-se obrigatoriamente criar uma skill dedicada em `.agents/skills/<module>-manager/SKILL.md` documentando sua arquitetura, contratos, endpoints e testes.
+
