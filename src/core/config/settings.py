@@ -60,6 +60,10 @@ class Settings(BaseSettings):
     CHUNK_OVERLAP_SECONDS: float = Field(default=10.0, ge=0.0, le=60.0)
     CHUNK_MAX_TOKENS_ESTIMATE: int = Field(default=300, ge=50, le=1000)
 
+    # --- Voice Recognition & Speaker Identification (pgvector) ---
+    VOICE_EMBEDDING_DIMENSION: int = Field(default=256, ge=64, le=2048)
+    VOICE_SIMILARITY_THRESHOLD: float = Field(default=0.65, ge=0.0, le=1.0)
+
     @property
     def database_url(self) -> str:
         return URL.create(

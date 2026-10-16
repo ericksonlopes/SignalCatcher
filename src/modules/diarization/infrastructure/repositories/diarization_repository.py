@@ -303,3 +303,15 @@ class DiarizationRepository(IDiarizationRepository):
         self.session.flush()
         self.session.refresh(model)
         return DiarizationMapper.to_domain(model)
+
+    def update_result_json(
+        self, task_id: str, result_json: dict
+    ) -> DiarizationEntity | None:
+        model = self._find_model(task_id)
+        if model is None:
+            return None
+        model.result_json = result_json
+        model.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        self.session.flush()
+        self.session.refresh(model)
+        return DiarizationMapper.to_domain(model)
