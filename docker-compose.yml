@@ -20,6 +20,7 @@ x-backend: &backend
     FFMPEG_LOCATION: ${FFMPEG_LOCATION:-}
     VOICE_MONKEY_API_TOKEN: ${VOICE_MONKEY_API_TOKEN:-}
     VOICE_MONKEY_NEW_VIDEO_FOR_DOWNLOAD_MONKEY_ID: ${VOICE_MONKEY_NEW_VIDEO_FOR_DOWNLOAD_MONKEY_ID:-}
+    TEI_API_URL: ${TEI_API_URL:-http://eriberry.local:8090}
   volumes:
     - /media/eriberry/SSD_1/youtube:/youtube
   networks:
