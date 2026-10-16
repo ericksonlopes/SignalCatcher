@@ -270,3 +270,26 @@ def assign_speaker_in_diarization(
     except Exception as exc:
         logger.error(f"Failed to assign speaker in diarization {diarization_id}: {exc}")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post(
+    "/diarization/{diarization_id}/reset",
+    summary="Reset and restore original anonymous speakers in a diarization",
+    responses={
+        400: {"description": "Diarization task not found"},
+        500: {"description": "Internal server error"},
+    },
+)
+def reset_diarization_speakers(
+    diarization_id: str,
+    use_case: Annotated[
+        IdentifyDiarizationSpeakersUseCase, Depends(get_identify_speakers_use_case)
+    ],
+) -> dict[str, Any]:
+    try:
+        return use_case.reset_diarization_speakers(diarization_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error(f"Failed to reset speakers in diarization {diarization_id}: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc

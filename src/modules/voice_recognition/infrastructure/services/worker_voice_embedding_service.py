@@ -3,7 +3,6 @@ import logging
 import math
 import os
 import subprocess
-import wave
 from typing import Any
 
 import httpx
@@ -157,6 +156,22 @@ class WorkerVoiceEmbeddingService(IVoiceEmbeddingService):
         except Exception:
             return False
 
+    @staticmethod
+    def _resolve_file_path(file_path: str) -> str:
+        if os.path.exists(file_path):
+            return file_path
+        if settings.DOWNLOAD_YOUTUBE_PATH:
+            rel_path = file_path.lstrip("/\\").replace("/", os.sep)
+            candidate = os.path.join(settings.DOWNLOAD_YOUTUBE_PATH, rel_path)
+            if os.path.exists(candidate):
+                return candidate
+            prefix = "youtube" + os.sep
+            if rel_path.lower().startswith(prefix):
+                candidate2 = os.path.join(settings.DOWNLOAD_YOUTUBE_PATH, rel_path[len(prefix):])
+                if os.path.exists(candidate2):
+                    return candidate2
+        return file_path
+
     def _extract_local_acoustic_from_segments(
         self,
         file_path: str,
@@ -164,12 +179,7 @@ class WorkerVoiceEmbeddingService(IVoiceEmbeddingService):
     ) -> list[float]:
         """Extracts spectral/energy acoustic features from local audio via ffmpeg or wave,
         or deterministic acoustic signature when running without the audio file."""
-        resolved_path = file_path
-        if not os.path.exists(resolved_path) and settings.DOWNLOAD_YOUTUBE_PATH:
-            rel_path = file_path.lstrip("/\\").replace("/", os.sep)
-            candidate = os.path.join(settings.DOWNLOAD_YOUTUBE_PATH, rel_path)
-            if os.path.exists(candidate):
-                resolved_path = candidate
+        resolved_path = self._resolve_file_path(file_path)
 
         if os.path.exists(resolved_path):
             try:
@@ -186,49 +196,31 @@ class WorkerVoiceEmbeddingService(IVoiceEmbeddingService):
         )
         return self._deterministic_vector(seed_material)
 
-    def _read_audio_slice_pcm(
-        self,
-        file_path: str,
-        segments: list[dict[str, Any]],
-    ) -> bytes:
-        valid_segments = sorted(
-            [
-                (float(s["start"]), float(s["end"]))
-                for s in segments
-                if float(s.get("end", 0)) - float(s.get("start", 0)) >= 0.3
-            ],
-            key=lambda item: item[1] - item[0],
-            reverse=True,
-        )[:5]
-        if not valid_segments:
-            valid_segments = [
-                (
-                    float(segments[0].get("start", 0.0)),
-                    float(segments[0].get("end", 5.0)),
-                )
-            ]
-
-        start_sec, end_sec = valid_segments[0]
-        duration = min(max(end_sec - start_sec, 0.5), 30.0)
-
-        if file_path.lower().endswith(".wav"):
-            with wave.open(file_path, "rb") as wf:
-                rate = wf.getframerate()
-                sampwidth = wf.getsampwidth()
-                nchannels = wf.getnchannels()
-                start_frame = max(0, int(start_sec * rate))
-                num_frames = int(duration * rate)
-                wf.setpos(min(start_frame, wf.getnframes()))
-                raw = wf.readframes(num_frames)
-                if sampwidth == 2 and nchannels >= 1:
-                    return raw
-
+    @staticmethod
+    def _get_ffmpeg_binary() -> str:
         ffmpeg_bin = "ffmpeg"
         if settings.FFMPEG_LOCATION:
             candidate = os.path.join(settings.FFMPEG_LOCATION, "ffmpeg")
             if os.path.exists(candidate) or os.path.exists(candidate + ".exe"):
                 ffmpeg_bin = candidate
+        return ffmpeg_bin
 
+    @staticmethod
+    def _get_valid_segment_spans(segments: list[dict[str, Any]]) -> list[tuple[float, float]]:
+        spans = [
+            (float(s["start"]), float(s["end"]))
+            for s in segments
+            if float(s.get("end", 0)) - float(s.get("start", 0)) >= 0.3
+        ]
+        spans.sort(key=lambda item: item[1] - item[0], reverse=True)
+        if not spans and segments:
+            spans = [(float(segments[0].get("start", 0.0)), float(segments[0].get("end", 5.0)))]
+        return spans[:3]
+
+    @staticmethod
+    def _run_ffmpeg_slice(
+        ffmpeg_bin: str, file_path: str, start_sec: float, duration: float
+    ) -> bytes | None:
         cmd = [
             ffmpeg_bin,
             "-nostdin",
@@ -246,10 +238,39 @@ class WorkerVoiceEmbeddingService(IVoiceEmbeddingService):
             "16000",
             "-",
         ]
-        proc = subprocess.run(cmd, capture_output=True, timeout=15, check=False)
-        if proc.returncode == 0 and proc.stdout:
-            return proc.stdout
-        return b""
+        try:
+            proc = subprocess.run(cmd, capture_output=True, timeout=15, check=False)
+            if proc.returncode == 0 and proc.stdout:
+                return proc.stdout
+        except Exception:
+            pass
+        return None
+
+    def _read_audio_slice_pcm(
+        self,
+        file_path: str,
+        segments: list[dict[str, Any]],
+    ) -> bytes:
+        valid_spans = self._get_valid_segment_spans(segments)
+        ffmpeg_bin = self._get_ffmpeg_binary()
+
+        pcm_slices: list[bytes] = []
+        total_sec = 0.0
+
+        for start_sec, end_sec in valid_spans:
+            duration = min(max(end_sec - start_sec, 0.5), 15.0)
+            if total_sec + duration > 30.0:
+                duration = max(0.5, 30.0 - total_sec)
+            total_sec += duration
+
+            slice_bytes = self._run_ffmpeg_slice(ffmpeg_bin, file_path, start_sec, duration)
+            if slice_bytes:
+                pcm_slices.append(slice_bytes)
+
+            if total_sec >= 30.0:
+                break
+
+        return b"".join(pcm_slices)
 
     def _compute_pcm_spectral_embedding(self, pcm_s16le: bytes) -> list[float]:
         import struct
