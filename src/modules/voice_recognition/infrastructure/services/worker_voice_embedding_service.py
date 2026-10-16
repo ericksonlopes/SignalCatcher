@@ -167,7 +167,7 @@ class WorkerVoiceEmbeddingService(IVoiceEmbeddingService):
                 return candidate
             prefix = "youtube" + os.sep
             if rel_path.lower().startswith(prefix):
-                candidate2 = os.path.join(settings.DOWNLOAD_YOUTUBE_PATH, rel_path[len(prefix):])
+                candidate2 = os.path.join(settings.DOWNLOAD_YOUTUBE_PATH, rel_path[len(prefix) :])
                 if os.path.exists(candidate2):
                     return candidate2
         return file_path
