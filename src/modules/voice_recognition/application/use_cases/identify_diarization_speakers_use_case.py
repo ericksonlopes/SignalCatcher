@@ -27,10 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 def _calculate_speech_duration(segments: list[dict[str, Any]]) -> float:
-    return sum(
-        max(0.0, float(s.get("end", 0.0)) - float(s.get("start", 0.0)))
-        for s in segments
-    )
+    return sum(max(0.0, float(s.get("end", 0.0)) - float(s.get("start", 0.0))) for s in segments)
 
 
 def _group_segments_by_speaker(
@@ -70,9 +67,7 @@ class IdentifyDiarizationSpeakersUseCase:
             raise ValueError(f"Diarization task '{diarization_id}' not found.")
 
         if not task.result_json or not isinstance(task.result_json, dict):
-            raise ValueError(
-                f"Diarization task '{diarization_id}' does not have result_json yet."
-            )
+            raise ValueError(f"Diarization task '{diarization_id}' does not have result_json yet.")
         return task
 
     def _match_single_speaker(
@@ -153,11 +148,9 @@ class IdentifyDiarizationSpeakersUseCase:
 
         segments_by_original, current_label_by_original = _group_segments_by_speaker(raw_segments)
 
-        embeddings_by_speaker = (
-            self.voice_embedding_service.extract_speakers_embeddings(
-                file_path=task.file_path,
-                segments_by_speaker=segments_by_original,
-            )
+        embeddings_by_speaker = self.voice_embedding_service.extract_speakers_embeddings(
+            file_path=task.file_path,
+            segments_by_speaker=segments_by_original,
         )
 
         matches: list[SpeakerMatchDTO] = []
@@ -245,9 +238,7 @@ class IdentifyDiarizationSpeakersUseCase:
 
         task = self.diarization_repository.get_task(diarization_id)
         if not task or not task.result_json:
-            raise ValueError(
-                f"Diarization task '{diarization_id}' not found or has no transcript."
-            )
+            raise ValueError(f"Diarization task '{diarization_id}' not found or has no transcript.")
 
         updated_json = apply_speaker_mapping_to_result_json(
             result_json=task.result_json,

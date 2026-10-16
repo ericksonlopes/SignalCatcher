@@ -35,9 +35,7 @@ router = APIRouter(tags=["Voice Recognition"])
 
 
 class EnrollAudioBase64RequestDTO(BaseModel):
-    audio_base64: str = Field(
-        ..., min_length=4, description="Base64-encoded audio file content"
-    )
+    audio_base64: str = Field(..., min_length=4, description="Base64-encoded audio file content")
     filename: str = Field(default="sample.wav")
     speaker_id: str | None = None
     speaker_name: str | None = None
@@ -65,9 +63,7 @@ def list_speaker_profiles(
         ManageSpeakerProfilesUseCase, Depends(get_manage_speaker_profiles_use_case)
     ],
     search: Annotated[str | None, Query(description="Filter by speaker name")] = None,
-    include_samples: Annotated[
-        bool, Query(description="Include enrolled voice samples")
-    ] = False,
+    include_samples: Annotated[bool, Query(description="Include enrolled voice samples")] = False,
 ) -> list[SpeakerProfileResponseDTO]:
     return use_case.list_profiles(search=search, include_samples=include_samples)
 
@@ -248,9 +244,7 @@ def identify_diarization_speakers(
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
-        logger.error(
-            f"Failed to identify speakers in diarization {diarization_id}: {exc}"
-        )
+        logger.error(f"Failed to identify speakers in diarization {diarization_id}: {exc}")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 

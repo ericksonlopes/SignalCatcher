@@ -103,9 +103,7 @@ class EnrollSpeakerUseCase:
             SpeakerProfileEntity(name=cleaned_name, description=description)
         )
 
-    def enroll_from_diarization(
-        self, request: EnrollFromDiarizationDTO
-    ) -> EnrollResponseDTO:
+    def enroll_from_diarization(self, request: EnrollFromDiarizationDTO) -> EnrollResponseDTO:
         task = self.diarization_repository.get_task(request.diarization_id)
         if not task:
             raise ValueError(f"Diarization task '{request.diarization_id}' not found.")
@@ -179,9 +177,7 @@ class EnrollSpeakerUseCase:
             self.diarization_repository.update_result_json(task.id, updated_json)
             applied = True
 
-        updated_profile = (
-            self.speaker_repository.get_profile(profile.id or "") or profile
-        )
+        updated_profile = self.speaker_repository.get_profile(profile.id or "") or profile
 
         logger.info(
             "Enrolled speaker '%s' (id=%s) from diarization %s speaker %s (%d segments, %.1fs)",
@@ -234,9 +230,7 @@ class EnrollSpeakerUseCase:
             embedding=embedding,
         )
         saved_sample = self.speaker_repository.add_sample(sample)
-        updated_profile = (
-            self.speaker_repository.get_profile(profile.id or "") or profile
-        )
+        updated_profile = self.speaker_repository.get_profile(profile.id or "") or profile
 
         return EnrollResponseDTO(
             speaker_id=profile.id or "",

@@ -39,9 +39,7 @@ class SpeakerMapper:
     @staticmethod
     def sample_to_entity(model: VoiceSampleModel) -> VoiceSampleEntity:
         raw_embedding: list[float] | None = getattr(model, "embedding", None)
-        embedding_list = (
-            [float(x) for x in raw_embedding] if raw_embedding is not None else None
-        )
+        embedding_list = [float(x) for x in raw_embedding] if raw_embedding is not None else None
         try:
             source_type = VoiceSourceType(model.source_type)
         except ValueError:
@@ -53,14 +51,10 @@ class SpeakerMapper:
             source_type=source_type,
             source_id=model.source_id,
             speaker_label=model.speaker_label,
-            start_time=(
-                float(model.start_time) if model.start_time is not None else None
-            ),
+            start_time=(float(model.start_time) if model.start_time is not None else None),
             end_time=float(model.end_time) if model.end_time is not None else None,
             duration_seconds=(
-                float(model.duration_seconds)
-                if model.duration_seconds is not None
-                else None
+                float(model.duration_seconds) if model.duration_seconds is not None else None
             ),
             metadata=dict(model.metadata_ or {}),
             embedding=embedding_list,

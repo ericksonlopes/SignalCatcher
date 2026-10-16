@@ -8,9 +8,7 @@ class EnrollFromDiarizationDTO(BaseModel):
         min_length=1,
         description="Original or current speaker label in the diarization (e.g. SPEAKER_00)",
     )
-    speaker_id: str | None = Field(
-        default=None, description="Existing speaker profile ID"
-    )
+    speaker_id: str | None = Field(default=None, description="Existing speaker profile ID")
     speaker_name: str | None = Field(
         default=None,
         description="Speaker name (creates or reuses profile if speaker_id is omitted)",

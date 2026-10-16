@@ -65,9 +65,7 @@ class ManageSpeakerProfilesUseCase:
             samples=samples_dto,
         )
 
-    def create_profile(
-        self, request: CreateSpeakerProfileDTO
-    ) -> SpeakerProfileResponseDTO:
+    def create_profile(self, request: CreateSpeakerProfileDTO) -> SpeakerProfileResponseDTO:
         cleaned_name = request.name.strip()
         if not cleaned_name:
             raise ValueError("Speaker name cannot be empty.")
@@ -86,9 +84,7 @@ class ManageSpeakerProfilesUseCase:
         include_samples: bool = False,
     ) -> list[SpeakerProfileResponseDTO]:
         profiles = self.speaker_repository.list_profiles(search=search)
-        return [
-            self._to_profile_dto(p, include_samples=include_samples) for p in profiles
-        ]
+        return [self._to_profile_dto(p, include_samples=include_samples) for p in profiles]
 
     def get_profile(self, speaker_id: str) -> SpeakerProfileResponseDTO:
         profile = self.speaker_repository.get_profile(speaker_id)

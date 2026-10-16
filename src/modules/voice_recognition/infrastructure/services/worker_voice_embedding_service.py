@@ -38,9 +38,7 @@ class WorkerVoiceEmbeddingService(IVoiceEmbeddingService):
         self.timeout = timeout_seconds or settings.DIARIZATION_READ_TIMEOUT
         self._client = httpx.Client(
             base_url=self.worker_url,
-            timeout=httpx.Timeout(
-                self.timeout, connect=settings.DIARIZATION_CONNECT_TIMEOUT
-            ),
+            timeout=httpx.Timeout(self.timeout, connect=settings.DIARIZATION_CONNECT_TIMEOUT),
         )
 
     def extract_embedding_from_segments(
@@ -49,9 +47,7 @@ class WorkerVoiceEmbeddingService(IVoiceEmbeddingService):
         segments: list[dict[str, Any]],
     ) -> list[float]:
         if not segments:
-            raise ValueError(
-                "At least one audio segment is required to extract a voice embedding."
-            )
+            raise ValueError("At least one audio segment is required to extract a voice embedding.")
 
         try:
             response = self._client.post(
@@ -181,9 +177,7 @@ class WorkerVoiceEmbeddingService(IVoiceEmbeddingService):
                 if pcm_bytes:
                     return self._compute_pcm_spectral_embedding(pcm_bytes)
             except Exception as exc:
-                logger.debug(
-                    "Local PCM extraction skipped for %s: %s", resolved_path, exc
-                )
+                logger.debug("Local PCM extraction skipped for %s: %s", resolved_path, exc)
 
         # Deterministic fallback based on file_path and segment acoustic timings
         seed_material = f"{os.path.basename(file_path)}:" + "|".join(
@@ -276,9 +270,7 @@ class WorkerVoiceEmbeddingService(IVoiceEmbeddingService):
                 continue
             rms = math.sqrt(sum(x * x for x in chunk) / len(chunk))
             zcr = sum(
-                1
-                for j in range(1, len(chunk))
-                if (chunk[j - 1] >= 0) != (chunk[j] >= 0)
+                1 for j in range(1, len(chunk)) if (chunk[j - 1] >= 0) != (chunk[j] >= 0)
             ) / max(1, len(chunk))
             mean_val = sum(chunk) / len(chunk)
             vec[i] = rms * 0.7 + zcr * 0.2 + mean_val * 0.1

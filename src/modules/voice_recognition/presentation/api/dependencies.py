@@ -49,9 +49,7 @@ def get_voice_embedding_service() -> IVoiceEmbeddingService:
 
 def get_manage_speaker_profiles_use_case(
     speaker_repository: ISpeakerRepository = Depends(get_speaker_repository),
-    voice_embedding_service: IVoiceEmbeddingService = Depends(
-        get_voice_embedding_service
-    ),
+    voice_embedding_service: IVoiceEmbeddingService = Depends(get_voice_embedding_service),
 ) -> ManageSpeakerProfilesUseCase:
     return ManageSpeakerProfilesUseCase(
         speaker_repository=speaker_repository,
@@ -61,12 +59,8 @@ def get_manage_speaker_profiles_use_case(
 
 def get_enroll_speaker_use_case(
     speaker_repository: ISpeakerRepository = Depends(get_speaker_repository),
-    voice_embedding_service: IVoiceEmbeddingService = Depends(
-        get_voice_embedding_service
-    ),
-    diarization_repository: IDiarizationRepository = Depends(
-        get_shared_diarization_repository
-    ),
+    voice_embedding_service: IVoiceEmbeddingService = Depends(get_voice_embedding_service),
+    diarization_repository: IDiarizationRepository = Depends(get_shared_diarization_repository),
 ) -> EnrollSpeakerUseCase:
     return EnrollSpeakerUseCase(
         speaker_repository=speaker_repository,
@@ -77,12 +71,8 @@ def get_enroll_speaker_use_case(
 
 def get_identify_speakers_use_case(
     speaker_repository: ISpeakerRepository = Depends(get_speaker_repository),
-    voice_embedding_service: IVoiceEmbeddingService = Depends(
-        get_voice_embedding_service
-    ),
-    diarization_repository: IDiarizationRepository = Depends(
-        get_shared_diarization_repository
-    ),
+    voice_embedding_service: IVoiceEmbeddingService = Depends(get_voice_embedding_service),
+    diarization_repository: IDiarizationRepository = Depends(get_shared_diarization_repository),
     enroll_use_case: EnrollSpeakerUseCase = Depends(get_enroll_speaker_use_case),
 ) -> IdentifyDiarizationSpeakersUseCase:
     return IdentifyDiarizationSpeakersUseCase(

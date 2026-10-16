@@ -141,9 +141,7 @@ class SpeakerRepository(ISpeakerRepository):
 
     def delete_sample(self, sample_id: str) -> bool:
         model = (
-            self.session.query(VoiceSampleModel)
-            .filter(VoiceSampleModel.id == sample_id)
-            .first()
+            self.session.query(VoiceSampleModel).filter(VoiceSampleModel.id == sample_id).first()
         )
         if not model:
             return False
@@ -179,9 +177,7 @@ class SpeakerRepository(ISpeakerRepository):
             distance_expr = VoiceSampleModel.embedding.cosine_distance(query_vector)
             similarity_expr = 1.0 - distance_expr
 
-            query = self.session.query(
-                VoiceSampleModel, SpeakerProfileModel, similarity_expr
-            ).join(
+            query = self.session.query(VoiceSampleModel, SpeakerProfileModel, similarity_expr).join(
                 SpeakerProfileModel,
                 SpeakerProfileModel.id == VoiceSampleModel.speaker_id,
             )

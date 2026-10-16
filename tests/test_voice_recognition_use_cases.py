@@ -128,9 +128,7 @@ class VoiceRecognitionUseCasesTest(unittest.TestCase):
             name="Alice",
             samples_count=0,
         )
-        self.embedding_service.extract_embedding_from_segments.return_value = [
-            0.25
-        ] * 256
+        self.embedding_service.extract_embedding_from_segments.return_value = [0.25] * 256
         self.speaker_repo.add_sample.return_value = VoiceSampleEntity(
             id="smp-1",
             speaker_id="spk-alice",
@@ -192,9 +190,7 @@ class VoiceRecognitionUseCasesTest(unittest.TestCase):
         }
 
         sample_alice = VoiceSampleEntity(id="smp-a", speaker_id="spk-alice")
-        profile_alice = SpeakerProfileEntity(
-            id="spk-alice", name="Alice", samples_count=2
-        )
+        profile_alice = SpeakerProfileEntity(id="spk-alice", name="Alice", samples_count=2)
 
         def fake_nearest(query_vector, top_k=1, min_similarity=0.65):
             if query_vector[0] == 1.0 and min_similarity <= 0.92:
@@ -205,9 +201,7 @@ class VoiceRecognitionUseCasesTest(unittest.TestCase):
 
         result = self.identify_use_case.identify_diarization(
             "diar-200",
-            IdentifyDiarizationSpeakersRequestDTO(
-                similarity_threshold=0.70, auto_apply=True
-            ),
+            IdentifyDiarizationSpeakersRequestDTO(similarity_threshold=0.70, auto_apply=True),
         )
 
         self.assertEqual(result.total_speakers, 2)

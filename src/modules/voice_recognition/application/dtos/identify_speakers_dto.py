@@ -5,9 +5,7 @@ class IdentifyDiarizationSpeakersRequestDTO(BaseModel):
     similarity_threshold: float = Field(default=0.65, ge=0.1, le=1.0)
     auto_apply: bool = Field(
         default=True,
-        description=(
-            "Automatically replace SPEAKER_XX labels with matched speaker profile names"
-        ),
+        description=("Automatically replace SPEAKER_XX labels with matched speaker profile names"),
     )
 
 
