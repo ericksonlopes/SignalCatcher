@@ -1,12 +1,15 @@
 import copy
 import logging
+import os
 from typing import Any
 
+from src.core.config.settings import settings
 from src.modules.diarization.domain.interfaces.repositories.diarization_repository import (
     IDiarizationRepository,
 )
 from src.modules.voice_recognition.application.dtos.enroll_speaker_dto import (
     EnrollFromDiarizationDTO,
+    EnrollFromVideoClipDTO,
     EnrollResponseDTO,
 )
 from src.modules.voice_recognition.domain.entities.speaker_profile_entity import (
@@ -19,6 +22,9 @@ from src.modules.voice_recognition.domain.enums.voice_source_type import VoiceSo
 from src.modules.voice_recognition.domain.interfaces import (
     ISpeakerRepository,
     IVoiceEmbeddingService,
+)
+from src.modules.youtube.domain.interfaces.repositories.youtube_content_repository import (
+    IYoutubeContentRepository,
 )
 
 logger = logging.getLogger(__name__)
@@ -67,17 +73,20 @@ def apply_speaker_mapping_to_result_json(
 
 
 class EnrollSpeakerUseCase:
-    """Enrolls a speaker voiceprint from a completed diarization or from an uploaded file."""
+    """Enrolls a speaker voiceprint from a completed diarization, a video clip,
+    or from an uploaded audio file."""
 
     def __init__(
         self,
         speaker_repository: ISpeakerRepository,
         voice_embedding_service: IVoiceEmbeddingService,
         diarization_repository: IDiarizationRepository,
+        youtube_content_repository: IYoutubeContentRepository | None = None,
     ) -> None:
         self.speaker_repository = speaker_repository
         self.voice_embedding_service = voice_embedding_service
         self.diarization_repository = diarization_repository
+        self.youtube_content_repository = youtube_content_repository
 
     def _resolve_or_create_profile(
         self,
@@ -103,6 +112,96 @@ class EnrollSpeakerUseCase:
             SpeakerProfileEntity(name=cleaned_name, description=description)
         )
 
+    def _resolve_media_file_path(self, video_id: str) -> tuple[str, str | None]:
+        # 1. Check if video_id is a Diarization task ID
+        task = self.diarization_repository.get_task(video_id)
+        if task and task.file_path:
+            return task.file_path, task.entity_id or task.id
+
+        # 2. Check if video_id is a YouTube external ID in content repository
+        if self.youtube_content_repository:
+            content = self.youtube_content_repository.get_by_external_id(video_id)
+            if content and content.file_path:
+                return content.file_path, content.external_id
+
+        # 3. Check direct path on disk
+        if os.path.exists(video_id):
+            return video_id, None
+
+        # 4. Check settings.DOWNLOAD_YOUTUBE_PATH
+        if settings.DOWNLOAD_YOUTUBE_PATH:
+            candidate = os.path.join(settings.DOWNLOAD_YOUTUBE_PATH, video_id)
+            if os.path.exists(candidate):
+                return candidate, None
+
+        raise ValueError(f"Media file for video '{video_id}' could not be located on the server.")
+
+    def enroll_from_video_clip(self, request: EnrollFromVideoClipDTO) -> EnrollResponseDTO:
+        if request.end_time <= request.start_time:
+            raise ValueError("The end time must be greater than the start time.")
+
+        clip_duration = request.end_time - request.start_time
+        if clip_duration < 1.0:
+            raise ValueError("The speech clip must be at least 1 second long.")
+
+        file_path, entity_id = self._resolve_media_file_path(request.video_id)
+
+        segments = [{"start": request.start_time, "end": request.end_time}]
+        embedding = self.voice_embedding_service.extract_embedding_from_segments(
+            file_path=file_path,
+            segments=segments,
+        )
+
+        profile = self._resolve_or_create_profile(
+            speaker_id=request.speaker_id,
+            speaker_name=request.speaker_name,
+            description=request.description,
+        )
+
+        label = request.label or f"CLIP_{int(request.start_time)}s_{int(request.end_time)}s"
+        sample = VoiceSampleEntity(
+            speaker_id=profile.id or "",
+            source_type=VoiceSourceType.YOUTUBE_CLIP,
+            source_id=entity_id or request.video_id,
+            speaker_label=label,
+            start_time=round(request.start_time, 2),
+            end_time=round(request.end_time, 2),
+            duration_seconds=round(clip_duration, 2),
+            metadata={
+                "clip": True,
+                "video_id": request.video_id,
+                "entity_id": entity_id,
+                "start_time": request.start_time,
+                "end_time": request.end_time,
+            },
+            embedding=embedding,
+        )
+        saved_sample = self.speaker_repository.add_sample(sample)
+        updated_profile = self.speaker_repository.get_profile(profile.id or "") or profile
+
+        logger.info(
+            "Enrolled speaker '%s' (id=%s) from video clip %s [%.1fs - %.1fs] (%.1fs)",
+            profile.name,
+            profile.id,
+            request.video_id,
+            request.start_time,
+            request.end_time,
+            clip_duration,
+        )
+
+        return EnrollResponseDTO(
+            speaker_id=profile.id or "",
+            speaker_name=profile.name,
+            sample_id=saved_sample.id or "",
+            source_type=VoiceSourceType.YOUTUBE_CLIP.value,
+            source_id=entity_id or request.video_id,
+            speaker_label=label,
+            segments_used=1,
+            speech_duration_seconds=round(clip_duration, 2),
+            applied_to_diarization=False,
+            samples_count=updated_profile.samples_count,
+        )
+
     def enroll_from_diarization(self, request: EnrollFromDiarizationDTO) -> EnrollResponseDTO:
         task = self.diarization_repository.get_task(request.diarization_id)
         if not task:
@@ -126,6 +225,17 @@ class EnrollSpeakerUseCase:
                 f"No segments found for speaker '{request.speaker_label}' "
                 f"in diarization '{request.diarization_id}'."
             )
+
+        # Apply specific speech segment selection if requested
+        if request.selected_segment_indices is not None and request.selected_segment_indices:
+            selected = [
+                matching_segments[i]
+                for i in request.selected_segment_indices
+                if 0 <= i < len(matching_segments)
+            ]
+            if not selected:
+                raise ValueError("None of the selected segment indices were valid.")
+            matching_segments = selected
 
         profile = self._resolve_or_create_profile(
             speaker_id=request.speaker_id,
@@ -157,6 +267,7 @@ class EnrollSpeakerUseCase:
                 "entity_id": task.entity_id,
                 "entity_type": task.entity_type,
                 "segments_count": len(matching_segments),
+                "selected_indices": request.selected_segment_indices,
                 "sample_text": " ".join(
                     str(s.get("text", "")).strip() for s in matching_segments[:3]
                 )[:240],

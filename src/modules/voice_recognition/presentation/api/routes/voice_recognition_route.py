@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from src.core.logger.logger import logger
 from src.modules.voice_recognition.application.dtos.enroll_speaker_dto import (
     EnrollFromDiarizationDTO,
+    EnrollFromVideoClipDTO,
     EnrollResponseDTO,
 )
 from src.modules.voice_recognition.application.dtos.identify_speakers_dto import (
@@ -189,6 +190,27 @@ def enroll_from_diarization(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         logger.error(f"Failed to enroll speaker from diarization: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post(
+    "/enroll/video-clip",
+    summary="Enroll a speaker voiceprint from a specific video time range (start/end clip)",
+    responses={
+        400: {"description": "Invalid clip range or missing video media"},
+        500: {"description": "Internal server error"},
+    },
+)
+def enroll_from_video_clip(
+    request: EnrollFromVideoClipDTO,
+    use_case: Annotated[EnrollSpeakerUseCase, Depends(get_enroll_speaker_use_case)],
+) -> EnrollResponseDTO:
+    try:
+        return use_case.enroll_from_video_clip(request)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error(f"Failed to enroll speaker from video clip: {exc}")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 

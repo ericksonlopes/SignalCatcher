@@ -4,14 +4,17 @@ services:
   migrate:
     volumes: !override
       - ./youtube:/youtube
+      - ./voice_training:/voice_training
 
   worker:
     volumes: !override
       - ./youtube:/youtube
+      - ./voice_training:/voice_training
 
   app:
     volumes: !override
       - ./youtube:/youtube
+      - ./voice_training:/voice_training
     ports: !override
       - "8000:8000"
 

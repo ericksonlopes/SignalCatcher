@@ -16,30 +16,16 @@ class Settings(BaseSettings):
     POSTGRES_DATABASE: str
     POSTGRES_HOST: str
 
-    # Required on purpose. While it was optional, an unset value travelled all the way
-    # into yt-dlp as None and blew up on os.path.join when a download started, which is
-    # a slow and confusing way to find out the variable is missing.
     DOWNLOAD_YOUTUBE_PATH: str
 
     LIST_LOG_LEVELS: str | None = None
 
-    # Optional: the notification degrades to a warning when either is missing.
     VOICE_MONKEY_API_TOKEN: str | None = None
     VOICE_MONKEY_NEW_VIDEO_FOR_DOWNLOAD_MONKEY_ID: str | None = None
 
     DIARIZATION_API_URL: str | None = "http://localhost:8001"
-
-    # Directory containing the ffmpeg binaries. Leave unset when ffmpeg is on PATH,
-    # which is the case inside the container: yt-dlp then locates it on its own. It only
-    # needs a value on a host where ffmpeg is installed somewhere yt-dlp cannot find.
     FFMPEG_LOCATION: str | None = None
 
-    # Comma-separated list of browser origins allowed to call the API. Declared as a
-    # string, like LIST_LOG_LEVELS, because pydantic-settings expects JSON for list
-    # fields, which is awkward to write in a .env file.
-    #
-    # The default only covers local development. Deployments that serve a frontend from
-    # another host have to set this explicitly.
     CORS_ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
     PROCESSING_LEASE_SECONDS: int = Field(default=300, ge=60)
     MAX_PROCESSING_ATTEMPTS: int = Field(default=5, ge=1, le=100)
@@ -63,6 +49,7 @@ class Settings(BaseSettings):
     # --- Voice Recognition & Speaker Identification (pgvector) ---
     VOICE_EMBEDDING_DIMENSION: int = Field(default=256, ge=64, le=2048)
     VOICE_SIMILARITY_THRESHOLD: float = Field(default=0.65, ge=0.0, le=1.0)
+    VOICE_TRAINING_PATH: str = "D:/voice_training"
 
     @property
     def database_url(self) -> str:

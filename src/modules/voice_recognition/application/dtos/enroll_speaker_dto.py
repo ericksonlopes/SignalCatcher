@@ -15,6 +15,41 @@ class EnrollFromDiarizationDTO(BaseModel):
     )
     description: str | None = None
     apply_to_diarization: bool = True
+    selected_segment_indices: list[int] | None = Field(
+        default=None,
+        description="Optional list of specific segment indices to train from",
+    )
+
+
+class EnrollFromVideoClipDTO(BaseModel):
+    video_id: str = Field(
+        ...,
+        min_length=1,
+        description="Diarization ID, YouTube external ID, or local media path",
+    )
+    speaker_name: str | None = Field(
+        default=None,
+        description="Speaker name (creates or reuses profile if speaker_id is omitted)",
+    )
+    speaker_id: str | None = Field(
+        default=None,
+        description="Existing speaker profile ID to append this sample to",
+    )
+    start_time: float = Field(
+        ...,
+        ge=0.0,
+        description="Start time of the speech clip in seconds",
+    )
+    end_time: float = Field(
+        ...,
+        gt=0.0,
+        description="End time of the speech clip in seconds",
+    )
+    description: str | None = None
+    label: str | None = Field(
+        default=None,
+        description="Optional descriptive label for this sample clip",
+    )
 
 
 class EnrollResponseDTO(BaseModel):

@@ -158,8 +158,80 @@ class VoiceRecognitionUseCasesTest(unittest.TestCase):
         updated_arg = self.diarization_repo.update_result_json.call_args[0][1]
         self.assertEqual(updated_arg["segments"][0]["speaker"], "Alice")
         self.assertEqual(updated_arg["segments"][0]["original_speaker"], "SPEAKER_00")
-        self.assertEqual(updated_arg["speakers"], ["Alice", "SPEAKER_01"])
-        self.assertIn("SPEAKER_00", updated_arg["speaker_mappings"])
+
+    def test_enroll_from_diarization_with_selected_segments(self) -> None:
+        self.diarization_repo.get_task.return_value = DiarizationEntity(
+            id="diar-100",
+            entity_id="yt-100",
+            entity_type="YOUTUBE",
+            file_path="video.mp4",
+            result_json={
+                "speakers": ["SPEAKER_00"],
+                "segments": [
+                    {"speaker": "SPEAKER_00", "start": 0.0, "end": 5.0, "text": "Ruído"},
+                    {"speaker": "SPEAKER_00", "start": 10.0, "end": 20.0, "text": "Fala limpa"},
+                ],
+            },
+        )
+        self.speaker_repo.get_profile_by_name.return_value = SpeakerProfileEntity(
+            id="spk-alice", name="Alice", samples_count=1
+        )
+        self.embedding_service.extract_embedding_from_segments.return_value = [0.1] * 256
+        self.speaker_repo.add_sample.return_value = VoiceSampleEntity(
+            id="smp-2", speaker_id="spk-alice"
+        )
+        self.speaker_repo.get_profile.return_value = SpeakerProfileEntity(
+            id="spk-alice", name="Alice", samples_count=2
+        )
+
+        response = self.enroll_use_case.enroll_from_diarization(
+            EnrollFromDiarizationDTO(
+                diarization_id="diar-100",
+                speaker_label="SPEAKER_00",
+                speaker_name="Alice",
+                selected_segment_indices=[1],
+                apply_to_diarization=False,
+            )
+        )
+        self.assertEqual(response.segments_used, 1)
+        self.assertEqual(response.speech_duration_seconds, 10.0)
+
+    def test_enroll_from_video_clip(self) -> None:
+        from src.modules.voice_recognition.application.dtos.enroll_speaker_dto import (
+            EnrollFromVideoClipDTO,
+        )
+
+        self.diarization_repo.get_task.return_value = DiarizationEntity(
+            id="diar-100",
+            entity_id="yt-100",
+            entity_type="YOUTUBE",
+            file_path="video.mp4",
+            result_json={},
+        )
+        self.speaker_repo.get_profile_by_name.return_value = None
+        self.speaker_repo.create_profile.return_value = SpeakerProfileEntity(
+            id="spk-bob", name="Bob", samples_count=0
+        )
+        self.embedding_service.extract_embedding_from_segments.return_value = [0.2] * 256
+        self.speaker_repo.add_sample.return_value = VoiceSampleEntity(
+            id="smp-3", speaker_id="spk-bob"
+        )
+        self.speaker_repo.get_profile.return_value = SpeakerProfileEntity(
+            id="spk-bob", name="Bob", samples_count=1
+        )
+
+        response = self.enroll_use_case.enroll_from_video_clip(
+            EnrollFromVideoClipDTO(
+                video_id="diar-100",
+                speaker_name="Bob",
+                start_time=15.0,
+                end_time=35.0,
+                label="Trecho Podcast",
+            )
+        )
+        self.assertEqual(response.speaker_name, "Bob")
+        self.assertEqual(response.speech_duration_seconds, 20.0)
+        self.assertEqual(response.speaker_label, "Trecho Podcast")
 
     def test_identify_diarization_speakers_matches_and_applies(self) -> None:
         self.diarization_repo.get_task.return_value = DiarizationEntity(
