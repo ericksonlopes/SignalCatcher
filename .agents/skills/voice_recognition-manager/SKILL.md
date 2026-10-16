@@ -147,7 +147,7 @@ renomeado (`assign_speaker_in_diarization`):
 | `PATCH /api/voice-recognition/profiles/{speaker_id}`    | Atualiza nome/descrição de um perfil                                                          |
 | `DELETE /api/voice-recognition/profiles/{speaker_id}`   | Remove perfil e suas amostras em cascata                                                      |
 | `DELETE /api/voice-recognition/samples/{sample_id}`     | Remove uma amostra de voz específica                                                          |
-| `POST /api/voice-recognition/enroll/from-diarization`   | Extrai voz de um `SPEAKER_XX` ou falas selecionadas, salva no `pgvector` e na pasta de cortes |
+| `POST /api/voice-recognition/enroll/from-diarization`   | Extrai voz de um `SPEAKER_XX`, falas selecionadas ou recorte de tempo customizado (`start_time`/`end_time`), salva no `pgvector` e na pasta de cortes |
 | `POST /api/voice-recognition/enroll/video-clip`          | Treina a voz a partir de um trecho de vídeo (`start_time` / `end_time`), salva em `D:/voice_training` |
 | `POST /api/voice-recognition/enroll/audio`              | Cadastra amostra de voz via áudio em Base64                                                   |
 | `POST /api/voice-recognition/diarization/{id}/identify` | Compara todos os locutores da diarização no `pgvector` e aplica os nomes identificados        |

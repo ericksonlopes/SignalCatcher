@@ -196,6 +196,41 @@ class VoiceRecognitionUseCasesTest(unittest.TestCase):
         self.assertEqual(response.segments_used, 1)
         self.assertEqual(response.speech_duration_seconds, 10.0)
 
+    def test_enroll_from_diarization_with_custom_time_range(self) -> None:
+        self.diarization_repo.get_task.return_value = DiarizationEntity(
+            id="diar-1",
+            file_path="dummy.mp4",
+            result_json={
+                "speakers": ["SPEAKER_00"],
+                "segments": [
+                    {"speaker": "SPEAKER_00", "start": 5.0, "end": 20.0, "text": "Fala 1"},
+                ],
+            },
+        )
+        self.speaker_repo.get_profile_by_name.return_value = SpeakerProfileEntity(
+            id="spk-1", name="Alice", samples_count=1
+        )
+        self.embedding_service.extract_embedding_from_segments.return_value = [0.1] * 256
+        self.speaker_repo.add_sample.return_value = VoiceSampleEntity(
+            id="smp-2", speaker_id="spk-1"
+        )
+        self.speaker_repo.get_profile.return_value = SpeakerProfileEntity(
+            id="spk-1", name="Alice", samples_count=2
+        )
+
+        response = self.enroll_use_case.enroll_from_diarization(
+            EnrollFromDiarizationDTO(
+                diarization_id="diar-1",
+                speaker_label="SPEAKER_00",
+                speaker_name="Alice",
+                start_time=7.5,
+                end_time=15.0,
+                apply_to_diarization=False,
+            )
+        )
+        self.assertEqual(response.segments_used, 1)
+        self.assertEqual(response.speech_duration_seconds, 7.5)
+
     def test_enroll_from_video_clip(self) -> None:
         from src.modules.voice_recognition.application.dtos.enroll_speaker_dto import (
             EnrollFromVideoClipDTO,

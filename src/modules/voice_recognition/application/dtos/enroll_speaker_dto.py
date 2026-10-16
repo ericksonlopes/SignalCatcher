@@ -19,6 +19,16 @@ class EnrollFromDiarizationDTO(BaseModel):
         default=None,
         description="Optional list of specific segment indices to train from",
     )
+    start_time: float | None = Field(
+        default=None,
+        ge=0.0,
+        description="Optional custom start time of clip in seconds",
+    )
+    end_time: float | None = Field(
+        default=None,
+        gt=0.0,
+        description="Optional custom end time of clip in seconds",
+    )
 
 
 class EnrollFromVideoClipDTO(BaseModel):

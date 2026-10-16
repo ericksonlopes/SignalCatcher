@@ -1,6 +1,9 @@
 import copy
 import logging
 import os
+import re
+import subprocess
+import time
 from typing import Any
 
 from src.core.config.settings import settings
@@ -70,6 +73,64 @@ def apply_speaker_mapping_to_result_json(
     }
     updated["speaker_mappings"] = mappings
     return updated
+
+
+def save_clip_to_voice_training(
+    file_path: str,
+    speaker_name: str,
+    start_time: float,
+    end_time: float,
+    label: str | None = None,
+) -> str | None:
+    """Exports a clipped .wav audio file to the configured voice training directory."""
+    try:
+        base_dir = settings.VOICE_TRAINING_PATH
+        if not base_dir or not os.path.exists(file_path):
+            return None
+        safe_name = re.sub(r'[\\/*?:"<>| ]+', "_", speaker_name.strip())
+        target_dir = os.path.join(base_dir, safe_name)
+        os.makedirs(target_dir, exist_ok=True)
+        clip_tag = label or f"clip_{int(start_time)}s_{int(end_time)}s"
+        safe_tag = re.sub(r'[\\/*?:"<>| ]+', "_", clip_tag)
+        filename = f"{safe_tag}_{int(time.time())}.wav"
+        output_file = os.path.join(target_dir, filename)
+
+        ffmpeg_bin = "ffmpeg"
+        if settings.FFMPEG_LOCATION:
+            candidate = os.path.join(settings.FFMPEG_LOCATION, "ffmpeg")
+            if os.path.exists(candidate) or os.path.exists(candidate + ".exe"):
+                ffmpeg_bin = candidate
+
+        duration = max(0.1, end_time - start_time)
+        cmd = [
+            ffmpeg_bin,
+            "-y",
+            "-nostdin",
+            "-ss",
+            f"{start_time:.3f}",
+            "-t",
+            f"{duration:.3f}",
+            "-i",
+            file_path,
+            "-ar",
+            "16000",
+            "-ac",
+            "1",
+            "-c:a",
+            "pcm_s16le",
+            output_file,
+        ]
+        proc = subprocess.run(cmd, capture_output=True, timeout=30, check=False)
+        if proc.returncode == 0 and os.path.exists(output_file):
+            logger.info("Saved voice training clip to %s", output_file)
+            return output_file
+    except Exception as exc:
+        logger.warning(
+            "Could not export voice training clip to %s: %s",
+            settings.VOICE_TRAINING_PATH,
+            exc,
+        )
+    return None
 
 
 class EnrollSpeakerUseCase:
@@ -159,6 +220,14 @@ class EnrollSpeakerUseCase:
         )
 
         label = request.label or f"CLIP_{int(request.start_time)}s_{int(request.end_time)}s"
+        saved_clip_path = save_clip_to_voice_training(
+            file_path=file_path,
+            speaker_name=profile.name,
+            start_time=request.start_time,
+            end_time=request.end_time,
+            label=label,
+        )
+
         sample = VoiceSampleEntity(
             speaker_id=profile.id or "",
             source_type=VoiceSourceType.YOUTUBE_CLIP,
@@ -173,6 +242,7 @@ class EnrollSpeakerUseCase:
                 "entity_id": entity_id,
                 "start_time": request.start_time,
                 "end_time": request.end_time,
+                "training_clip_path": saved_clip_path,
             },
             embedding=embedding,
         )
@@ -243,16 +313,35 @@ class EnrollSpeakerUseCase:
             description=request.description,
         )
 
+        if request.start_time is not None and request.end_time is not None:
+            if request.end_time <= request.start_time:
+                raise ValueError("The end time must be greater than the start time.")
+            clip_dur = request.end_time - request.start_time
+            if clip_dur < 1.0:
+                raise ValueError("The speech clip must be at least 1 second long.")
+            matching_segments = [{"start": request.start_time, "end": request.end_time}]
+            start_time = request.start_time
+            end_time = request.end_time
+            speech_duration = clip_dur
+        else:
+            start_time = min(float(s.get("start", 0.0)) for s in matching_segments)
+            end_time = max(float(s.get("end", 0.0)) for s in matching_segments)
+            speech_duration = sum(
+                max(0.0, float(s.get("end", 0.0)) - float(s.get("start", 0.0)))
+                for s in matching_segments
+            )
+
         embedding = self.voice_embedding_service.extract_embedding_from_segments(
             file_path=task.file_path,
             segments=matching_segments,
         )
 
-        start_time = min(float(s.get("start", 0.0)) for s in matching_segments)
-        end_time = max(float(s.get("end", 0.0)) for s in matching_segments)
-        speech_duration = sum(
-            max(0.0, float(s.get("end", 0.0)) - float(s.get("start", 0.0)))
-            for s in matching_segments
+        saved_clip_path = save_clip_to_voice_training(
+            file_path=task.file_path,
+            speaker_name=profile.name,
+            start_time=start_time,
+            end_time=end_time,
+            label=request.speaker_label,
         )
 
         sample = VoiceSampleEntity(
@@ -271,6 +360,8 @@ class EnrollSpeakerUseCase:
                 "sample_text": " ".join(
                     str(s.get("text", "")).strip() for s in matching_segments[:3]
                 )[:240],
+                "training_clip_path": saved_clip_path,
+                "custom_time_range": request.start_time is not None,
             },
             embedding=embedding,
         )
