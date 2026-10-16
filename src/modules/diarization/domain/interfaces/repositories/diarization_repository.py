@@ -55,3 +55,7 @@ class IDiarizationRepository(Protocol):
     def prioritize_task(self, task_id: str) -> DiarizationEntity | None:
         """Prioritize a task and return other running tasks to the end of the queue."""
         ...
+
+    def update_result_json(self, task_id: str, result_json: dict) -> DiarizationEntity | None:
+        """Updates the result_json of an existing diarization task (e.g. speaker mappings)."""
+        ...
