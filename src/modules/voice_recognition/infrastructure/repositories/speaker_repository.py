@@ -227,7 +227,7 @@ class SpeakerRepository(ISpeakerRepository):
             model.embedding = sample.embedding
 
         self.session.flush()
-        self._update_profile_aggregates(model.speaker_id)
+        self._update_profile_aggregates(str(model.speaker_id))
         self.session.flush()
         self.session.refresh(model)
         return SpeakerMapper.sample_to_entity(model)
@@ -238,7 +238,7 @@ class SpeakerRepository(ISpeakerRepository):
         )
         if not model:
             return False
-        speaker_id = model.speaker_id
+        speaker_id = str(model.speaker_id)
         self.session.delete(model)
         self.session.flush()
         self._update_profile_aggregates(speaker_id)
