@@ -21,6 +21,9 @@ from src.modules.voice_recognition.domain.entities.speaker_profile_entity import
 from src.modules.voice_recognition.domain.entities.voice_sample_entity import (
     VoiceSampleEntity,
 )
+from src.modules.voice_recognition.domain.enums.sample_review_status import (
+    SampleReviewStatus,
+)
 from src.modules.voice_recognition.domain.enums.voice_source_type import VoiceSourceType
 from src.modules.voice_recognition.domain.interfaces import (
     ISpeakerRepository,
@@ -64,7 +67,8 @@ def apply_speaker_mapping_to_result_json(
             seen_speakers.append(spk)
     updated["speakers"] = seen_speakers
 
-    mappings = dict(updated.get("speaker_mappings") or {})
+    # Record mapping metadata
+    mappings: dict[str, Any] = dict(updated.get("speaker_mappings", {}))
     mappings[original_key] = {
         "original_speaker": original_key,
         "speaker_id": speaker_id,
@@ -82,7 +86,7 @@ def save_clip_to_voice_training(
     end_time: float,
     label: str | None = None,
 ) -> str | None:
-    """Exports a clipped .wav audio file to the configured voice training directory."""
+    """Exports a clipped 16kHz mono WAV audio file to the configured voice training directory."""
     try:
         base_dir = settings.VOICE_TRAINING_PATH
         if not base_dir or not os.path.exists(file_path):
@@ -134,8 +138,7 @@ def save_clip_to_voice_training(
 
 
 class EnrollSpeakerUseCase:
-    """Enrolls a speaker voiceprint from a completed diarization, a video clip,
-    or from an uploaded audio file."""
+    """Orchestrates speaker enrollment from video clips, diarization tasks, and raw audio."""
 
     def __init__(
         self,
@@ -208,9 +211,11 @@ class EnrollSpeakerUseCase:
         file_path, entity_id = self._resolve_media_file_path(request.video_id)
 
         segments = [{"start": request.start_time, "end": request.end_time}]
-        embedding = self.voice_embedding_service.extract_embedding_from_segments(
-            file_path=file_path,
-            segments=segments,
+        embedding, model_name, quality = (
+            self.voice_embedding_service.extract_embedding_with_quality(
+                file_path=file_path,
+                segments=segments,
+            )
         )
 
         profile = self._resolve_or_create_profile(
@@ -236,6 +241,10 @@ class EnrollSpeakerUseCase:
             start_time=round(request.start_time, 2),
             end_time=round(request.end_time, 2),
             duration_seconds=round(clip_duration, 2),
+            status=SampleReviewStatus.PENDING_REVIEW,
+            clip_path=saved_clip_path,
+            quality=quality,
+            embedding_model=model_name,
             metadata={
                 "clip": True,
                 "video_id": request.video_id,
@@ -250,13 +259,12 @@ class EnrollSpeakerUseCase:
         updated_profile = self.speaker_repository.get_profile(profile.id or "") or profile
 
         logger.info(
-            "Enrolled speaker '%s' (id=%s) from video clip %s [%.1fs - %.1fs] (%.1fs)",
+            "Enrolled sample candidate for '%s' (id=%s) from clip %s [%.1fs - %.1fs]",
             profile.name,
             profile.id,
             request.video_id,
             request.start_time,
             request.end_time,
-            clip_duration,
         )
 
         return EnrollResponseDTO(
@@ -331,9 +339,11 @@ class EnrollSpeakerUseCase:
                 for s in matching_segments
             )
 
-        embedding = self.voice_embedding_service.extract_embedding_from_segments(
-            file_path=task.file_path,
-            segments=matching_segments,
+        embedding, model_name, quality = (
+            self.voice_embedding_service.extract_embedding_with_quality(
+                file_path=task.file_path,
+                segments=matching_segments,
+            )
         )
 
         saved_clip_path = save_clip_to_voice_training(
@@ -352,6 +362,10 @@ class EnrollSpeakerUseCase:
             start_time=round(start_time, 3),
             end_time=round(end_time, 3),
             duration_seconds=round(speech_duration, 3),
+            status=SampleReviewStatus.PENDING_REVIEW,
+            clip_path=saved_clip_path,
+            quality=quality,
+            embedding_model=model_name,
             metadata={
                 "entity_id": task.entity_id,
                 "entity_type": task.entity_type,
@@ -382,7 +396,8 @@ class EnrollSpeakerUseCase:
         updated_profile = self.speaker_repository.get_profile(profile.id or "") or profile
 
         logger.info(
-            "Enrolled speaker '%s' (id=%s) from diarization %s speaker %s (%d segments, %.1fs)",
+            "Enrolled sample candidate for '%s' (id=%s) from diarization %s speaker %s"
+            " (%d segments, %.1fs)",
             profile.name,
             profile.id,
             task.id,
@@ -428,6 +443,8 @@ class EnrollSpeakerUseCase:
             source_type=VoiceSourceType.AUDIO_UPLOAD,
             source_id=filename,
             speaker_label="UPLOAD",
+            status=SampleReviewStatus.PENDING_REVIEW,
+            embedding_model="pyannote/wespeaker-voxceleb-resnet34-LM",
             metadata={"filename": filename, "size_bytes": len(audio_bytes)},
             embedding=embedding,
         )

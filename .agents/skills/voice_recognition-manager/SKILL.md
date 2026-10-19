@@ -88,7 +88,10 @@ src/modules/voice_recognition/
     - `name` (`VARCHAR(255)`, Unique, Indexed): Nome real da pessoa (ex: `"João Silva"`).
     - `description` (`TEXT`, Nullable): Cargo, canal ou observações.
     - `avatar_url` (`VARCHAR(512)`, Nullable): URL opcional de avatar.
-    - `samples_count` (`INTEGER`, Default `0`): Quantidade de amostras de voz cadastradas.
+    - `samples_count` (`INTEGER`, Default `0`): Quantidade de amostras **aprovadas** cadastradas.
+    - `pending_count` (`INTEGER`, Default `0`): Quantidade de amostras aguardando curadoria (`PENDING_REVIEW`).
+    - `profile_strength` (`VARCHAR(20)`, Default `'weak'`): Força do perfil (`weak`, `moderate`, `strong`).
+    - `centroid` (`vector(256)`, Nullable): Centróide L2-normalizado dos embeddings das amostras aprovadas.
     - `created_at` / `updated_at` (`TIMESTAMP`).
 
 2. **`voice_samples`**:
@@ -98,41 +101,50 @@ src/modules/voice_recognition/
     - `source_id` (`VARCHAR(255)`): ID da tarefa de diarização ou nome do arquivo.
     - `speaker_label` (`VARCHAR(100)`): Rótulo original (ex: `SPEAKER_00`).
     - `start_time`, `end_time`, `duration_seconds` (`FLOAT`).
-    - `metadata` (`JSON`): Metadados extras (`entity_id`, `segments_count`, `sample_text`).
+    - `status` (`VARCHAR(30)`, Default `'PENDING_REVIEW'`): `PENDING_REVIEW`, `APPROVED`, `REJECTED`.
+    - `clip_path` (`VARCHAR(1024)`, Nullable): Caminho absoluto do arquivo WAV mono 16kHz em disco.
+    - `quality` (`JSON`): Métricas de VAD (`speech_ratio`, `speech_seconds`, `sample_rate`, etc.).
+    - `reviewed_at` (`TIMESTAMP`, Nullable): Data/hora em que a amostra foi aprovada ou rejeitada.
+    - `embedding_model` (`VARCHAR(100)`): Modelo neural utilizado (`pyannote/wespeaker-voxceleb-resnet34-LM`).
+    - `metadata` (`JSON`): Metadados extras (`entity_id`, `segments_count`, `text`).
     - `embedding` (`vector(256)`): Vetor L2-normalizado de 256 dimensões.
-    - Índice HNSW: `ix_voice_samples_embedding_hnsw` com `vector_cosine_ops`.
+    - Índices: HNSW `ix_voice_samples_embedding_hnsw` (`vector_cosine_ops`), `ix_voice_samples_status`, `ix_voice_samples_speaker_status`.
 
-### Migration Alembic
+### Migrations Alembic
 
-- Revisão: `d4f8a1e2b3c9_add_voice_recognition_tables.py` (sucede `c7c9ce3f01a1`).
+- `d4f8a1e2b3c9_add_voice_recognition_tables.py`: Criação das tabelas iniciais com pgvector.
+- `e1a2b3c4d5e6_add_voice_sample_curation_fields.py`: Adiciona colunas de curadoria, campos de status e migra registros legados para `PENDING_REVIEW` com `samples_count = 0` ("revisar do zero").
 
 ---
 
-## 3. Extração de Embeddings no Worker (`SignalCatcherDiarization`)
+## 3. Extração de Embeddings & Qualidade no Worker (`SignalCatcherDiarization`)
 
 - **Serviço**: `src/modules/diarization/infrastructure/services/voice_embedder.py` (`VoiceEmbedder`)
-- **Modelo Principal**: `pyannote/wespeaker-voxceleb-resnet34-LM` (256 dimensões, carregado sob demanda via
-  `model_loader.get_voice_embedding_inference` e descarregado após uso com `unload_voice_embedding()`).
-- **Fallback Acústico**: Caso o modelo Pyannote não esteja disponível no ambiente, utiliza extração espectral
-  STFT/log-magnitude normalizada em 256 dimensões.
+- **Modelo Principal**: `pyannote/wespeaker-voxceleb-resnet34-LM` (256 dimensões, normalizado L2).
+- **VAD & Filtragem**:
+    - Janelamento deslizante de 3.0s com hop de 1.5s sobre os turnos de fala.
+    - Filtro de VAD por RMS e speech ratio.
+    - Rejeição de outliers por similaridade de cosseno intra-janelas.
+- **Fallback Acústico**: Caso o modelo Pyannote não esteja disponível no ambiente, utiliza extração espectral STFT/log-magnitude normalizada em 256 dimensões (`spectral-v1`).
 - **Rotas do Worker** (`/api/voice-recognition`):
-    - `POST /api/voice-recognition/extract-segments`: extrai embedding de uma lista de segmentos `[start, end]`.
-    - `POST /api/voice-recognition/extract-batch`: extrai embeddings de múltiplos locutores carregando o áudio apenas
-      uma vez.
+    - `POST /api/voice-recognition/extract-segments`: extrai embedding de uma lista de segmentos `[start, end]`, retornando `embedding`, `quality` e `embedding_model`.
+    - `POST /api/voice-recognition/extract-batch`: extrai embeddings de múltiplos locutores carregando o áudio apenas uma vez.
     - `POST /api/voice-recognition/extract-file`: extrai embedding de um arquivo enviado via upload.
 
 ---
 
-## 4. Contrato de Atualização de `result_json` na Diarização
+## 4. Curadoria de Voz (Human-in-the-Loop) & Força do Perfil
 
-Quando um locutor é cadastrado (`enroll_from_diarization`), identificado automaticamente (`identify_diarization`) ou
-renomeado (`assign_speaker_in_diarization`):
-
-- A função `apply_speaker_mapping_to_result_json` preserva o rótulo original de clusterização em
-  `segment["original_speaker"]` (ex: `"SPEAKER_00"`) antes de substituir `segment["speaker"]` pelo nome real.
-- Assim, re-identificações futuras ou novos cadastros continuam funcionando mesmo depois que `SPEAKER_00` já foi
-  substituído pelo nome da pessoa.
-- O mapa consolidado é gravado em `result_json["speaker_mappings"]`.
+- **Fluxo do Treinamento**:
+    1. Novos recortes criados a partir de vídeos ou diarizações são salvos como WAV mono 16kHz em disco e entram inicialmente com status `PENDING_REVIEW`.
+    2. O usuário escuta a amostra pelo player de áudio embutido (`VoiceClipPlayer`), confere o texto e as métricas de qualidade (VAD, fala útil, SNR).
+    3. O usuário pode ajustar o início/fim com botões de passo e ouvir uma prévia em tempo real (`/api/voice-recognition/preview`).
+    4. Ao aprovar, a amostra passa para `APPROVED`, é incorporada ao `centroid` do perfil e incrementa o `samples_count`.
+    5. Apenas amostras **aprovadas** com modelo neural verificado participam da identificação automática de locutores por cosseno.
+- **Força do Perfil (`profile_strength`)**:
+    - `weak`: < 3 amostras aprovadas ou < 30s úteis de fala.
+    - `moderate`: ≥ 3 amostras aprovadas e ≥ 15s de voz.
+    - `strong`: ≥ 5 amostras aprovadas, ≥ 60s de voz e ≥ 2 fontes distintas de vídeo.
 
 ---
 
@@ -140,17 +152,23 @@ renomeado (`assign_speaker_in_diarization`):
 
 | Método e Rota                                           | Descrição                                                                                     |
 |---------------------------------------------------------|-----------------------------------------------------------------------------------------------|
-| `GET /api/voice-recognition/stats`                      | Estatísticas de perfis, amostras, dimensão (`256`) e saúde do worker                          |
+| `GET /api/voice-recognition/stats`                      | Estatísticas de perfis, amostras aprovadas/pendentes, dimensão (`256`) e worker               |
 | `GET /api/voice-recognition/profiles`                   | Lista perfis de voz (suporta `?search=` e `?include_samples=true`)                            |
 | `POST /api/voice-recognition/profiles`                  | Cria um novo perfil de voz                                                                    |
-| `GET /api/voice-recognition/profiles/{speaker_id}`      | Detalhes de um perfil com suas amostras                                                       |
+| `GET /api/voice-recognition/profiles/{speaker_id}`      | Detalhes de um perfil com suas amostras e força                                               |
 | `PATCH /api/voice-recognition/profiles/{speaker_id}`    | Atualiza nome/descrição de um perfil                                                          |
 | `DELETE /api/voice-recognition/profiles/{speaker_id}`   | Remove perfil e suas amostras em cascata                                                      |
 | `DELETE /api/voice-recognition/samples/{sample_id}`     | Remove uma amostra de voz específica                                                          |
-| `POST /api/voice-recognition/enroll/from-diarization`   | Extrai voz de um `SPEAKER_XX`, falas selecionadas ou recorte de tempo customizado (`start_time`/`end_time`), salva no `pgvector` e na pasta de cortes |
-| `POST /api/voice-recognition/enroll/video-clip`          | Treina a voz a partir de um trecho de vídeo (`start_time` / `end_time`), salva em `D:/voice_training` |
+| `GET /api/voice-recognition/samples/review-queue`       | Fila de curadoria filtrável por `?status=PENDING_REVIEW|APPROVED|REJECTED` e `?speaker_id=`    |
+| `PATCH /api/voice-recognition/samples/{id}/review`      | Aprova/rejeita amostra, suporta corte retificado (`start_time`/`end_time`) e re-extração       |
+| `POST /api/voice-recognition/samples/review/bulk`       | Aprovação ou rejeição em lote de múltiplas amostras                                           |
+| `GET /api/voice-recognition/samples/{id}/audio`         | Stream/download direto do arquivo WAV da amostra                                              |
+| `GET /api/voice-recognition/preview`                    | Prévia on-demand de áudio de qualquer vídeo (`?video_id=&start_time=&end_time=`) via ffmpeg    |
+| `GET /api/voice-recognition/diarization/{id}/speakers/{label}/suggested-clips` | Retorna as top falas mais limpas do locutor para treinamento    |
+| `POST /api/voice-recognition/enroll/from-diarization`   | Extrai voz de um `SPEAKER_XX`, cria amostra como `PENDING_REVIEW` com WAV salvo em disco       |
+| `POST /api/voice-recognition/enroll/video-clip`          | Treina a voz a partir de um trecho de vídeo (`start_time` / `end_time`), salva WAV em disco    |
 | `POST /api/voice-recognition/enroll/audio`              | Cadastra amostra de voz via áudio em Base64                                                   |
-| `POST /api/voice-recognition/diarization/{id}/identify` | Compara todos os locutores da diarização no `pgvector` e aplica os nomes identificados        |
+| `POST /api/voice-recognition/diarization/{id}/identify` | Compara locutores da diarização contra amostras aprovadas no `pgvector` e aplica os nomes     |
 | `POST /api/voice-recognition/diarization/{id}/assign`   | Renomeia um locutor na diarização e opcionalmente cadastra sua voz no `pgvector`              |
 
 ---
@@ -158,28 +176,28 @@ renomeado (`assign_speaker_in_diarization`):
 ## 6. Integração Frontend (`SignalCatcherFrontend`)
 
 1. **`src/components/apps/VoiceRecognitionApp.tsx`**:
-    - Acessível pela barra lateral (`Fingerprint`) e pelo Command Palette (`Ctrl+K` -> "Reconhecimento de Voz").
-    - Permite gerenciar perfis de voz, cadastrar amostras a partir de qualquer diarização concluída ou upload de áudio,
-      e executar identificação automática com ajuste de limiar de similaridade (`similarity_threshold`).
-2. **`src/components/apps/diarization/DiarizationViewer.tsx`**:
-    - Botão **"Identificar Locutores"** no cabeçalho da transcrição para reconhecer automaticamente os falantes do vídeo
-      aberto.
-    - Ao renomear qualquer locutor na barra lateral, persiste o nome no backend e permite cadastrar automaticamente a
-      amostra de voz no `pgvector`.
-3. **Mocks (`server.ts`)**:
-    - Todos os endpoints `/api/voice-recognition/*` possuem implementação mockada em memória no `server.ts`.
+    - Abas dedicadas:
+        - **Curadoria de Voz** (`VoiceCurationQueue`): fila de aprovação com player de áudio integrado, badges de VAD/SNR, atalhos de teclado (`A` para aprovar, `R` para rejeitar, `Espaço` para play/pause), botões de ajuste de corte com prévia e aprovação em massa.
+        - **Treinamento & Recortes**: formulários para recortar vídeos ou selecionar turnos contíguos de fala, enriquecido com **Trechos Sugeridos** (`VoiceSuggestedClips`) para escutar e treinar as melhores falas com 1 clique.
+        - **Perfis de Locutores & Identificação**: diretório com badge de força do perfil (`Fraco`, `Médio`, `Forte`), contadores de pendências e amostras com mini players de áudio, além do painel de identificação por cosseno pgvector.
+2. **`src/components/apps/voice/VoiceClipPlayer.tsx`**:
+    - Player de áudio com scrubbing de barra de progresso, velocidade ajustável (1x, 1.25x, 1.5x), mute e modo compacto/completo.
+3. **`src/components/apps/diarization/DiarizationViewer.tsx`**:
+    - Botão **"Trechos Sugeridos para Treino"** no card de cada locutor, permitindo escutar os melhores turnos e cadastrá-los na fila de curadoria diretamente da transcrição.
+4. **Mocks (`server.ts`)**:
+    - Endpoints de fila de curadoria, aprovação, rejeição, bulk, streaming de áudio e suggested clips implementados.
 
 ---
 
 ## 7. Testes e Verificação
 
 ```powershell
+# Backend
 uv run python -m unittest discover -s tests -p "test_*.py" -v
-uv run ruff check src/modules/voice_recognition/ tests/test_voice_recognition_use_cases.py
-uv run mypy src/modules/voice_recognition/ main.py
+uv run ruff check src/modules/voice_recognition/
+
+# Frontend
+npx tsc --noEmit
+npm run lint
+npm run build
 ```
-
-### Política de Documentação Viva
-
-Sempre que novos endpoints, dimensões de embedding ou contratos de `result_json` forem alterados no módulo
-`voice_recognition`, atualize imediatamente este arquivo `SKILL.md`.

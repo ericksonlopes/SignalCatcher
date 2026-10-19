@@ -6,6 +6,9 @@ from src.modules.voice_recognition.domain.entities.speaker_profile_entity import
 from src.modules.voice_recognition.domain.entities.voice_sample_entity import (
     VoiceSampleEntity,
 )
+from src.modules.voice_recognition.domain.enums.sample_review_status import (
+    SampleReviewStatus,
+)
 
 
 class ISpeakerRepository(ABC):
@@ -47,17 +50,34 @@ class ISpeakerRepository(ABC):
 
     @abstractmethod
     def add_sample(self, sample: VoiceSampleEntity) -> VoiceSampleEntity:
-        """Persists a voiceprint sample and updates the profile's samples_count."""
+        """Persists a voiceprint sample and updates profile sample counters and centroid."""
         pass
 
     @abstractmethod
-    def list_samples(self, speaker_id: str) -> list[VoiceSampleEntity]:
-        """Lists all voiceprint samples for a given speaker profile."""
+    def get_sample(self, sample_id: str) -> VoiceSampleEntity | None:
+        """Returns a specific voice sample by its ID."""
+        pass
+
+    @abstractmethod
+    def list_samples(
+        self,
+        speaker_id: str | None = None,
+        status: SampleReviewStatus | None = None,
+    ) -> list[VoiceSampleEntity]:
+        """Lists voiceprint samples, optionally filtered by speaker_id and/or status."""
+        pass
+
+    @abstractmethod
+    def update_sample(
+        self,
+        sample: VoiceSampleEntity,
+    ) -> VoiceSampleEntity:
+        """Updates sample fields (e.g. status, quality, clip_path, embedding)."""
         pass
 
     @abstractmethod
     def delete_sample(self, sample_id: str) -> bool:
-        """Deletes a specific voice sample and decrements the profile's samples_count."""
+        """Deletes a specific voice sample and updates profile counters and centroid."""
         pass
 
     @abstractmethod
@@ -66,8 +86,13 @@ class ISpeakerRepository(ABC):
         pass
 
     @abstractmethod
-    def count_samples(self) -> int:
-        """Counts total registered voice samples."""
+    def count_samples(self, status: SampleReviewStatus | None = None) -> int:
+        """Counts registered voice samples, optionally filtered by status."""
+        pass
+
+    @abstractmethod
+    def recompute_profile_centroid(self, speaker_id: str) -> list[float] | None:
+        """Recomputes and saves the L2-normalized centroid of all APPROVED samples of a profile."""
         pass
 
     @abstractmethod
@@ -76,6 +101,7 @@ class ISpeakerRepository(ABC):
         query_vector: list[float],
         top_k: int = 5,
         min_similarity: float = 0.65,
+        only_approved: bool = True,
     ) -> list[tuple[VoiceSampleEntity, SpeakerProfileEntity, float]]:
         """Searches voice samples nearest to query_vector using cosine similarity."""
         pass

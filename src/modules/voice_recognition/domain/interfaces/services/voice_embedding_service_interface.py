@@ -13,6 +13,15 @@ class IVoiceEmbeddingService(ABC):
         pass
 
     @abstractmethod
+    def extract_embedding_with_quality(
+        self,
+        file_path: str,
+        segments: list[dict[str, Any]],
+    ) -> tuple[list[float], str, dict[str, Any]]:
+        """Extracts normalized embedding vector, embedding model name, and quality metrics."""
+        pass
+
+    @abstractmethod
     def extract_speakers_embeddings(
         self,
         file_path: str,

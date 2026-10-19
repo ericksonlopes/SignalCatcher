@@ -13,5 +13,7 @@ class SpeakerProfileEntity(BaseModel):
     description: str | None = None
     avatar_url: str | None = None
     samples_count: int = 0
+    pending_count: int = 0
+    centroid: list[float] | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None

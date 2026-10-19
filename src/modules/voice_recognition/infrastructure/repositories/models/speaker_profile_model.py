@@ -31,6 +31,8 @@ class SpeakerProfileModel(Base):
     description = Column(Text, nullable=True)
     avatar_url = Column(String(512), nullable=True)
     samples_count = Column(Integer, nullable=False, default=0, server_default="0")
+    pending_count = Column(Integer, nullable=False, default=0, server_default="0")
+    centroid = Column(Vector(settings.VOICE_EMBEDDING_DIMENSION), nullable=True)
     created_at = Column(DateTime, default=get_utc_now)
     updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now)
 
@@ -46,6 +48,8 @@ class VoiceSampleModel(Base):
         ),
         Index("ix_voice_samples_speaker_id", "speaker_id"),
         Index("ix_voice_samples_source", "source_type", "source_id"),
+        Index("ix_voice_samples_status", "status"),
+        Index("ix_voice_samples_speaker_status", "speaker_id", "status"),
         {"extend_existing": True},
     )
 
@@ -61,6 +65,13 @@ class VoiceSampleModel(Base):
     start_time = Column(Float, nullable=True)
     end_time = Column(Float, nullable=True)
     duration_seconds = Column(Float, nullable=True)
+    status = Column(
+        String(30), nullable=False, default="PENDING_REVIEW", server_default="PENDING_REVIEW"
+    )
+    clip_path = Column(String(1024), nullable=True)
+    quality = Column(JSON, nullable=False, default=dict)
+    reviewed_at = Column(DateTime, nullable=True)
+    embedding_model = Column(String(100), nullable=True)
     metadata_ = Column("metadata", JSON, nullable=False, default=dict)
     embedding = Column(Vector(settings.VOICE_EMBEDDING_DIMENSION), nullable=False)
     created_at = Column(DateTime, default=get_utc_now)

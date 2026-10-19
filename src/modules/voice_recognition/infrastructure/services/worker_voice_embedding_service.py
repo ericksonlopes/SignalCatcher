@@ -45,6 +45,14 @@ class WorkerVoiceEmbeddingService(IVoiceEmbeddingService):
         file_path: str,
         segments: list[dict[str, Any]],
     ) -> list[float]:
+        vec, _, _ = self.extract_embedding_with_quality(file_path, segments)
+        return vec
+
+    def extract_embedding_with_quality(
+        self,
+        file_path: str,
+        segments: list[dict[str, Any]],
+    ) -> tuple[list[float], str, dict[str, Any]]:
         if not segments:
             raise ValueError("At least one audio segment is required to extract a voice embedding.")
 
@@ -64,15 +72,18 @@ class WorkerVoiceEmbeddingService(IVoiceEmbeddingService):
             response.raise_for_status()
             data = response.json()
             embedding = data.get("embedding")
+            model_name = data.get("embedding_model") or "pyannote/wespeaker-voxceleb-resnet34-LM"
+            quality = data.get("quality") or {}
             if isinstance(embedding, list) and len(embedding) == self.dimension:
-                return _normalize_vector([float(x) for x in embedding])
+                return _normalize_vector([float(x) for x in embedding]), model_name, quality
         except Exception as exc:
             logger.warning(
                 "Worker voice embedding extraction failed (%s), using local acoustic fallback.",
                 exc,
             )
 
-        return self._extract_local_acoustic_from_segments(file_path, segments)
+        fallback_vec = self._extract_local_acoustic_from_segments(file_path, segments)
+        return fallback_vec, "spectral-v1", {"fallback": True, "segments_count": len(segments)}
 
     def extract_speakers_embeddings(
         self,

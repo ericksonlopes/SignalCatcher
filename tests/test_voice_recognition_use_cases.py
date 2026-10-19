@@ -6,6 +6,9 @@ from sqlalchemy.orm import sessionmaker
 
 from src.core.database.connector import Base
 from src.modules.diarization.domain.entities.diarization_entity import DiarizationEntity
+from src.modules.voice_recognition.domain.enums.sample_review_status import (
+    SampleReviewStatus,
+)
 from src.modules.voice_recognition.application.dtos.enroll_speaker_dto import (
     EnrollFromDiarizationDTO,
 )
@@ -46,6 +49,11 @@ class VoiceRecognitionUseCasesTest(unittest.TestCase):
         self.manage_use_case = ManageSpeakerProfilesUseCase(
             speaker_repository=self.speaker_repo,
             voice_embedding_service=self.embedding_service,
+        )
+        self.embedding_service.extract_embedding_with_quality.return_value = (
+            [0.25] * 256,
+            "pyannote/wespeaker-voxceleb-resnet34-LM",
+            {"speech_ratio": 0.85, "speech_seconds": 12.0},
         )
         self.enroll_use_case = EnrollSpeakerUseCase(
             speaker_repository=self.speaker_repo,
@@ -299,7 +307,7 @@ class VoiceRecognitionUseCasesTest(unittest.TestCase):
         sample_alice = VoiceSampleEntity(id="smp-a", speaker_id="spk-alice")
         profile_alice = SpeakerProfileEntity(id="spk-alice", name="Alice", samples_count=2)
 
-        def fake_nearest(query_vector, top_k=1, min_similarity=0.65):
+        def fake_nearest(query_vector, top_k=1, min_similarity=0.65, **kwargs):
             if query_vector[0] == 1.0 and min_similarity <= 0.92:
                 return [(sample_alice, profile_alice, 0.92)]
             return []
@@ -374,6 +382,7 @@ class SpeakerRepositorySqliteTest(unittest.TestCase):
                 speaker_id=profile.id or "",
                 source_id="diar-1",
                 speaker_label="SPEAKER_00",
+                status=SampleReviewStatus.APPROVED,
                 embedding=vec_roberto,
             )
         )

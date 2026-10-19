@@ -87,11 +87,24 @@ class IdentifyDiarizationSpeakersUseCase:
                 query_vector=vec,
                 top_k=5,
                 min_similarity=0.0,
+                only_approved=True,
             )
-            candidates_by_speaker[orig_label] = candidates
-            for sample_m, profile_m, score in candidates:
-                if score >= similarity_threshold:
-                    candidate_pairs.append((float(score), orig_label, profile_m, sample_m))
+            enhanced_candidates: list[tuple[Any, Any, float]] = []
+            for sample_m, profile_m, sample_score in candidates:
+                final_score = sample_score
+                if profile_m.centroid:
+                    dot = sum(x * y for x, y in zip(vec, profile_m.centroid))
+                    norm_a = sum(x * x for x in vec) ** 0.5
+                    norm_b = sum(y * y for y in profile_m.centroid) ** 0.5
+                    centroid_score = dot / (norm_a * norm_b) if norm_a and norm_b else 0.0
+                    final_score = max(sample_score, centroid_score)
+
+                enhanced_candidates.append((sample_m, profile_m, final_score))
+                if final_score >= similarity_threshold:
+                    candidate_pairs.append((float(final_score), orig_label, profile_m, sample_m))
+
+            enhanced_candidates.sort(key=lambda item: item[2], reverse=True)
+            candidates_by_speaker[orig_label] = enhanced_candidates
 
         return candidates_by_speaker, candidate_pairs
 
