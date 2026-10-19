@@ -6,9 +6,6 @@ from sqlalchemy.orm import sessionmaker
 
 from src.core.database.connector import Base
 from src.modules.diarization.domain.entities.diarization_entity import DiarizationEntity
-from src.modules.voice_recognition.domain.enums.sample_review_status import (
-    SampleReviewStatus,
-)
 from src.modules.voice_recognition.application.dtos.enroll_speaker_dto import (
     EnrollFromDiarizationDTO,
 )
@@ -30,6 +27,9 @@ from src.modules.voice_recognition.domain.entities.speaker_profile_entity import
 )
 from src.modules.voice_recognition.domain.entities.voice_sample_entity import (
     VoiceSampleEntity,
+)
+from src.modules.voice_recognition.domain.enums.sample_review_status import (
+    SampleReviewStatus,
 )
 from src.modules.voice_recognition.infrastructure.repositories.models import (
     SpeakerProfileModel,
