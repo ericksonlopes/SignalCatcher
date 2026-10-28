@@ -173,6 +173,6 @@ Run the module unit test suite and the global test suite to ensure 100% pass rat
 Every new module MUST have a dedicated manager skill created for it in the `.agents/skills/` directory.
 1. Create a new directory: `.agents/skills/<module_name>-manager/`
 2. Create the file `.agents/skills/<module_name>-manager/SKILL.md`.
-3. The skill must document the module's architecture, core domain entities, database schema/migrations, services, REST endpoints, and frontend integration (following the pattern of `youtube-manager`, `diarization-manager`, and `vectorization-manager`).
+3. The skill must document the module's architecture, core domain entities, database schema/migrations, services, REST endpoints, and frontend integration (following the pattern of `youtube-manager` and `diarization-manager`).
 4. Include testing procedures and a "Mandatory Living Documentation Policy" section to ensure the skill is updated alongside code evolutions.
 

@@ -17,8 +17,6 @@ dependencies = [
     "requests>=2.34.2",
     "google-api-python-client>=2.198.0",
     "google-auth-httplib2>=0.4.1",
-    "pgvector>=0.5.1",
-    "httpx>=0.28.1",
 ]
 
 [dependency-groups]
