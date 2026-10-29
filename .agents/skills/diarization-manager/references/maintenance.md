@@ -205,7 +205,3 @@ estados vazios/erro, start-now/cancel/retry, falantes e exportação conforme o 
 Para schema, confira heads e migration sem aplicá-la a banco compartilhado como teste.
 Não execute script/test_diarizer.py ou inicialize a API do worker para uma validação que
 só exige testes isolados: isso pode carregar modelos ou consumir recursos/dados reais.
-
-## Voice identity extension
-
-See `../../voice_identity-manager/SKILL.md`. Original media preview is read-only. Voice assignments are persisted separately and scoped to the transcript version; original speaker labels remain stable.
