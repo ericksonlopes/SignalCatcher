@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     POSTGRES_DATABASE: str
     POSTGRES_HOST: str
 
+    VOICE_SAMPLES_PATH: str = "./voice_samples"
+    FFMPEG_PROBE: str = "ffprobe"
     DOWNLOAD_YOUTUBE_PATH: str
 
     LIST_LOG_LEVELS: str | None = None

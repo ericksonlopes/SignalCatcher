@@ -9,6 +9,7 @@ from src.core.api.metrics import router as metrics_router
 from src.core.config.settings import settings
 from src.core.logger.logger import logger
 from src.modules.diarization.presentation.api.routes import diarization_router
+from src.modules.voice_identity.presentation.routes import router as voices_router
 from src.modules.youtube.presentation.api.routes import youtube_router
 
 logging.basicConfig(handlers=[logger.get_intercept_handler()], level=logging.INFO, force=True)
@@ -24,11 +25,14 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
     allow_credentials=False,
-    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type"],
+    allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Range"],
+    expose_headers=["Content-Range", "Accept-Ranges", "Content-Length"],
 )
 app.include_router(youtube_router, prefix="/api/youtube")
 app.include_router(diarization_router, prefix="/api/diarization")
+
+app.include_router(voices_router, prefix="/api")
 app.include_router(metrics_router)
 
 
