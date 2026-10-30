@@ -18,6 +18,9 @@ class YoutubeVideoCardResponse(BaseModel):
     description: str | None = None
     tags: list[str] | None = None
     file_path: str | None = None
+    storage_location: str | None = None
+    drive_url: str | None = None
+    storage_verified_at: datetime | None = None
     language: str | None = None
     is_diarized: bool = False
     diarization_status: str | None = None

@@ -8,10 +8,12 @@ from src.core.api.health import readiness
 from src.core.api.metrics import router as metrics_router
 from src.core.config.settings import settings
 from src.core.logger.logger import logger
+from src.core.services.oauth_credentials import OAuthAccessLogFilter
 from src.modules.diarization.presentation.api.routes import diarization_router
 from src.modules.youtube.presentation.api.routes import youtube_router
 
 logging.basicConfig(handlers=[logger.get_intercept_handler()], level=logging.INFO, force=True)
+logging.getLogger("uvicorn.access").addFilter(OAuthAccessLogFilter())
 for name in ["uvicorn", "uvicorn.error", "uvicorn.access", "fastapi"]:
     logging.getLogger(name).handlers = [logger.get_intercept_handler()]
 

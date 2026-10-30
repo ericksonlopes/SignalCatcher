@@ -17,6 +17,12 @@ class Settings(BaseSettings):
     POSTGRES_HOST: str
 
     DOWNLOAD_YOUTUBE_PATH: str
+    GOOGLE_DRIVE_OAUTH_PATH: str = "./drive-auth/token.json"
+    GOOGLE_DRIVE_CLIENT_JSON_PATH: str = "./drive-auth/client.json"
+    GOOGLE_DRIVE_OAUTH_REDIRECT_URI: str = (
+        "http://eriberry.local:3000/api/youtube/drive-oauth/callback"
+    )
+    GOOGLE_DRIVE_FOLDER_ID: str = "15UskOqNHVgjXmeN1URSf8ZP300GM-BSu"
 
     LIST_LOG_LEVELS: str | None = None
 
@@ -26,7 +32,7 @@ class Settings(BaseSettings):
     DIARIZATION_API_URL: str | None = "http://localhost:8001"
     FFMPEG_LOCATION: str | None = None
 
-    CORS_ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
+    CORS_ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173,http://eriberry.local:3000/"
     PROCESSING_LEASE_SECONDS: int = Field(default=300, ge=60)
     MAX_PROCESSING_ATTEMPTS: int = Field(default=5, ge=1, le=100)
     RETRY_BASE_SECONDS: int = Field(default=300, ge=1)

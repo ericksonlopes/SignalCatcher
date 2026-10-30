@@ -30,6 +30,9 @@ cookies.txt
 *.key
 credentials.json
 token.json
+drive-auth/
+service_account*.json
+client_secret*.json
 
 # Local data that must not enter the image
 youtube_downloads/

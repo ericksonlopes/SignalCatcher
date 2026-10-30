@@ -1,5 +1,6 @@
 import os
 from collections.abc import Callable
+from pathlib import Path
 
 from src.core.logger.interfaces import ILogger
 from src.core.utils.file_utils import format_storage_path
@@ -12,16 +13,19 @@ from src.modules.youtube.domain.processing import LeaseLostError
 
 
 class DownloadVideoUseCase:
+
     def __init__(
         self,
         uow_factory: Callable[[], IYoutubeUnitOfWork],
         scraper: IYouTubeScraper,
         output_path: str,
         logger: ILogger,
+        storage_mode: Callable[[], str] | None = None,
     ):
         self.uow_factory = uow_factory
         self.scraper = scraper
         self.output_path = output_path
+        self.storage_mode = storage_mode
         self.logger = logger
 
     def execute(self, external_id: str | None = None) -> bool:
@@ -36,23 +40,38 @@ class DownloadVideoUseCase:
             return False
         with ContentLease(self.uow_factory, content, self.logger) as lease:
             try:
+                mode = self.storage_mode() if self.storage_mode else "LOCAL"
+                output_path = (
+                    str(Path(self.output_path) / ".staging")
+                    if mode == "DRIVE"
+                    else self.output_path
+                )
                 final_path = self.scraper.download_video(
                     url=content.url,
                     content_id=content.external_id,
                     origin=content.origin,
-                    output_path=self.output_path,
+                    output_path=output_path,
                     progress_guard=lease.ensure_owned,
                 )
                 lease.ensure_owned()
-                content.file_path = format_storage_path(
+                stored_path = format_storage_path(
                     content.origin, os.path.basename(final_path)
+                )
+                content.storage_mode = mode
+                content.storage_size = os.path.getsize(final_path)
+                content.file_path = stored_path if mode != "DRIVE" else None
+                content.staging_path = (
+                    "/youtube/.staging/" + stored_path.removeprefix("/youtube/")
+                    if mode == "DRIVE"
+                    else None
                 )
                 content.error_info = None
                 with self.uow_factory() as uow:
                     content.step = ContentStep.DOWNLOADED
                     content = uow.contents.update_content(content)
-                    content.step = ContentStep.COMPLETED
-                    uow.contents.update_content(content)
+                    if mode != "DRIVE":
+                        content.step = ContentStep.COMPLETED
+                        uow.contents.update_content(content)
                     uow.commit()
             except LeaseLostError:
                 raise

@@ -7,6 +7,10 @@ x-backend: &backend
     POSTGRES_HOST: ${POSTGRES_HOST:-postgresql}
     POSTGRES_DATABASE: ${POSTGRES_DATABASE:-signalcatcher}
     DOWNLOAD_YOUTUBE_PATH: /youtube
+    GOOGLE_DRIVE_OAUTH_PATH: /run/drive-auth/token.json
+    GOOGLE_DRIVE_CLIENT_JSON_PATH: /run/drive-auth/client.json
+    GOOGLE_DRIVE_OAUTH_REDIRECT_URI: ${GOOGLE_DRIVE_OAUTH_REDIRECT_URI:-http://127.0.0.1:8000/api/youtube/drive-oauth/callback}
+    GOOGLE_DRIVE_FOLDER_ID: ${GOOGLE_DRIVE_FOLDER_ID:-15UskOqNHVgjXmeN1URSf8ZP300GM-BSu}
     LIST_LOG_LEVELS: ${LIST_LOG_LEVELS:-ERROR,WARNING,INFO}
     CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
     DIARIZATION_API_URL: ${DIARIZATION_API_URL:-http://diarization:8001}
@@ -22,6 +26,7 @@ x-backend: &backend
     VOICE_MONKEY_NEW_VIDEO_FOR_DOWNLOAD_MONKEY_ID: ${VOICE_MONKEY_NEW_VIDEO_FOR_DOWNLOAD_MONKEY_ID:-}
   volumes:
     - /media/eriberry/SSD_1/youtube:/youtube
+    - /media/eriberry/SSD_1/drive-auth:/run/drive-auth
   networks:
     - shared_postgres_network
 

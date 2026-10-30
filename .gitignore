@@ -218,3 +218,6 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 .cache/
+drive-auth/
+service_account*.json
+client_secret*.json

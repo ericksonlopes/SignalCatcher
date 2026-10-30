@@ -1,7 +1,17 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import JSON, Boolean, Column, DateTime, Enum, Index, Integer, String
+from sqlalchemy import (
+    JSON,
+    BigInteger,
+    Boolean,
+    Column,
+    DateTime,
+    Enum,
+    Index,
+    Integer,
+    String,
+)
 
 from src.core.database.connector import Base
 from src.modules.youtube.domain.enums.content_step import ContentStep
@@ -43,6 +53,13 @@ class YoutubeContentModel(Base):
     categories = Column(JSON, nullable=True)  # List of categories
     tags = Column(JSON, nullable=True)  # List of tags
     file_path = Column(String, nullable=True)  # Absolute path to the downloaded audio/video file
+    storage_location = Column(String(10), nullable=True, index=True)
+    storage_mode = Column(String(10), nullable=True)
+    staging_path = Column(String, nullable=True)
+    storage_size = Column(BigInteger, nullable=True)
+    storage_verified_at = Column(DateTime(timezone=True), nullable=True)
+    drive_file_id = Column(String, nullable=True)
+    drive_url = Column(String, nullable=True)
     created_at = Column(DateTime, default=get_brazil_time)
     updated_at = Column(DateTime, default=get_brazil_time, onupdate=get_brazil_time)
 

@@ -93,6 +93,7 @@ class YoutubeContentRepository(IYoutubeContentRepository):
         step: str | None = None,
         search: str | None = None,
         channel: str | None = None,
+        storage_location: str | None = None,
     ) -> tuple[list[YoutubeContentEntity], int]:
         try:
             offset = (page - 1) * limit
@@ -105,6 +106,10 @@ class YoutubeContentRepository(IYoutubeContentRepository):
                 query = query.filter(YoutubeContentModel.title.ilike(f"%{search}%"))
             if channel:
                 query = query.filter(YoutubeContentModel.origin.ilike(f"%{channel}%"))
+            if storage_location:
+                query = query.filter(
+                    YoutubeContentModel.storage_location == storage_location
+                )
             total = query.count()
             items = query.offset(offset).limit(limit).all()
             return [YoutubeContentMapper.to_domain(item) for item in items], total
@@ -243,6 +248,7 @@ class YoutubeContentRepository(IYoutubeContentRepository):
                 raise ValueError(f"Content with id {youtube_content_entity.id} not found.")
 
             self._validate_lease(model, youtube_content_entity.lease_token)
+            previous_step = model.step
 
             # Update the model fields
             model.title = youtube_content_entity.title
@@ -256,10 +262,42 @@ class YoutubeContentRepository(IYoutubeContentRepository):
             model.tags = youtube_content_entity.tags
             model.origin = youtube_content_entity.origin
             model.file_path = youtube_content_entity.file_path
+            model.storage_location = youtube_content_entity.storage_location
+            model.storage_mode = youtube_content_entity.storage_mode
+            model.staging_path = youtube_content_entity.staging_path
+            model.storage_size = youtube_content_entity.storage_size
+            model.storage_verified_at = youtube_content_entity.storage_verified_at
+            model.drive_file_id = youtube_content_entity.drive_file_id
+            model.drive_url = youtube_content_entity.drive_url
             model.error_info = youtube_content_entity.error_info
             model.published_at = youtube_content_entity.published_at
 
             self._update_step_state(model)
+
+            if (
+                model.step == ContentStep.DOWNLOADED
+                and previous_step != ContentStep.DOWNLOADED
+            ):
+                from src.modules.youtube.infrastructure.repositories.storage_repository import (
+                    record_download,
+                )
+
+                record_download(self.session, model)
+            if model.step == ContentStep.DELETED:
+                from src.modules.youtube.infrastructure.repositories.storage_repository import (
+                    event,
+                )
+
+                location = "DRIVE" if model.drive_file_id else "NONE"
+                event(
+                    self.session,
+                    model.id,
+                    "LOCAL_DELETED",
+                    previous=model.storage_location,
+                    location=location,
+                )
+                model.storage_location = location
+                model.staging_path = None
 
             self.session.flush()
             self.session.refresh(model)

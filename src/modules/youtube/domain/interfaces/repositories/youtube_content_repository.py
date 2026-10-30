@@ -26,6 +26,7 @@ class IYoutubeContentRepository(Protocol):
         step: str | None = None,
         search: str | None = None,
         channel: str | None = None,
+        storage_location: str | None = None,
     ) -> tuple[list[YoutubeContentEntity], int]:
         """Returns a paginated list of contents and the total count."""
         ...

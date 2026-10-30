@@ -12,6 +12,7 @@ JOB_IDS = frozenset(
         "youtube_extract_and_download",
         "youtube_extract_metadata",
         "youtube_download_videos",
+        "youtube_drive_backup",
         "youtube_process_errors",
         "youtube_promote_scheduled",
         "youtube_delete_contents",

@@ -12,6 +12,9 @@ from src.modules.youtube.presentation.schedules.jobs.youtube_delete_contents_job
     delete_contents_job,
 )
 from src.modules.youtube.presentation.schedules.jobs.youtube_download_job import download_videos_job
+from src.modules.youtube.presentation.schedules.jobs.youtube_drive_backup_job import (
+    drive_backup_job,
+)
 from src.modules.youtube.presentation.schedules.jobs.youtube_extract_and_download_job import (
     extract_and_download_job,
 )
@@ -38,14 +41,22 @@ JOB_DEFINITIONS: dict[str, tuple[Callable[[], None], int | None]] = {
     "youtube_delete_contents": (delete_contents_job, 30),
     "youtube_extract_metadata": (extract_metadata_job, None),
     "youtube_download_videos": (download_videos_job, None),
+    "youtube_drive_backup": (drive_backup_job, 5),
 }
 _pipeline_lock = Lock()
 _monitor_lock = Lock()
+_storage_lock = Lock()
+
+
+def _gate(job_id: str) -> Lock:
+    if job_id == "youtube_drive_backup":
+        return _storage_lock
+    return _monitor_lock if job_id == "youtube_monitor_channels" else _pipeline_lock
 
 
 def _run_job(job_id: str) -> None:
     # Monitoring can run alongside media work; media operations share one lane.
-    gate = _monitor_lock if job_id == "youtube_monitor_channels" else _pipeline_lock
+    gate = _gate(job_id)
     if not gate.acquire(blocking=False):
         with Session.begin() as session:
             JobControlRepository(session).request(job_id)
@@ -92,6 +103,6 @@ def start_scheduler() -> BackgroundScheduler:
 
 def dispatch_requests(scheduler: BackgroundScheduler, pending: list[str]) -> None:
     for job_id in pending:
-        gate = _monitor_lock if job_id == "youtube_monitor_channels" else _pipeline_lock
+        gate = _gate(job_id)
         if not gate.locked():
             scheduler.modify_job(job_id, next_run_time=datetime.now(timezone.utc))

@@ -6,6 +6,9 @@ from src.modules.youtube.application.use_cases.jobs.process_errors_use_case impo
 from src.modules.youtube.application.use_cases.jobs.reprocess_video_use_case import (
     ReprocessVideoUseCase,
 )
+from src.modules.youtube.infrastructure.repositories.storage_repository import (
+    StorageRepository,
+)
 from src.modules.youtube.infrastructure.services.youtube_scraper import (
     YouTubeScraperService,
 )
@@ -21,6 +24,7 @@ def process_errors_job():
         scraper=scraper,
         output_path=settings.DOWNLOAD_YOUTUBE_PATH,
         logger=global_logger,
+        storage_mode=lambda: StorageRepository().settings()["mode"],
     )
 
     try:
@@ -40,6 +44,7 @@ def reprocess_single_video_job(external_id: str):
         scraper=scraper,
         output_path=settings.DOWNLOAD_YOUTUBE_PATH,
         logger=global_logger,
+        storage_mode=lambda: StorageRepository().settings()["mode"],
     )
 
     use_case.execute(external_id)

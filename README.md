@@ -339,6 +339,10 @@ All settings are configured via environment variables and validated through Pyda
 
 ## 🛠️ Maintenance CLI & Diagnostics
 
+Google Drive copies, configurable destinations and browser OAuth setup are described
+in [Google Drive storage](docs/google-drive-storage.md). The Tracking screen includes
+storage settings, connection status, transfers, restoration and per-video history.
+
 Built-in maintenance scripts allow operators to manage queues and database states safely without bypassing business rules:
 
 ```sh
@@ -350,7 +354,33 @@ uv run python -m script.reprocess_errors
 
 # Reset orphaned or stuck processing leases that lost worker ownership
 uv run python -m script.reset_stuck_states
+
+# Report COMPLETED records without a video on the SSD (read-only)
+uv run python -m script.find_missing_youtube_videos
+
+# Audit only completed downloads against a specific mounted SSD folder
+uv run python -m script.find_missing_youtube_videos --path /media/eriberry/SSD_1/youtube --step COMPLETED --output missing_completed.csv
+
+# Return missing COMPLETED records from the audit CSV to the download queue
+uv run python -m script.requeue_missing_youtube_videos missing_completed.csv --path /media/eriberry/SSD_1/youtube
 ```
+
+The audit uses `DOWNLOAD_YOUTUBE_PATH` unless `--path` is supplied. Run it where both
+PostgreSQL and the SSD folder are accessible. It matches stored `/youtube/...` paths
+and YouTube IDs in filenames, including records with a missing or outdated `file_path`.
+It prints missing videos and writes `missing_youtube_videos.csv` (overwriting an existing
+report). Empty files, sidecars and recognizable download fragments are ignored. This
+checks file presence only; a nonempty video can still be incomplete or corrupt. An
+unavailable or unreadable folder aborts the audit. Only `COMPLETED` records are queried
+and included in logs and CSV output. The optional `--step COMPLETED` argument is kept
+for compatibility; other statuses are not accepted.
+The `expected_path` CSV column and each missing-video log line show the expected
+local file path using the supplied downloads folder. When `file_path` is absent,
+the script shows the channel directory and an `ID_*` filename pattern instead.
+The requeue command checks files again and only changes records that are still
+`COMPLETED`, unreserved, and not awaiting deletion. It moves them to `PENDING_DOWNLOAD`,
+clears stale file paths and retry state, and preserves the transition history. It
+aborts if no video files are visible on the SSD.
 
 ---
 

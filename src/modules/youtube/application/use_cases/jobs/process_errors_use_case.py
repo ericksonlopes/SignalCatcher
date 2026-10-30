@@ -13,15 +13,19 @@ from src.modules.youtube.domain.interfaces.unit_of_work import IYoutubeUnitOfWor
 
 
 class ProcessErrorsUseCase:
+
     def __init__(
         self,
         uow_factory: Callable[[], IYoutubeUnitOfWork],
         scraper: IYouTubeScraper,
         output_path: str,
         logger: ILogger,
+        storage_mode: Callable[[], str] | None = None,
     ):
         self.extractor = ExtractMetadataUseCase(uow_factory, scraper, logger)
-        self.downloader = DownloadVideoUseCase(uow_factory, scraper, output_path, logger)
+        self.downloader = DownloadVideoUseCase(
+            uow_factory, scraper, output_path, logger, storage_mode
+        )
 
     def execute(self) -> int:
         tried_ids: set[str] = set()

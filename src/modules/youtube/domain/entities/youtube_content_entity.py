@@ -18,6 +18,13 @@ class YoutubeContentEntity(BaseModel):
     categories: list | None = None
     tags: list[str] | None = None
     file_path: str | None = None
+    storage_location: str | None = None
+    storage_mode: str | None = None
+    staging_path: str | None = None
+    storage_size: int | None = None
+    storage_verified_at: datetime | None = None
+    drive_file_id: str | None = None
+    drive_url: str | None = None
     language: str | None = None
     error_info: str | None = None
     published_at: datetime | None = None

@@ -64,11 +64,18 @@ def trigger_youtube_diarization(
         if content.step != ContentStep.COMPLETED.name and content.step != ContentStep.COMPLETED:
             raise HTTPException(status_code=400, detail="Content must be completed to diarize")
 
-        if not content.file_path:
+        media_path = content.file_path
+        if (
+            not media_path
+            and content.drive_file_id
+            and content.storage_location in {"DRIVE", "BOTH"}
+        ):
+            media_path = f"gdrive://{content.drive_file_id}"
+        if not media_path:
             raise HTTPException(status_code=400, detail="Content file path is missing")
 
         task = commands.create_task(
-            file_path=content.file_path,
+            file_path=media_path,
             entity_id=content.external_id,
             entity_type="YOUTUBE",
             language=request.language or "en",

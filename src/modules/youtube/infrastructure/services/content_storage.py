@@ -20,11 +20,13 @@ class ContentStorage:
             raise ValueError("Invalid content identifier for file removal.")
         directory = self._confined(self.root.joinpath(*sanitize_path_parts(content.origin)))
         candidates = set(directory.glob(f"{content.external_id}_*"))
-        if content.file_path:
+        for stored_path in (content.file_path, content.staging_path):
+            if not stored_path:
+                continue
             # Stored paths are public /youtube/... paths, not host paths.
-            if not content.file_path.startswith("/youtube/"):
+            if not stored_path.startswith("/youtube/"):
                 raise ValueError("Invalid stored content path.")
-            candidates.add(self.root / content.file_path.removeprefix("/youtube/"))
+            candidates.add(self.root / stored_path.removeprefix("/youtube/"))
         resolved_candidates = []
         for candidate in candidates:
             if not candidate.name.startswith(f"{content.external_id}_") or candidate.is_symlink():

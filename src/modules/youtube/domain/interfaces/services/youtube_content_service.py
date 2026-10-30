@@ -66,6 +66,7 @@ class IYoutubeContentService(ABC):
         step: str | None = None,
         search: str | None = None,
         channel: str | None = None,
+        storage_location: str | None = None,
     ) -> tuple[list[YoutubeContentEntity], int]:
         pass
 

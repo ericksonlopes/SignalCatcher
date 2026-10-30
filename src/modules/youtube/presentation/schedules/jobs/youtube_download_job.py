@@ -3,6 +3,9 @@ from src.core.logger.logger import logger as global_logger
 from src.modules.youtube.application.use_cases.jobs.download_video_use_case import (
     DownloadVideoUseCase,
 )
+from src.modules.youtube.infrastructure.repositories.storage_repository import (
+    StorageRepository,
+)
 from src.modules.youtube.infrastructure.services.youtube_scraper import (
     YouTubeScraperService,
 )
@@ -20,6 +23,7 @@ def download_videos_job():
         scraper=scraper,
         output_path=settings.DOWNLOAD_YOUTUBE_PATH,
         logger=global_logger,
+        storage_mode=lambda: StorageRepository().settings()["mode"],
     )
 
     try:
