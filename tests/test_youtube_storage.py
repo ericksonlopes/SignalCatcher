@@ -95,9 +95,7 @@ class YoutubeStorageTest(unittest.TestCase):
 
     def content(self, staging=False):
         relative = "channel/12345678901_title.mp4"
-        path = Path(self.directory.name) / (
-            ".staging/" + relative if staging else relative
-        )
+        path = Path(self.directory.name) / (".staging/" + relative if staging else relative)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(b"complete video bytes")
         with self.factory() as db, db.begin():
@@ -124,9 +122,7 @@ class YoutubeStorageTest(unittest.TestCase):
             item = db.scalar(select(YoutubeContentModel))
             self.assertEqual(item.storage_location, "BOTH")
             self.assertEqual(item.drive_file_id, "remote-1")
-            self.assertEqual(
-                db.scalar(select(func.count()).select_from(StorageTransferModel)), 1
-            )
+            self.assertEqual(db.scalar(select(func.count()).select_from(StorageTransferModel)), 1)
             events = db.scalars(select(StorageEventModel.action)).all()
             self.assertIn("UPLOAD_COMPLETED", events)
 
@@ -163,12 +159,8 @@ class YoutubeStorageTest(unittest.TestCase):
             self.manager.run()
         self.assertTrue(path.exists())
         with self.factory() as db:
-            self.assertEqual(
-                db.scalar(select(StorageTransferModel.status)), "COMPLETED"
-            )
-            self.assertEqual(
-                db.scalar(select(YoutubeContentModel.storage_location)), "DRIVE"
-            )
+            self.assertEqual(db.scalar(select(StorageTransferModel.status)), "COMPLETED")
+            self.assertEqual(db.scalar(select(YoutubeContentModel.storage_location)), "DRIVE")
         self.manager.run()
         self.assertFalse(path.exists())
         self.assertEqual(self.drive.uploads, 1)
@@ -185,9 +177,7 @@ class YoutubeStorageTest(unittest.TestCase):
         self.assertFalse(path.exists())
         self.assertEqual(len(self.drive.files), 1)
         with self.factory() as db:
-            self.assertEqual(
-                db.scalar(select(YoutubeContentModel.storage_location)), "BOTH"
-            )
+            self.assertEqual(db.scalar(select(YoutubeContentModel.storage_location)), "BOTH")
 
     def test_wrong_checksum_keeps_local_and_does_not_confirm_remote(self):
         path = self.content()
@@ -202,9 +192,7 @@ class YoutubeStorageTest(unittest.TestCase):
         self.assertTrue(path.exists())
         with self.factory() as db:
             self.assertEqual(db.scalar(select(StorageTransferModel.status)), "ERROR")
-            self.assertEqual(
-                db.scalar(select(YoutubeContentModel.storage_location)), "LOCAL"
-            )
+            self.assertEqual(db.scalar(select(YoutubeContentModel.storage_location)), "LOCAL")
 
     def test_replaced_lease_cannot_overwrite_new_owner(self):
         self.content()

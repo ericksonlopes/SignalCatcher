@@ -107,9 +107,7 @@ class YoutubeContentRepository(IYoutubeContentRepository):
             if channel:
                 query = query.filter(YoutubeContentModel.origin.ilike(f"%{channel}%"))
             if storage_location:
-                query = query.filter(
-                    YoutubeContentModel.storage_location == storage_location
-                )
+                query = query.filter(YoutubeContentModel.storage_location == storage_location)
             total = query.count()
             items = query.offset(offset).limit(limit).all()
             return [YoutubeContentMapper.to_domain(item) for item in items], total
@@ -274,10 +272,7 @@ class YoutubeContentRepository(IYoutubeContentRepository):
 
             self._update_step_state(model)
 
-            if (
-                model.step == ContentStep.DOWNLOADED
-                and previous_step != ContentStep.DOWNLOADED
-            ):
+            if model.step == ContentStep.DOWNLOADED and previous_step != ContentStep.DOWNLOADED:
                 from src.modules.youtube.infrastructure.repositories.storage_repository import (
                     record_download,
                 )

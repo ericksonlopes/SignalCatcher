@@ -24,9 +24,7 @@ class ContentQueries:
         channel: str | None = None,
         storage_location: str | None = None,
     ):
-        return self.service.get_paginated(
-            page, limit, step, search, channel, storage_location
-        )
+        return self.service.get_paginated(page, limit, step, search, channel, storage_location)
 
     def get_content_by_external_id(self, external_id: str):
         return self.service.get_by_external_id(external_id)

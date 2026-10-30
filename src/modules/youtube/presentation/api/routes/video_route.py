@@ -163,12 +163,8 @@ def get_youtube_contents(
     limit: Annotated[int, Query(ge=1, le=100, description="Items per page")] = 20,
     step: Annotated[str | None, Query(description="Filter by step status")] = None,
     search: Annotated[str | None, Query(description="Search by title")] = None,
-    channel: Annotated[
-        str | None, Query(description="Filter by channel/origin name")
-    ] = None,
-    storage_location: Annotated[
-        str | None, Query(pattern="^(LOCAL|DRIVE|BOTH|NONE)$")
-    ] = None,
+    channel: Annotated[str | None, Query(description="Filter by channel/origin name")] = None,
+    storage_location: Annotated[str | None, Query(pattern="^(LOCAL|DRIVE|BOTH|NONE)$")] = None,
 ):
     """
     Returns a paginated list of YouTube contents.
@@ -212,9 +208,7 @@ def get_youtube_contents(
                     thumbnail=item.thumbnail,
                     duration=item.duration,
                     description=(
-                        item.raw_metadata.get("description")
-                        if item.raw_metadata
-                        else None
+                        item.raw_metadata.get("description") if item.raw_metadata else None
                     ),
                     tags=item.tags,
                     file_path=item.file_path,

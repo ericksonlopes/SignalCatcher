@@ -234,15 +234,11 @@ class StorageRepository:
                     .with_for_update(skip_locked=True)
                 )
             }
-            backups = {
-                item.content_id: item for item in db.scalars(select(DriveBackupModel))
-            }
+            backups = {item.content_id: item for item in db.scalars(select(DriveBackupModel))}
             uploads = {
                 item.content_id: item
                 for item in db.scalars(
-                    select(StorageTransferModel).where(
-                        StorageTransferModel.operation == "UPLOAD"
-                    )
+                    select(StorageTransferModel).where(StorageTransferModel.operation == "UPLOAD")
                 )
             }
             for row in observations:
@@ -322,13 +318,9 @@ class StorageRepository:
             if operation == "UPLOAD" and backup and backup.verified:
                 return
             if operation == "RESTORE" and not (backup and backup.verified):
-                raise ValueError(
-                    "A verified Drive copy is required to restore this video."
-                )
+                raise ValueError("A verified Drive copy is required to restore this video.")
             if backup is None:
-                relative = (item.file_path or item.staging_path or "").replace(
-                    "\\", "/"
-                )
+                relative = (item.file_path or item.staging_path or "").replace("\\", "/")
                 relative = relative.removeprefix("/youtube/").removeprefix(".staging/")
                 if not relative:
                     return
@@ -348,11 +340,7 @@ class StorageRepository:
                 )
             )
             if transfer is None:
-                db.add(
-                    StorageTransferModel(
-                        content_id=content_id, operation=operation, mode=mode
-                    )
-                )
+                db.add(StorageTransferModel(content_id=content_id, operation=operation, mode=mode))
                 event(db, content_id, operation + "_QUEUED")
             elif transfer.status in {"COMPLETED", "MISSING_FILE"}:
                 transfer.status = "PENDING"
@@ -369,9 +357,7 @@ class StorageRepository:
             db.query(StorageTransferModel).filter(
                 StorageTransferModel.status == "RUNNING",
                 StorageTransferModel.lease_expires_at < now(),
-            ).update(
-                {"status": "PENDING", "lease_token": None, "lease_expires_at": None}
-            )
+            ).update({"status": "PENDING", "lease_token": None, "lease_expires_at": None})
             query = (
                 select(StorageTransferModel)
                 .join(
@@ -425,11 +411,7 @@ class StorageRepository:
     @staticmethod
     def _owned(db: Session, task: dict[str, Any]) -> StorageTransferModel:
         item = db.get(StorageTransferModel, task["task_id"], with_for_update=True)
-        if (
-            item is None
-            or item.lease_token != task["token"]
-            or item.status != "RUNNING"
-        ):
+        if item is None or item.lease_token != task["token"] or item.status != "RUNNING":
             raise TransferInterrupted("Transfer reservation was lost.")
         expires = item.lease_expires_at
         if expires is None:
@@ -527,17 +509,13 @@ class StorageRepository:
                 )
             )
             if task:
-                task.error = (
-                    "Drive copy verified; temporary cleanup failed: " + error[:1000]
-                )
+                task.error = "Drive copy verified; temporary cleanup failed: " + error[:1000]
             event(db, content_id, "TEMPORARY_REMOVE_FAILED", error[:1000])
 
     def fail(self, task: dict[str, Any], error: str, blocked: bool = False) -> None:
         with self.factory() as db, db.begin():
             item = self._owned(db, task)
-            item.status = (
-                "MISSING_FILE" if error.startswith("Missing source:") else "ERROR"
-            )
+            item.status = "MISSING_FILE" if error.startswith("Missing source:") else "ERROR"
             item.error = error[:2000]
             if any(
                 marker in error.lower()
@@ -550,9 +528,7 @@ class StorageRepository:
             ):
                 item.session_uri = None
                 item.bytes_transferred = 0
-            item.next_retry_at = now() + timedelta(
-                seconds=min(86400, 300 * 2**item.attempts)
-            )
+            item.next_retry_at = now() + timedelta(seconds=min(86400, 300 * 2**item.attempts))
             item.lease_token = None
             item.lease_expires_at = None
             item.updated_at = now()
@@ -609,11 +585,7 @@ class StorageRepository:
                         "md5",
                     )
                 }
-                | {
-                    "completed_at": (
-                        item.completed_at.isoformat() if item.completed_at else None
-                    )
-                }
+                | {"completed_at": (item.completed_at.isoformat() if item.completed_at else None)}
                 for item in db.scalars(
                     select(DriveBackupModel)
                     .where(DriveBackupModel.verified.is_(True))
@@ -659,9 +631,7 @@ class StorageRepository:
                         ),
                         0,
                     )
-                ).where(
-                    StorageTransferModel.status.in_(["PENDING", "RUNNING", "ERROR"])
-                )
+                ).where(StorageTransferModel.status.in_(["PENDING", "RUNNING", "ERROR"]))
             )
         return result
 
@@ -724,32 +694,22 @@ class StorageRepository:
                         "next_retry_at": transfer.next_retry_at,
                         "updated_at": transfer.updated_at,
                         "file_path": content.file_path,
-                        "drive_url": (
-                            backup.web_url if backup and backup.verified else None
-                        ),
+                        "drive_url": (backup.web_url if backup and backup.verified else None),
                     }
                 )
             return {"items": items, "total": total, "page": page, "limit": limit}
 
-    def history(
-        self, external_id: str, page: int = 1, limit: int = 50
-    ) -> dict[str, Any]:
+    def history(self, external_id: str, page: int = 1, limit: int = 50) -> dict[str, Any]:
         with self.factory() as db:
             content_id = db.scalar(
-                select(YoutubeContentModel.id).where(
-                    YoutubeContentModel.external_id == external_id
-                )
+                select(YoutubeContentModel.id).where(YoutubeContentModel.external_id == external_id)
             )
             if content_id is None:
                 raise ValueError("Content not found.")
-            query = select(StorageEventModel).where(
-                StorageEventModel.content_id == content_id
-            )
+            query = select(StorageEventModel).where(StorageEventModel.content_id == content_id)
             total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
             items = db.scalars(
-                query.order_by(StorageEventModel.id.desc())
-                .offset((page - 1) * limit)
-                .limit(limit)
+                query.order_by(StorageEventModel.id.desc()).offset((page - 1) * limit).limit(limit)
             ).all()
             return {
                 "items": [

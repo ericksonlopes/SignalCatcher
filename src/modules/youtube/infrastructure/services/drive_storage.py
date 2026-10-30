@@ -28,9 +28,7 @@ class DriveStorage:
             )
         with credential_file.open(encoding="utf-8") as source:
             if json.load(source).get("type") != "authorized_user":
-                raise StorageBlocked(
-                    "This My Drive destination requires authorized_user OAuth."
-                )
+                raise StorageBlocked("This My Drive destination requires authorized_user OAuth.")
         self.session = AuthorizedSession(
             Credentials.from_authorized_user_file(
                 str(credential_file), scopes=["https://www.googleapis.com/auth/drive"]
@@ -44,11 +42,7 @@ class DriveStorage:
         if response.status_code in {200, 201, 204, 206, 308, 404}:
             return response
         try:
-            message = (
-                response.json()
-                .get("error", {})
-                .get("message", "Google Drive request failed")
-            )
+            message = response.json().get("error", {}).get("message", "Google Drive request failed")
         except ValueError:
             message = "Google Drive request failed"
         # Never expose request/session URLs or credentials in API errors or logs.
@@ -66,9 +60,7 @@ class DriveStorage:
             },
         )
         if response.status_code == 404:
-            raise StorageBlocked(
-                "The configured Google Drive folder is not accessible."
-            )
+            raise StorageBlocked("The configured Google Drive folder is not accessible.")
         folder = response.json()
         if (
             folder.get("mimeType") != "application/vnd.google-apps.folder"
@@ -102,9 +94,7 @@ class DriveStorage:
     def get_file(self, file_id: str) -> dict[str, Any] | None:
         if not re.fullmatch(r"[A-Za-z0-9_-]+", file_id):
             raise ValueError("Invalid Google Drive file ID.")
-        response = self._request(
-            "GET", f"{API}/files/{file_id}", params={"fields": FIELDS}
-        )
+        response = self._request("GET", f"{API}/files/{file_id}", params={"fields": FIELDS})
         if response.status_code == 404:
             return None
         result = response.json()
@@ -191,8 +181,7 @@ class DriveStorage:
                 offset = 0
             else:
                 offset = (
-                    int(response.headers.get("Range", "bytes=0--1").rsplit("-", 1)[-1])
-                    + 1
+                    int(response.headers.get("Range", "bytes=0--1").rsplit("-", 1)[-1]) + 1
                     if response.headers.get("Range")
                     else 0
                 )
@@ -240,9 +229,7 @@ class DriveStorage:
                     },
                 )
                 if response.status_code == 404:
-                    raise RuntimeError(
-                        "Upload session expired; the next attempt will restart it."
-                    )
+                    raise RuntimeError("Upload session expired; the next attempt will restart it.")
                 if response.status_code in {200, 201}:
                     progress(total, total, session_uri)
                     return self.get_file(file_id) or response.json()
@@ -311,9 +298,7 @@ class DriveStorage:
                     "appProperties": {"signalcatcher_catalog": "1"},
                 },
             ).json()["id"]
-        data = json.dumps({"version": 1, "videos": entries}, ensure_ascii=False).encode(
-            "utf-8"
-        )
+        data = json.dumps({"version": 1, "videos": entries}, ensure_ascii=False).encode("utf-8")
         self._request(
             "PATCH",
             f"{UPLOAD}/{file_id}",

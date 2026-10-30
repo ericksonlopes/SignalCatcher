@@ -44,8 +44,7 @@ def client_configuration() -> dict:
         (
             parsed.scheme != "https"
             and not (
-                parsed.scheme == "http"
-                and parsed.hostname in {"127.0.0.1", "localhost", "::1"}
+                parsed.scheme == "http" and parsed.hostname in {"127.0.0.1", "localhost", "::1"}
             )
         )
         or parsed.username
@@ -150,16 +149,12 @@ def callback_page(message: str, success: bool) -> HTMLResponse:
 def drive_callback(request: Request, state: str = "", code: str = "", error: str = ""):
     cookie = request.cookies.get(COOKIE, "")
     if not state or not cookie or not secrets.compare_digest(state, cookie):
-        return callback_page(
-            "Sessão de autorização inválida. Inicie a conexão novamente.", False
-        )
+        return callback_page("Sessão de autorização inválida. Inicie a conexão novamente.", False)
     state_hash = hashlib.sha256(state.encode()).hexdigest()
     with Session.begin() as db:
         session = db.get(DriveOAuthSessionModel, state_hash, with_for_update=True)
         if session is None:
-            return callback_page(
-                "Autorização já utilizada ou expirada. Inicie novamente.", False
-            )
+            return callback_page("Autorização já utilizada ou expirada. Inicie novamente.", False)
         expires = session.expires_at
         if expires.tzinfo is None:
             expires = expires.replace(tzinfo=timezone.utc)
@@ -176,18 +171,14 @@ def drive_callback(request: Request, state: str = "", code: str = "", error: str
         )
         flow.fetch_token(code=code)
         if not flow.credentials.refresh_token:
-            return callback_page(
-                "O Google não concedeu acesso offline. Autorize novamente.", False
-            )
+            return callback_page("O Google não concedeu acesso offline. Autorize novamente.", False)
         payload = json.loads(flow.credentials.to_json())
         path = Path(settings.GOOGLE_DRIVE_OAUTH_PATH)
         # Validate the account/destination before replacing an existing authorization.
         candidate = path.with_name(".candidate-" + secrets.token_hex(16) + ".json")
         try:
             write_oauth_credentials(candidate, payload)
-            info = DriveStorage(
-                str(candidate), settings.GOOGLE_DRIVE_FOLDER_ID
-            ).inspect()
+            info = DriveStorage(str(candidate), settings.GOOGLE_DRIVE_FOLDER_ID).inspect()
             write_oauth_credentials(path, payload)
         finally:
             candidate.unlink(missing_ok=True)
@@ -200,6 +191,4 @@ def drive_callback(request: Request, state: str = "", code: str = "", error: str
             "Não foi possível concluir a conexão. Confira a conta e o acesso à pasta.",
             False,
         )
-    return callback_page(
-        "Conta conectada. As cópias serão processadas pelo servidor.", True
-    )
+    return callback_page("Conta conectada. As cópias serão processadas pelo servidor.", True)

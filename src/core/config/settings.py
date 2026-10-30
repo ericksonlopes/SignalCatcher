@@ -32,7 +32,9 @@ class Settings(BaseSettings):
     DIARIZATION_API_URL: str | None = "http://localhost:8001"
     FFMPEG_LOCATION: str | None = None
 
-    CORS_ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173,http://eriberry.local:3000/"
+    CORS_ALLOWED_ORIGINS: str = (
+        "http://localhost:3000,http://localhost:5173,http://eriberry.local:3000/"
+    )
     PROCESSING_LEASE_SECONDS: int = Field(default=300, ge=60)
     MAX_PROCESSING_ATTEMPTS: int = Field(default=5, ge=1, le=100)
     RETRY_BASE_SECONDS: int = Field(default=300, ge=1)

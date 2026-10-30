@@ -65,9 +65,7 @@ class BrowserOAuthTest(unittest.TestCase):
         self.addCleanup(self.client.close)
 
     def start(self):
-        response = self.client.get(
-            "/api/youtube/drive-oauth/connect", follow_redirects=False
-        )
+        response = self.client.get("/api/youtube/drive-oauth/connect", follow_redirects=False)
         self.assertEqual(response.status_code, 303)
         parameters = parse_qs(urlparse(response.headers["location"]).query)
         self.assertEqual(parameters["code_challenge_method"], ["S256"])
@@ -98,9 +96,7 @@ class BrowserOAuthTest(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 400)
         with self.factory() as db:
-            self.assertEqual(
-                db.scalar(select(func.count()).select_from(DriveOAuthSessionModel)), 0
-            )
+            self.assertEqual(db.scalar(select(func.count()).select_from(DriveOAuthSessionModel)), 0)
         response = self.client.get(
             "/api/youtube/drive-oauth/callback",
             params={"state": state, "code": "unused"},
@@ -111,9 +107,7 @@ class BrowserOAuthTest(unittest.TestCase):
     def test_expired_state_is_rejected(self):
         state = self.start()
         with self.factory.begin() as db:
-            session = db.get(
-                DriveOAuthSessionModel, hashlib.sha256(state.encode()).hexdigest()
-            )
+            session = db.get(DriveOAuthSessionModel, hashlib.sha256(state.encode()).hexdigest())
             session.expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
         response = self.client.get(
             "/api/youtube/drive-oauth/callback",

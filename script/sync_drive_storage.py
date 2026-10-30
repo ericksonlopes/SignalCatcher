@@ -8,9 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Inventory media and process Google Drive copies."
-    )
+    parser = argparse.ArgumentParser(description="Inventory media and process Google Drive copies.")
     parser.add_argument("--path", help="Override DOWNLOAD_YOUTUBE_PATH for this run.")
     parser.add_argument(
         "--inventory-only", action="store_true", help="Update inventory; no uploads."
@@ -28,9 +26,7 @@ def main() -> None:
 
     drive = None
     if not args.inventory_only and Path(settings.GOOGLE_DRIVE_OAUTH_PATH).is_file():
-        drive = DriveStorage(
-            settings.GOOGLE_DRIVE_OAUTH_PATH, settings.GOOGLE_DRIVE_FOLDER_ID
-        )
+        drive = DriveStorage(settings.GOOGLE_DRIVE_OAUTH_PATH, settings.GOOGLE_DRIVE_FOLDER_ID)
     repository = StorageRepository()
     manager = StorageManager(
         repository, StorageFiles(args.path or settings.DOWNLOAD_YOUTUBE_PATH), drive

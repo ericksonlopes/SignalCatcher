@@ -13,7 +13,6 @@ from src.modules.youtube.domain.interfaces.unit_of_work import IYoutubeUnitOfWor
 
 
 class ReprocessVideoUseCase:
-
     def __init__(
         self,
         uow_factory: Callable[[], IYoutubeUnitOfWork],

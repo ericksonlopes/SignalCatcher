@@ -100,9 +100,7 @@ def restore_storage(request: RestoreRequest):
         if len(contents) != len(external_ids):
             raise HTTPException(404, "One or more videos were not found.")
         if any(not item.drive_file_id or item.deletion_requested for item in contents):
-            raise HTTPException(
-                409, "A verified Drive copy is required for every selected video."
-            )
+            raise HTTPException(409, "A verified Drive copy is required for every selected video.")
         content_ids = [cast(int, item.id) for item in contents]
     try:
         for content_id in content_ids:

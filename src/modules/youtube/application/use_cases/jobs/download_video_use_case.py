@@ -13,7 +13,6 @@ from src.modules.youtube.domain.processing import LeaseLostError
 
 
 class DownloadVideoUseCase:
-
     def __init__(
         self,
         uow_factory: Callable[[], IYoutubeUnitOfWork],
@@ -54,9 +53,7 @@ class DownloadVideoUseCase:
                     progress_guard=lease.ensure_owned,
                 )
                 lease.ensure_owned()
-                stored_path = format_storage_path(
-                    content.origin, os.path.basename(final_path)
-                )
+                stored_path = format_storage_path(content.origin, os.path.basename(final_path))
                 content.storage_mode = mode
                 content.storage_size = os.path.getsize(final_path)
                 content.file_path = stored_path if mode != "DRIVE" else None

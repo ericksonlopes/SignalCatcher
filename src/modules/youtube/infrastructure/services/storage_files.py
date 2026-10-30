@@ -50,9 +50,7 @@ class StorageFiles:
 
     def inventory(self) -> dict[str, Path]:
         if not self.root.is_dir():
-            raise FileNotFoundError(
-                "Downloads directory is unavailable; check the SSD mount."
-            )
+            raise FileNotFoundError("Downloads directory is unavailable; check the SSD mount.")
         result: dict[str, Path] = {}
         self.sizes = {}
         directories = [self.root]
@@ -61,8 +59,7 @@ class StorageFiles:
                 for entry in entries:
                     meta = entry.stat(follow_symlinks=False)
                     if entry.is_symlink() or (
-                        getattr(meta, "st_file_attributes", 0)
-                        & stat.FILE_ATTRIBUTE_REPARSE_POINT
+                        getattr(meta, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
                     ):
                         continue
                     if entry.is_dir(follow_symlinks=False):
@@ -70,16 +67,10 @@ class StorageFiles:
                             directories.append(Path(entry.path))
                         continue
                     path = Path(entry.path)
-                    if path.suffix.lower() not in VIDEO_EXTENSIONS or FRAGMENT.search(
-                        entry.name
-                    ):
+                    if path.suffix.lower() not in VIDEO_EXTENSIONS or FRAGMENT.search(entry.name):
                         continue
                     match = VIDEO_ID.match(entry.name)
-                    if (
-                        match
-                        and entry.is_file(follow_symlinks=False)
-                        and meta.st_size > 0
-                    ):
+                    if match and entry.is_file(follow_symlinks=False) and meta.st_size > 0:
                         result.setdefault(match[1], path)
                         self.sizes[path] = meta.st_size
         return result

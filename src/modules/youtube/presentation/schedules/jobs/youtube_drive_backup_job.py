@@ -16,11 +16,7 @@ def drive_backup_job() -> None:
     drive = None
     if Path(settings.GOOGLE_DRIVE_OAUTH_PATH).is_file():
         try:
-            drive = DriveStorage(
-                settings.GOOGLE_DRIVE_OAUTH_PATH, settings.GOOGLE_DRIVE_FOLDER_ID
-            )
+            drive = DriveStorage(settings.GOOGLE_DRIVE_OAUTH_PATH, settings.GOOGLE_DRIVE_FOLDER_ID)
         except Exception as exc:
             repository.record_health({}, str(exc)[:2000])
-    StorageManager(
-        repository, StorageFiles(settings.DOWNLOAD_YOUTUBE_PATH), drive
-    ).run()
+    StorageManager(repository, StorageFiles(settings.DOWNLOAD_YOUTUBE_PATH), drive).run()
