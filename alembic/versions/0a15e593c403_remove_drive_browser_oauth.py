@@ -11,7 +11,7 @@ depends_on = None
 
 
 def upgrade():
-    op.drop_table("youtube_drive_oauth_sessions")
+    op.drop_table("youtube_drive_oauth_sessions", if_exists=True)
 
 
 def downgrade():
@@ -21,4 +21,5 @@ def downgrade():
         sa.Column("code_verifier", sa.Text(), nullable=False),
         sa.Column("redirect_uri", sa.Text(), nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
+        if_not_exists=True,
     )

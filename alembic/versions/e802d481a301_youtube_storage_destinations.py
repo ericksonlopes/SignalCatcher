@@ -11,6 +11,14 @@ depends_on = None
 
 
 def upgrade():
+    # Some installations already have storage objects but still point to the parent revision.
+    # Inspect online databases and keep offline PostgreSQL DDL safe to apply as well.
+    existing_columns = set()
+    if not op.get_context().as_sql:
+        existing_columns = {
+            column["name"] for column in sa.inspect(op.get_bind()).get_columns("youtube_contents")
+        }
+    postgresql = op.get_bind().dialect.name == "postgresql"
     for name, kind in (
         ("storage_location", sa.String(10)),
         ("storage_mode", sa.String(10)),
@@ -20,9 +28,17 @@ def upgrade():
         ("drive_file_id", sa.String()),
         ("drive_url", sa.String()),
     ):
-        op.add_column("youtube_contents", sa.Column(name, kind, nullable=True))
+        if name not in existing_columns:
+            op.add_column(
+                "youtube_contents",
+                sa.Column(name, kind, nullable=True),
+                if_not_exists=postgresql,
+            )
     op.create_index(
-        "ix_youtube_contents_storage_location", "youtube_contents", ["storage_location"]
+        "ix_youtube_contents_storage_location",
+        "youtube_contents",
+        ["storage_location"],
+        if_not_exists=True,
     )
     op.create_table(
         "youtube_storage_settings",
@@ -36,12 +52,13 @@ def upgrade():
         sa.Column("checked_at", sa.DateTime(timezone=True)),
         sa.Column("catalog_error", sa.Text()),
         sa.Column("catalog_updated_at", sa.DateTime(timezone=True)),
+        if_not_exists=True,
     )
     op.execute(
         sa.text(
             "INSERT INTO youtube_storage_settings "
             "(id, mode, uploads_paused, drive_ready, drive_info) "
-            "VALUES (1, 'BOTH', false, false, '{}')"
+            "VALUES (1, 'BOTH', false, false, '{}') ON CONFLICT (id) DO NOTHING"
         )
     )
     op.create_table(
@@ -58,6 +75,7 @@ def upgrade():
         sa.Column("md5", sa.String(32)),
         sa.Column("verified", sa.Boolean(), nullable=False),
         sa.Column("completed_at", sa.DateTime(timezone=True)),
+        if_not_exists=True,
     )
     op.create_table(
         "youtube_storage_transfers",
@@ -75,17 +93,20 @@ def upgrade():
         sa.Column("next_retry_at", sa.DateTime(timezone=True)),
         sa.Column("error", sa.Text()),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        if_not_exists=True,
     )
     op.create_index(
         "ix_youtube_storage_transfer_queue",
         "youtube_storage_transfers",
         ["status", "next_retry_at", "id"],
+        if_not_exists=True,
     )
     op.create_index(
         "uq_youtube_storage_transfer",
         "youtube_storage_transfers",
         ["content_id", "operation"],
         unique=True,
+        if_not_exists=True,
     )
     op.create_table(
         "youtube_storage_events",
@@ -96,11 +117,13 @@ def upgrade():
         sa.Column("new_location", sa.String(10)),
         sa.Column("details", sa.Text()),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        if_not_exists=True,
     )
     op.create_index(
         "ix_youtube_storage_event_content",
         "youtube_storage_events",
         ["content_id", "id"],
+        if_not_exists=True,
     )
 
 
