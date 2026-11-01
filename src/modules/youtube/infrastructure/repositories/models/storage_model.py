@@ -37,15 +37,6 @@ class StorageSettingsModel(Base):
     catalog_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
-class DriveOAuthSessionModel(Base):
-    __tablename__ = "youtube_drive_oauth_sessions"
-
-    state_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
-    code_verifier: Mapped[str] = mapped_column(Text)
-    redirect_uri: Mapped[str] = mapped_column(Text)
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-
-
 class DriveBackupModel(Base):
     __tablename__ = "youtube_drive_backups"
 

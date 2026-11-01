@@ -194,6 +194,58 @@ class YoutubeStorageTest(unittest.TestCase):
             self.assertEqual(db.scalar(select(StorageTransferModel.status)), "ERROR")
             self.assertEqual(db.scalar(select(YoutubeContentModel.storage_location)), "LOCAL")
 
+    def test_restore_conflict_preserves_existing_local_file_and_remote_copy(self):
+        self.content(staging=True)
+        self.manager.run()
+        with self.factory() as db:
+            content_id = db.scalar(select(YoutubeContentModel.id))
+        restored = Path(self.directory.name, "channel/12345678901_title.mp4")
+        restored.parent.mkdir(parents=True, exist_ok=True)
+        restored.write_bytes(b"another local video")
+        self.repository.enqueue(content_id, "RESTORE", "BOTH")
+        self.manager.run()
+        self.assertEqual(restored.read_bytes(), b"another local video")
+        self.assertEqual(self.drive.payloads["remote-1"], b"complete video bytes")
+        with self.factory() as db:
+            transfer = db.scalar(
+                select(StorageTransferModel).where(StorageTransferModel.operation == "RESTORE")
+            )
+            self.assertEqual(transfer.status, "ERROR")
+            self.assertIn("Restore conflict", transfer.error)
+
+    def test_unavailable_drive_keeps_local_inventory_and_pending_uploads(self):
+        path = self.content()
+        self.manager.drive = None
+        self.manager.run()
+        self.assertTrue(path.exists())
+        self.assertEqual(self.drive.uploads, 0)
+        self.assertFalse(self.repository.settings()["drive_ready"])
+        with self.factory() as db:
+            self.assertEqual(db.scalar(select(YoutubeContentModel.storage_location)), "LOCAL")
+            self.assertEqual(db.scalar(select(StorageTransferModel.status)), "PENDING")
+
+    def test_upload_rate_limit_keeps_checkpoints_during_throttle(self):
+        path = self.content()
+        self.repository.update_settings({"max_upload_mib_per_second": 0.1})
+        clock = [0.0]
+
+        def advance(seconds):
+            clock[0] += seconds
+
+        module = "src.modules.youtube.application.use_cases.jobs.storage_manager"
+        with (
+            patch(module + ".monotonic", side_effect=lambda: clock[0]),
+            patch(module + ".sleep", side_effect=advance) as waiting,
+            patch.object(
+                self.repository, "checkpoint", wraps=self.repository.checkpoint
+            ) as checkpoint,
+        ):
+            self.manager.run()
+        self.assertEqual(self.drive.uploads, 1)
+        self.assertGreaterEqual(clock[0], path.stat().st_size / (0.1 * 1024 * 1024))
+        waiting.assert_called()
+        self.assertGreaterEqual(checkpoint.call_count, 3)
+
     def test_replaced_lease_cannot_overwrite_new_owner(self):
         self.content()
         self.manager.reconcile([])

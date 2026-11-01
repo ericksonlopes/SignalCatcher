@@ -7,7 +7,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from google.auth.transport.requests import AuthorizedSession
-from google.oauth2.credentials import Credentials
+from google.oauth2 import service_account
 
 from src.modules.youtube.domain.storage import ProgressCallback, StorageBlocked
 
@@ -23,21 +23,33 @@ class DriveStorage:
             raise ValueError("Invalid Google Drive destination folder ID.")
         credential_file = Path(credentials_path)
         if not credential_file.is_file():
-            raise StorageBlocked(
-                "OAuth authorization is missing. Run script.authorize_google_drive."
-            )
-        with credential_file.open(encoding="utf-8") as source:
-            if json.load(source).get("type") != "authorized_user":
-                raise StorageBlocked("This My Drive destination requires authorized_user OAuth.")
-        self.session = AuthorizedSession(
-            Credentials.from_authorized_user_file(
+            raise StorageBlocked("Google Drive service-account credential file is missing.")
+        try:
+            credentials = service_account.Credentials.from_service_account_file(
                 str(credential_file), scopes=["https://www.googleapis.com/auth/drive"]
             )
-        )
+        except (OSError, ValueError) as exc:
+            raise StorageBlocked(
+                "Google Drive service-account credentials are invalid or unreadable."
+            ) from exc
+        self.session = AuthorizedSession(credentials, refresh_timeout=30)
         self.folder_id = folder_id
+        self.drive_id: str | None = None
         self.folders: dict[str, str] = {"": folder_id}
 
     def _request(self, method: str, url: str, **kwargs: Any) -> Any:
+        # Shared-drive files require these flags on metadata, media and upload requests.
+        if not urlparse(url).query and (
+            url == f"{API}/files"
+            or (url.startswith(f"{API}/files/") and url != f"{API}/files/generateIds")
+            or url == UPLOAD
+            or url.startswith(f"{UPLOAD}/")
+        ):
+            params = dict(kwargs.get("params", {}))
+            params["supportsAllDrives"] = "true"
+            if method == "GET" and url == f"{API}/files":
+                params["includeItemsFromAllDrives"] = "true"
+            kwargs["params"] = params
         response = self.session.request(method, url, timeout=(10, 90), **kwargs)
         if response.status_code in {200, 201, 204, 206, 308, 404}:
             return response
@@ -55,33 +67,36 @@ class DriveStorage:
             "GET",
             f"{API}/files/{self.folder_id}",
             params={
-                "fields": "id,name,mimeType,trashed,capabilities(canAddChildren)",
+                "fields": "id,name,mimeType,trashed,driveId,capabilities(canAddChildren)",
                 "supportsAllDrives": "true",
             },
         )
         if response.status_code == 404:
             raise StorageBlocked("The configured Google Drive folder is not accessible.")
         folder = response.json()
+        if not folder.get("driveId"):
+            raise StorageBlocked(
+                "Service-account uploads require a folder in a Google Workspace shared drive. "
+                "A shared My Drive folder does not provide storage quota."
+            )
         if (
             folder.get("mimeType") != "application/vnd.google-apps.folder"
             or folder.get("trashed")
             or not folder.get("capabilities", {}).get("canAddChildren")
         ):
             raise StorageBlocked("The destination folder does not allow file creation.")
-        about = self._request(
-            "GET", f"{API}/about", params={"fields": "user(emailAddress),storageQuota"}
-        ).json()
-        quota = about.get("storageQuota", {})
-        limit = int(quota["limit"]) if quota.get("limit") else None
-        used = int(quota.get("usage", 0))
+        about = self._request("GET", f"{API}/about", params={"fields": "user(emailAddress)"}).json()
+        self.drive_id = folder["driveId"]
         return {
             "folder_id": self.folder_id,
             "folder_name": folder["name"],
             "folder_url": f"https://drive.google.com/drive/folders/{self.folder_id}",
             "account": about.get("user", {}).get("emailAddress"),
-            "limit_bytes": limit,
-            "used_bytes": used,
-            "free_bytes": max(0, limit - used) if limit is not None else None,
+            "shared_drive_id": folder["driveId"],
+            # A service account's personal quota does not describe shared-drive storage.
+            "limit_bytes": None,
+            "used_bytes": None,
+            "free_bytes": None,
         }
 
     def reserve_id(self) -> str:
@@ -109,6 +124,8 @@ class DriveStorage:
                 "fields": f"files({fields}),nextPageToken",
                 "pageSize": 1000,
             }
+            if self.drive_id:
+                params.update({"corpora": "drive", "driveId": self.drive_id})
             if token:
                 params["pageToken"] = token
             data = self._request("GET", f"{API}/files", params=params).json()
@@ -164,54 +181,75 @@ class DriveStorage:
     ) -> dict[str, Any]:
         total = path.stat().st_size
         remote = self.get_file(file_id)
+        offset = 0
         if session_uri:
-            parsed = urlparse(session_uri)
-            if parsed.scheme != "https" or parsed.hostname != "www.googleapis.com":
-                raise ValueError("Invalid persisted upload session host.")
-            response = self._request(
-                "PUT",
-                session_uri,
-                headers={"Content-Range": f"bytes */{total}", "Content-Length": "0"},
-                data=b"",
-            )
+            response = self._probe_upload(session_uri, total)
             if response.status_code in {200, 201}:
                 return self.get_file(file_id) or response.json()
             if response.status_code == 404:
                 session_uri = None
-                offset = 0
             else:
-                offset = (
-                    int(response.headers.get("Range", "bytes=0--1").rsplit("-", 1)[-1]) + 1
-                    if response.headers.get("Range")
-                    else 0
-                )
-        else:
-            offset = 0
+                received = response.headers.get("Range")
+                offset = int(received.rsplit("-", 1)[-1]) + 1 if received else 0
         if not session_uri:
-            parent_path = str(PurePosixPath(relative_path).parent)
-            parent = self._folder("" if parent_path == "." else parent_path)
-            metadata: dict[str, Any] = {
-                "name": path.name,
-                "appProperties": {
-                    "signalcatcher_root": self.folder_id,
-                    "youtube_id": external_id,
-                },
-            }
-            if remote is None:
-                metadata.update({"id": file_id, "parents": [parent]})
-            response = self._request(
-                "PATCH" if remote else "POST",
-                f"{UPLOAD}/{file_id}" if remote else UPLOAD,
-                params={"uploadType": "resumable", "fields": FIELDS},
-                json=metadata,
-                headers={
-                    "X-Upload-Content-Type": "application/octet-stream",
-                    "X-Upload-Content-Length": str(total),
-                },
+            session_uri = self._start_upload(
+                path, relative_path, external_id, file_id, remote, total
             )
-            session_uri = response.headers["Location"]
             progress(0, total, session_uri)
-        assert session_uri is not None
+        return self._upload_chunks(path, file_id, session_uri, offset, total, progress)
+
+    def _probe_upload(self, session_uri: str, total: int) -> Any:
+        parsed = urlparse(session_uri)
+        if parsed.scheme != "https" or parsed.hostname != "www.googleapis.com":
+            raise ValueError("Invalid persisted upload session host.")
+        return self._request(
+            "PUT",
+            session_uri,
+            headers={"Content-Range": f"bytes */{total}", "Content-Length": "0"},
+            data=b"",
+        )
+
+    def _start_upload(
+        self,
+        path: Path,
+        relative_path: str,
+        external_id: str,
+        file_id: str,
+        remote: dict[str, Any] | None,
+        total: int,
+    ) -> str:
+        parent_path = str(PurePosixPath(relative_path).parent)
+        parent = self._folder("" if parent_path == "." else parent_path)
+        metadata: dict[str, Any] = {
+            "name": path.name,
+            "appProperties": {
+                "signalcatcher_root": self.folder_id,
+                "youtube_id": external_id,
+            },
+        }
+        if remote is None:
+            metadata.update({"id": file_id, "parents": [parent]})
+        response = self._request(
+            "PATCH" if remote else "POST",
+            f"{UPLOAD}/{file_id}" if remote else UPLOAD,
+            params={"uploadType": "resumable", "fields": FIELDS},
+            json=metadata,
+            headers={
+                "X-Upload-Content-Type": "application/octet-stream",
+                "X-Upload-Content-Length": str(total),
+            },
+        )
+        return response.headers["Location"]
+
+    def _upload_chunks(
+        self,
+        path: Path,
+        file_id: str,
+        session_uri: str,
+        offset: int,
+        total: int,
+        progress: ProgressCallback,
+    ) -> dict[str, Any]:
         with path.open("rb") as source:
             source.seek(offset)
             while offset < total:

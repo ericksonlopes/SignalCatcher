@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from src.core.config.settings import settings
 from src.core.database.connector import Session
 from src.core.database.job_control import JobControlRepository
+from src.modules.youtube.domain.storage import StorageBlocked
 from src.modules.youtube.infrastructure.repositories.models.youtube_content_model import (
     YoutubeContentModel,
 )
@@ -39,7 +40,10 @@ def storage_settings():
     return StorageRepository().settings()
 
 
-@router.patch("/storage-settings")
+@router.patch(
+    "/storage-settings",
+    responses={409: {"description": "Drive credentials or destination could not be validated."}},
+)
 def update_storage_settings(request: StorageSettingsUpdate):
     values = request.model_dump(exclude_unset=True)
     if values.get("mode") is None:
@@ -49,12 +53,18 @@ def update_storage_settings(request: StorageSettingsUpdate):
     if values.get("mode") == "DRIVE":
         try:
             info = DriveStorage(
-                settings.GOOGLE_DRIVE_OAUTH_PATH, settings.GOOGLE_DRIVE_FOLDER_ID
+                settings.GOOGLE_DRIVE_CREDENTIALS_PATH, settings.GOOGLE_DRIVE_FOLDER_ID
             ).inspect()
             StorageRepository().record_health(info)
+        except StorageBlocked as exc:
+            StorageRepository().record_health({}, str(exc))
+            raise HTTPException(409, str(exc)) from exc
         except Exception as exc:
+            StorageRepository().record_health({}, "Could not validate Google Drive access.")
             raise HTTPException(
-                409, "Authorize Google Drive before selecting Drive-only mode."
+                409,
+                "Check the server credential and destination folder "
+                "before selecting Drive-only mode.",
             ) from exc
     result = StorageRepository().update_settings(values)
     request_storage_job()
@@ -86,7 +96,14 @@ def retry_storage_errors():
     return {"queued": count}
 
 
-@router.post("/drive-backups/restore", status_code=202)
+@router.post(
+    "/drive-backups/restore",
+    status_code=202,
+    responses={
+        404: {"description": "One or more selected videos were not found."},
+        409: {"description": "A selected video has no verified Drive copy or cannot be queued."},
+    },
+)
 def restore_storage(request: RestoreRequest):
     external_ids = set(request.external_ids)
     with Session() as db:
@@ -111,7 +128,10 @@ def restore_storage(request: RestoreRequest):
     return {"queued": len(content_ids)}
 
 
-@router.get("/content/{external_id}/storage-history")
+@router.get(
+    "/content/{external_id}/storage-history",
+    responses={404: {"description": "The requested video was not found."}},
+)
 def storage_history(
     external_id: str,
     page: Annotated[int, Query(ge=1)] = 1,

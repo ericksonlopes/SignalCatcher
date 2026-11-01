@@ -17,11 +17,7 @@ class Settings(BaseSettings):
     POSTGRES_HOST: str
 
     DOWNLOAD_YOUTUBE_PATH: str
-    GOOGLE_DRIVE_OAUTH_PATH: str = "./drive-auth/token.json"
-    GOOGLE_DRIVE_CLIENT_JSON_PATH: str = "./drive-auth/client.json"
-    GOOGLE_DRIVE_OAUTH_REDIRECT_URI: str = (
-        "http://eriberry.local:3000/api/youtube/drive-oauth/callback"
-    )
+    GOOGLE_DRIVE_CREDENTIALS_PATH: str = "./service_account.json"
     GOOGLE_DRIVE_FOLDER_ID: str = "15UskOqNHVgjXmeN1URSf8ZP300GM-BSu"
 
     LIST_LOG_LEVELS: str | None = None

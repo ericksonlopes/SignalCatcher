@@ -25,8 +25,10 @@ def main() -> None:
     from src.modules.youtube.infrastructure.services.storage_files import StorageFiles
 
     drive = None
-    if not args.inventory_only and Path(settings.GOOGLE_DRIVE_OAUTH_PATH).is_file():
-        drive = DriveStorage(settings.GOOGLE_DRIVE_OAUTH_PATH, settings.GOOGLE_DRIVE_FOLDER_ID)
+    if not args.inventory_only:
+        drive = DriveStorage(
+            settings.GOOGLE_DRIVE_CREDENTIALS_PATH, settings.GOOGLE_DRIVE_FOLDER_ID
+        )
     repository = StorageRepository()
     manager = StorageManager(
         repository, StorageFiles(args.path or settings.DOWNLOAD_YOUTUBE_PATH), drive
@@ -38,7 +40,7 @@ def main() -> None:
     summary = repository.summary()
     print("Locations:", summary["locations"])
     print("Transfers:", summary["transfers"])
-    print("Drive authorized:", summary["drive_ready"])
+    print("Drive ready:", summary["drive_ready"])
 
 
 if __name__ == "__main__":

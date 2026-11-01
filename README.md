@@ -339,7 +339,7 @@ All settings are configured via environment variables and validated through Pyda
 
 ## 🛠️ Maintenance CLI & Diagnostics
 
-Google Drive copies, configurable destinations and browser OAuth setup are described
+Google Drive copies, configurable destinations and service-account setup are described
 in [Google Drive storage](docs/google-drive-storage.md). The Tracking screen includes
 storage settings, connection status, transfers, restoration and per-video history.
 
