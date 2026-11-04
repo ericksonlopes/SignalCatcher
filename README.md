@@ -330,8 +330,6 @@ All settings are configured via environment variables and validated through Pyda
 | `RETRY_BASE_SECONDS` | `300` | Initial exponential backoff delay (5 minutes) |
 | `RETRY_MAX_SECONDS` | `86400` | Maximum exponential backoff cap (24 hours) |
 | `WORKER_HEARTBEAT_MAX_AGE`| `60` | Max age in seconds before worker is marked stale by `/ready` |
-| `DIARIZATION_API_URL` | `http://localhost:8001` | Base URL of the WhisperX Diarization service |
-| `DIARIZATION_READ_TIMEOUT`| `300` | HTTP read timeout for AI diarization requests |
 | `FFMPEG_LOCATION` | `None` | Custom path to FFmpeg binary (defaults to system PATH) |
 | `VOICE_MONKEY_API_TOKEN` | `None` | Optional token for smart home / Alexa audio notifications |
 

@@ -25,7 +25,6 @@ class Settings(BaseSettings):
     VOICE_MONKEY_API_TOKEN: str | None = None
     VOICE_MONKEY_NEW_VIDEO_FOR_DOWNLOAD_MONKEY_ID: str | None = None
 
-    DIARIZATION_API_URL: str | None = "http://localhost:8001"
     FFMPEG_LOCATION: str | None = None
 
     CORS_ALLOWED_ORIGINS: str = (
@@ -35,8 +34,6 @@ class Settings(BaseSettings):
     MAX_PROCESSING_ATTEMPTS: int = Field(default=5, ge=1, le=100)
     RETRY_BASE_SECONDS: int = Field(default=300, ge=1)
     RETRY_MAX_SECONDS: int = Field(default=86400, ge=1)
-    DIARIZATION_CONNECT_TIMEOUT: float = Field(default=10, gt=0)
-    DIARIZATION_READ_TIMEOUT: float = Field(default=300, gt=0)
     WORKER_HEARTBEAT_MAX_AGE: int = Field(default=60, ge=10)
 
     @property

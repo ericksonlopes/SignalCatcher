@@ -21,9 +21,6 @@ Sob `src/modules/diarization/`:
   transação por requisição; preserve o commit antes da resposta via dependência
   com `scope="function"`.
 - `presentation/api/routes/diarization_route.py`: rotas.
-- `infrastructure/clients/diarization_api_client.py` e
-  `application/dtos/diarization_api_dtos.py`: cliente HTTP de path/upload, distinto
-  da criação direta por YouTube.
 
 Fora do módulo:
 - `main.py` monta `/api/diarization` com `require_admin`.

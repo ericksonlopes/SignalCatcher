@@ -36,8 +36,8 @@ Leia [references/maintenance.md](references/maintenance.md) apenas nas seções 
 - API principal e worker mapeiam a mesma tabela `diarization`. Alterar sua estrutura
   exige compatibilizar os dois models e criar migration no SignalCatcher, onde estão
   as revisões existentes. Não crie cadeias Alembic concorrentes para a mesma tabela.
-- A criação via YouTube na API principal grava a fila diretamente. A existência de
-  `DiarizationApiClient` não significa que esse fluxo use HTTP para enfileirar.
+- A criação via YouTube na API principal grava a fila diretamente; o worker consome
+  a tabela compartilhada.
 - Mantenha `DiarizationStep` separado de `ContentStep`. Sincronize mudanças de estados
   com `ACTIVE_STEPS` do worker, filtros, ações e mocks do frontend.
 - Uma execução possui `worker_token` e lease. Resultados, erros e progresso atrasados
