@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -19,7 +20,7 @@ class ServiceAccountDriveTest(unittest.TestCase):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         self.key = Path(directory.name, "service_account.json")
-        self.key.write_text("{}", encoding="utf-8")
+        self.key.write_text('{"type":"service_account"}', encoding="utf-8")
         self.video = self.key.with_name("video.mp4")
         self.video.write_bytes(b"video bytes")
         credentials = patch.object(
@@ -90,6 +91,62 @@ class ServiceAccountDriveTest(unittest.TestCase):
         self.assertEqual(
             self.session.request.call_args_list[0].kwargs["params"]["supportsAllDrives"], "true"
         )
+
+    def test_authorized_user_can_use_personal_folder_and_account_quota(self):
+        self.key.write_text('{"type":"authorized_user"}', encoding="utf-8")
+        with patch.object(drive_storage.UserCredentials, "from_authorized_user_file") as user:
+            drive = drive_storage.DriveStorage(str(self.key), "destination")
+        user.assert_called_once_with(
+            str(self.key), scopes=["https://www.googleapis.com/auth/drive"]
+        )
+        self.session.request.side_effect = [
+            response(
+                payload={
+                    "id": "destination",
+                    "name": "youtube",
+                    "mimeType": "application/vnd.google-apps.folder",
+                    "capabilities": {"canAddChildren": True},
+                }
+            ),
+            response(
+                payload={
+                    "user": {"emailAddress": "owner@example.invalid"},
+                    "storageQuota": {"limit": "1000", "usage": "250"},
+                }
+            ),
+        ]
+        info = drive.inspect()
+        self.assertEqual(info["account"], "owner@example.invalid")
+        self.assertIsNone(info["shared_drive_id"])
+        self.assertEqual(info["limit_bytes"], 1000)
+        self.assertEqual(info["used_bytes"], 250)
+        self.assertEqual(info["free_bytes"], 750)
+
+    def test_unsupported_credential_type_does_not_construct_a_session(self):
+        self.key.write_text('{"type":"external_account"}', encoding="utf-8")
+        key_path = str(self.key)
+        self.session_factory.reset_mock()
+        with self.assertRaisesRegex(StorageBlocked, "invalid or unreadable"):
+            drive_storage.DriveStorage(key_path, "destination")
+        self.session_factory.assert_not_called()
+
+    def test_gcloud_authorized_user_format_loads_without_an_access_token(self):
+        self.key.write_text(
+            json.dumps(
+                {
+                    "type": "authorized_user",
+                    "client_id": "test-client.apps.googleusercontent.com",
+                    "client_secret": "test-only-secret",
+                    "refresh_token": "test-only-refresh",
+                }
+            ),
+            encoding="utf-8",
+        )
+        drive_storage.DriveStorage(str(self.key), "destination")
+        credentials = self.session_factory.call_args.args[0]
+        self.assertIsInstance(credentials, drive_storage.UserCredentials)
+        self.assertEqual(credentials.refresh_token, "test-only-refresh")
+        self.assertIsNone(credentials.token)
 
     def test_inventory_includes_shared_drive_items_across_pages(self):
         self.session.request.side_effect = [

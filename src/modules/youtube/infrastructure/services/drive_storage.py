@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 
 from google.auth.transport.requests import AuthorizedSession
 from google.oauth2 import service_account
+from google.oauth2.credentials import Credentials as UserCredentials
 
 from src.modules.youtube.domain.storage import ProgressCallback, StorageBlocked
 
@@ -23,14 +24,30 @@ class DriveStorage:
             raise ValueError("Invalid Google Drive destination folder ID.")
         credential_file = Path(credentials_path)
         if not credential_file.is_file():
-            raise StorageBlocked("Google Drive service-account credential file is missing.")
+            raise StorageBlocked("Google Drive credential file is missing.")
         try:
-            credentials = service_account.Credentials.from_service_account_file(
-                str(credential_file), scopes=["https://www.googleapis.com/auth/drive"]
-            )
+            with credential_file.open(encoding="utf-8") as source:
+                payload = json.load(source)
+            if not isinstance(payload, dict):
+                raise ValueError("Google Drive credentials must be a JSON object.")
+            kind = payload.get("type")
+            self._service_account = kind == "service_account"
+            scopes = ["https://www.googleapis.com/auth/drive"]
+            credentials: service_account.Credentials | UserCredentials
+            if self._service_account:
+                credentials = service_account.Credentials.from_service_account_file(
+                    str(credential_file), scopes=scopes
+                )
+            elif kind == "authorized_user":
+                credentials = UserCredentials.from_authorized_user_file(
+                    str(credential_file), scopes=scopes
+                )
+            else:
+                raise ValueError("Unsupported Google Drive credential type.")
         except (OSError, ValueError) as exc:
             raise StorageBlocked(
-                "Google Drive service-account credentials are invalid or unreadable."
+                "Google Drive credentials are invalid or unreadable. "
+                "Use a service-account key or an authorized-user token."
             ) from exc
         self.session = AuthorizedSession(credentials, refresh_timeout=30)
         self.folder_id = folder_id
@@ -74,7 +91,7 @@ class DriveStorage:
         if response.status_code == 404:
             raise StorageBlocked("The configured Google Drive folder is not accessible.")
         folder = response.json()
-        if not folder.get("driveId"):
+        if not folder.get("driveId") and self._service_account:
             raise StorageBlocked(
                 "Service-account uploads require a folder in a Google Workspace shared drive. "
                 "A shared My Drive folder does not provide storage quota."
@@ -85,19 +102,28 @@ class DriveStorage:
             or not folder.get("capabilities", {}).get("canAddChildren")
         ):
             raise StorageBlocked("The destination folder does not allow file creation.")
-        about = self._request("GET", f"{API}/about", params={"fields": "user(emailAddress)"}).json()
-        self.drive_id = folder["driveId"]
+        about = self._request(
+            "GET", f"{API}/about", params={"fields": "user(emailAddress),storageQuota"}
+        ).json()
+        self.drive_id = folder.get("driveId")
         return {
             "folder_id": self.folder_id,
             "folder_name": folder["name"],
             "folder_url": f"https://drive.google.com/drive/folders/{self.folder_id}",
             "account": about.get("user", {}).get("emailAddress"),
-            "shared_drive_id": folder["driveId"],
-            # A service account's personal quota does not describe shared-drive storage.
-            "limit_bytes": None,
-            "used_bytes": None,
-            "free_bytes": None,
+            "shared_drive_id": self.drive_id,
+            **self._storage_quota(about),
         }
+
+    def _storage_quota(self, about: dict[str, Any]) -> dict[str, int | None]:
+        # Personal quota is only relevant to an authorized user's My Drive destination.
+        if self.drive_id:
+            return {"limit_bytes": None, "used_bytes": None, "free_bytes": None}
+        quota = about.get("storageQuota", {})
+        limit = int(quota["limit"]) if quota.get("limit") else None
+        used = int(quota["usage"]) if quota.get("usage") is not None else None
+        free = max(0, limit - used) if limit is not None and used is not None else None
+        return {"limit_bytes": limit, "used_bytes": used, "free_bytes": free}
 
     def reserve_id(self) -> str:
         return self._request(

@@ -133,9 +133,7 @@ class StorageManager:
         remote_files = None
         try:
             if self.drive is None:
-                raise StorageBlocked(
-                    "Google Drive service-account credentials are not configured on the server."
-                )
+                raise StorageBlocked("Google Drive credentials are not configured on the server.")
             info = self.drive.inspect()
             remote_files = self.drive.managed_files()
             self.repository.record_health(info)
