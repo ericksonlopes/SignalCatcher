@@ -183,6 +183,7 @@ class StorageManager:
     def _restore(self, task: dict[str, Any], progress: ProgressCallback) -> None:
         assert self.drive is not None
         destination = self.files.destination(task, task["relative_path"])
+        partial = None
         if destination.is_file():
             if self.files.checksum(destination) != task["md5"]:
                 raise ValueError("Restore conflict: a different local file already exists.")
@@ -192,17 +193,21 @@ class StorageManager:
             if self.files.checksum(partial) != task["md5"]:
                 partial.unlink(missing_ok=True)
                 raise ValueError("Restore checksum mismatch; the partial file was discarded.")
-            # Hard-link creation refuses to overwrite a file created concurrently.
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            try:
-                destination.hardlink_to(partial)
-            except FileExistsError:
-                if self.files.checksum(destination) != task["md5"]:
+
+        def publish() -> None:
+            if partial is not None:
+                # Hard-link creation refuses to overwrite a file created concurrently.
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                try:
+                    destination.hardlink_to(partial)
+                except FileExistsError:
                     raise ValueError(
                         "Restore conflict: destination appeared during transfer."
                     ) from None
+
+        self.repository.finish(task, {"file_path": self.files.public(destination)}, publish)
+        if partial is not None:
             partial.unlink(missing_ok=True)
-        self.repository.finish(task, {"file_path": self.files.public(destination)})
 
     def _upload(
         self, task: dict[str, Any], info: dict[str, Any], progress: ProgressCallback

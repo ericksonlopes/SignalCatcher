@@ -69,6 +69,31 @@ class DiarizationTrackingTest(unittest.TestCase):
         self.assertEqual(first.id, second.id)
         self.assertEqual(self.session.query(DiarizationModel).count(), 1)
 
+    def test_reprocessing_historical_attempt_queues_the_visible_latest_attempt(self):
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        old = DiarizationModel(
+            file_path="old.wav",
+            entity_id="video",
+            entity_type="YOUTUBE",
+            step="ERROR",
+            created_at=now - timedelta(days=1),
+        )
+        latest = DiarizationModel(
+            file_path="new.wav",
+            entity_id="video",
+            entity_type="YOUTUBE",
+            step="CANCELLED",
+            created_at=now,
+        )
+        self.session.add_all([old, latest])
+        self.session.flush()
+        repository = DiarizationRepository(self.session)
+        task = repository.reprocess_task(old.id)
+        self.assertEqual(task.id, latest.id)
+        self.assertEqual(old.step, "ERROR")
+        items, total = repository.get_paginated(1, 20, step="PENDING")
+        self.assertEqual((total, [item.id for item in items]), (1, [latest.id]))
+
     def test_start_now_requeues_current_and_prioritizes_selected_video(self):
         current = DiarizationModel(
             file_path="current.wav",

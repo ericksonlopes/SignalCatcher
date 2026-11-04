@@ -6,7 +6,7 @@ from pathlib import Path
 
 from alembic.autogenerate import rewriter
 from alembic.operations import ops
-from sqlalchemy import engine_from_config, pool, text
+from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 from src.core.config.settings import settings
@@ -88,32 +88,6 @@ def add_if_exists(context, revision, op):
     return op
 
 
-def _heal_orphaned_revisions(connection) -> None:
-    """If the database alembic_version points to a removed revision (e.g. removed module),
-    reset it to the current available head to avoid 'Can't locate revision' errors."""
-    try:
-        result = connection.execute(
-            text("SELECT version_num FROM alembic_version LIMIT 1")
-        ).scalar()
-        if not result:
-            return
-
-        script = context.script
-        try:
-            script.get_revision(result)
-        except Exception:
-            heads = script.get_heads()
-            target_head = heads[0] if heads else None
-            if target_head:
-                connection.execute(
-                    text("UPDATE alembic_version SET version_num = :head"),
-                    {"head": target_head},
-                )
-                connection.commit()
-    except Exception:
-        pass
-
-
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
 
@@ -157,8 +131,6 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        _heal_orphaned_revisions(connection)
-
         tracker = MigrationModelTracker(
             target_metadata=target_metadata,
             connection=connection,

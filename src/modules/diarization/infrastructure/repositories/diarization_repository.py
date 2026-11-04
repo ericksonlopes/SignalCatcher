@@ -208,20 +208,23 @@ class DiarizationRepository(IDiarizationRepository):
                     text("SELECT pg_advisory_xact_lock(hashtext(:key))"),
                     {"key": f"diarization:{model.entity_type}:{model.entity_id}"},
                 )
-            active = (
+            attempts = (
                 self.session.query(DiarizationModel)
                 .filter(
                     DiarizationModel.entity_id == model.entity_id,
                     DiarizationModel.entity_type == model.entity_type,
-                    DiarizationModel.step.in_(
-                        ["PENDING", *[s.value for s in DiarizationStep.in_progress()]]
-                    ),
                 )
                 .order_by(DiarizationModel.created_at.desc(), DiarizationModel.id.desc())
-                .first()
             )
+            active = attempts.filter(
+                DiarizationModel.step.in_(
+                    ["PENDING", *[s.value for s in DiarizationStep.in_progress()]]
+                ),
+            ).first()
             if active:
                 return DiarizationMapper.to_domain(active)
+            # Keep historical attempts intact and requeue the row the library displays.
+            model = attempts.populate_existing().with_for_update().limit(1).one()
         model.step = DiarizationStep.PENDING.value
         model.progress_percent = None
         model.worker_token = None

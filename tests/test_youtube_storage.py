@@ -1,8 +1,9 @@
 import hashlib
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
@@ -11,6 +12,7 @@ from src.modules.youtube.application.use_cases.jobs.storage_manager import (
     StorageManager,
 )
 from src.modules.youtube.domain.enums.content_step import ContentStep
+from src.modules.youtube.domain.processing import ContentBusyError
 from src.modules.youtube.domain.storage import TransferInterrupted
 from src.modules.youtube.infrastructure.repositories.models.step_tracking_model import (
     StepTrackingModel,
@@ -26,6 +28,9 @@ from src.modules.youtube.infrastructure.repositories.models.youtube_content_mode
 )
 from src.modules.youtube.infrastructure.repositories.storage_repository import (
     StorageRepository,
+)
+from src.modules.youtube.infrastructure.repositories.youtube_content_repository import (
+    YoutubeContentRepository,
 )
 from src.modules.youtube.infrastructure.services.storage_files import StorageFiles
 
@@ -224,6 +229,58 @@ class YoutubeStorageTest(unittest.TestCase):
             self.assertEqual(db.scalar(select(YoutubeContentModel.storage_location)), "LOCAL")
             self.assertEqual(db.scalar(select(StorageTransferModel.status)), "PENDING")
 
+    def test_inventory_preserves_verified_remote_copy_until_its_loss_is_confirmed(self):
+        self.content()
+        self.manager.run()
+        with self.factory() as db:
+            content_id = db.scalar(select(YoutubeContentModel.id))
+        for method in ("observe", "reconcile"):
+            for local, remote, expected in (
+                ("/youtube/channel/12345678901_title.mp4", True, "BOTH"),
+                (None, None, "DRIVE"),
+                (None, False, "NONE"),
+                ("/youtube/channel/12345678901_title.mp4", False, "LOCAL"),
+            ):
+                with self.subTest(method=method, local=local, remote=remote):
+                    if method == "observe":
+                        self.repository.observe(content_id, local, remote)
+                    else:
+                        self.repository.reconcile(
+                            [{"id": content_id, "local": local, "remote": remote}], "LOCAL"
+                        )
+                    with self.factory() as db:
+                        item = db.get(YoutubeContentModel, content_id)
+                        self.assertEqual(item.storage_location, expected)
+                        self.assertEqual(item.file_path, local)
+                        self.assertEqual(bool(item.drive_file_id), expected in {"BOTH", "DRIVE"})
+
+    def test_enqueue_does_not_reset_errors_but_requeues_finished_transfers(self):
+        self.content()
+        with self.factory() as db:
+            content_id = db.scalar(select(YoutubeContentModel.id))
+        self.repository.enqueue(content_id, "UPLOAD", "BOTH")
+        with self.factory() as db, db.begin():
+            transfer = db.scalar(select(StorageTransferModel))
+            transfer.status = "ERROR"
+            transfer.attempts = 3
+            transfer.error = "keep-error"
+        self.repository.enqueue(content_id, "UPLOAD", "BOTH")
+        with self.factory() as db, db.begin():
+            transfer = db.scalar(select(StorageTransferModel))
+            self.assertEqual(
+                (transfer.status, transfer.attempts, transfer.error), ("ERROR", 3, "keep-error")
+            )
+            transfer.status = "MISSING_FILE"
+        self.repository.enqueue(content_id, "UPLOAD", "DRIVE")
+        with self.factory() as db:
+            transfer = db.scalar(select(StorageTransferModel))
+            self.assertEqual(
+                (transfer.status, transfer.attempts, transfer.mode), ("PENDING", 0, "DRIVE")
+            )
+            self.assertIsNone(transfer.error)
+            self.assertEqual(db.scalar(select(func.count()).select_from(StorageTransferModel)), 1)
+        self.assertEqual(self.repository.summary()["transfers"], {"PENDING": 1})
+
     def test_upload_rate_limit_keeps_checkpoints_during_throttle(self):
         path = self.content()
         self.repository.update_settings({"max_upload_mib_per_second": 0.1})
@@ -256,6 +313,88 @@ class YoutubeStorageTest(unittest.TestCase):
             transfer.lease_token = "another-worker"
         with self.assertRaises(TransferInterrupted):
             self.repository.finish(task, {})
+
+    def test_transfer_blocks_deletion_and_reprocessing_until_finished(self):
+        self.content()
+        self.manager.reconcile([])
+        task = self.repository.claim()
+        with self.factory() as db:
+            repository = YoutubeContentRepository(db, Mock())
+            for command in (repository.request_deletion, repository.request_reprocessing):
+                with self.assertRaises(ContentBusyError):
+                    command(task["external_id"])
+        self.manager.transfer(task, {})
+        with self.factory() as db, db.begin():
+            item = db.get(YoutubeContentModel, task["content_id"])
+            self.assertIsNone(item.lease_token)
+            self.assertIsNone(item.lease_expires_at)
+            self.assertTrue(YoutubeContentRepository(db, Mock()).request_deletion(item.external_id))
+
+    def test_restore_cannot_publish_after_content_reservation_is_revoked(self):
+        self.content(staging=True)
+        self.manager.run()
+        with self.factory() as db:
+            content_id = db.scalar(select(YoutubeContentModel.id))
+        self.repository.enqueue(content_id, "RESTORE", "BOTH")
+        task = self.repository.claim()
+        download = self.drive.download
+
+        def revoke_after_download(*args):
+            download(*args)
+            with self.factory() as db, db.begin():
+                item = db.get(YoutubeContentModel, content_id)
+                item.step = ContentStep.DELETED
+                item.lease_token = item.lease_expires_at = None
+
+        self.drive.download = revoke_after_download
+        self.manager._process_transfer(task, {})
+        restored = Path(self.directory.name, "channel/12345678901_title.mp4")
+        self.assertFalse(restored.exists())
+        self.assertIsNone(self.repository.claim())
+        with self.factory() as db:
+            item = db.get(YoutubeContentModel, content_id)
+            self.assertEqual(item.step, ContentStep.DELETED)
+            self.assertIsNone(item.file_path)
+        with self.assertRaisesRegex(ValueError, "Deleted content"):
+            self.repository.enqueue(content_id, "RESTORE", "BOTH")
+
+    def test_transfer_checkpoint_renews_content_reservation_and_release_clears_it(self):
+        self.content()
+        self.manager.reconcile([])
+        task = self.repository.claim()
+        self.repository.checkpoint(task, 1, 20, None)
+        with self.factory() as db:
+            item = db.get(YoutubeContentModel, task["content_id"])
+            transfer = db.get(StorageTransferModel, task["task_id"])
+            self.assertEqual(item.lease_token, task["token"])
+            self.assertEqual(item.lease_expires_at, transfer.lease_expires_at)
+        self.repository.release(task)
+        with self.factory() as db:
+            self.assertIsNone(db.get(YoutubeContentModel, task["content_id"]).lease_token)
+        self.assertIsNotNone(self.repository.claim())
+
+    def test_expired_transfer_is_reclaimed_without_releasing_a_new_content_owner(self):
+        self.content()
+        self.manager.reconcile([])
+        task = self.repository.claim()
+        expired = datetime.now(timezone.utc) - timedelta(seconds=1)
+        with self.factory() as db, db.begin():
+            db.get(StorageTransferModel, task["task_id"]).lease_expires_at = expired
+            db.get(YoutubeContentModel, task["content_id"]).lease_expires_at = expired
+        replacement = self.repository.claim()
+        self.assertNotEqual(replacement["token"], task["token"])
+        self.repository.release(task)
+        with self.factory() as db:
+            item = db.get(YoutubeContentModel, task["content_id"])
+            self.assertEqual(item.lease_token, replacement["token"])
+        with self.factory() as db, db.begin():
+            db.get(StorageTransferModel, task["task_id"]).lease_expires_at = expired
+            db.get(YoutubeContentModel, task["content_id"]).lease_token = "media-worker"
+        self.assertIsNone(self.repository.claim())
+        with self.factory() as db:
+            self.assertEqual(
+                db.get(YoutubeContentModel, task["content_id"]).lease_token, "media-worker"
+            )
 
 
 if __name__ == "__main__":

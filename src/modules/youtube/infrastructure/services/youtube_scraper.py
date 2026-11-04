@@ -29,7 +29,6 @@ class YouTubeScraperService(IYouTubeScraper):
             "ignoreerrors": True,
             "source_address": "0.0.0.0",
             # Network Resilience
-            "nocheckcertificate": True,
             "geo_bypass": True,
             "socket_timeout": 30,
             # Mimic a modern browser to avoid blocks
@@ -60,12 +59,9 @@ class YouTubeScraperService(IYouTubeScraper):
 
         # Check if cookies.txt exists in the project root to bypass YouTube bot protection
 
-        project_root = os.path.dirname(
-            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        )
-        cookies_path = os.path.join(project_root, "cookies.txt")
-        if os.path.exists(cookies_path):
-            opts["cookiefile"] = cookies_path
+        cookies_path = Path(__file__).resolve().parents[5] / "cookies.txt"
+        if cookies_path.is_file():
+            opts["cookiefile"] = str(cookies_path)
 
         return opts
 

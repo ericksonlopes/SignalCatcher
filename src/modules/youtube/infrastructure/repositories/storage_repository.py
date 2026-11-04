@@ -44,6 +44,16 @@ def now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def storage_location(local: str | None, remote: bool) -> str:
+    if local and remote:
+        return "BOTH"
+    if local:
+        return "LOCAL"
+    if remote:
+        return "DRIVE"
+    return "NONE"
+
+
 def event(
     db: Session,
     content_id: Any,
@@ -191,31 +201,37 @@ class StorageRepository:
             if item is None or item.lease_token or item.deletion_requested:
                 return
             backup = db.get(DriveBackupModel, content_id)
-            if backup and remote is not None:
-                backup.verified = remote
-            has_remote = bool(backup and backup.verified)
-            location = (
-                "BOTH"
-                if local and has_remote
-                else ("LOCAL" if local else "DRIVE" if has_remote else "NONE")
+            self._apply_observation(db, item, backup, local, remote)
+
+    @staticmethod
+    def _apply_observation(
+        db: Session,
+        item: YoutubeContentModel,
+        backup: DriveBackupModel | None,
+        local: str | None,
+        remote: bool | None,
+    ) -> bool:
+        if backup and remote is not None:
+            backup.verified = remote
+        verified = bool(backup and backup.verified)
+        location = storage_location(local, verified)
+        if item.storage_location != location:
+            event(
+                db,
+                item.id,
+                "LOCATION_CHANGED",
+                previous=item.storage_location,
+                location=location,
             )
-            previous = item.storage_location
-            if previous != location:
-                event(
-                    db,
-                    content_id,
-                    "LOCATION_CHANGED",
-                    previous=previous,
-                    location=location,
-                )
-            item.storage_location = location
-            item.storage_verified_at = now()
-            item.file_path = local
-            if backup and backup.verified:
-                item.drive_file_id = backup.file_id
-                item.drive_url = backup.web_url
-            elif remote is not None:
-                item.drive_file_id = item.drive_url = None
+        item.storage_location = location
+        item.storage_verified_at = now()
+        item.file_path = local
+        if backup and verified:
+            item.drive_file_id = backup.file_id
+            item.drive_url = backup.web_url
+        elif remote is not None:
+            item.drive_file_id = item.drive_url = None
+        return verified
 
     def reconcile(self, observations: list[dict[str, Any]], mode: str) -> None:
         if not observations:
@@ -246,33 +262,10 @@ class StorageRepository:
                 if item is None:
                     continue
                 backup = backups.get(item.id)
-                remote = row.get("remote")
-                if backup and remote is not None:
-                    backup.verified = remote
-                local = row.get("local")
-                verified = bool(backup and backup.verified)
-                location = (
-                    "BOTH"
-                    if local and verified
-                    else ("LOCAL" if local else "DRIVE" if verified else "NONE")
+                verified = self._apply_observation(
+                    db, item, backup, row.get("local"), row.get("remote")
                 )
-                if item.storage_location != location:
-                    event(
-                        db,
-                        item.id,
-                        "LOCATION_CHANGED",
-                        previous=item.storage_location,
-                        location=location,
-                    )
-                item.storage_location = location
-                item.storage_verified_at = now()
-                item.file_path = local
                 item.storage_size = row.get("size")
-                if verified and backup:
-                    item.drive_file_id = backup.file_id
-                    item.drive_url = backup.web_url
-                elif remote is not None:
-                    item.drive_file_id = item.drive_url = None
                 if (
                     mode == "LOCAL"
                     or verified
@@ -314,6 +307,8 @@ class StorageRepository:
             item = db.get(YoutubeContentModel, content_id, with_for_update=True)
             if item is None or item.deletion_requested:
                 return
+            if item.step == ContentStep.DELETED:
+                raise ValueError("Deleted content cannot be transferred.")
             backup = db.get(DriveBackupModel, content_id)
             if operation == "UPLOAD" and backup and backup.verified:
                 return
@@ -354,10 +349,19 @@ class StorageRepository:
         with self.factory() as db, db.begin():
             config = self._settings(db)
             # A dead worker's reservation is recovered without losing its upload session.
-            db.query(StorageTransferModel).filter(
-                StorageTransferModel.status == "RUNNING",
-                StorageTransferModel.lease_expires_at < now(),
-            ).update({"status": "PENDING", "lease_token": None, "lease_expires_at": None})
+            expired = db.scalars(
+                select(StorageTransferModel)
+                .where(
+                    StorageTransferModel.status == "RUNNING",
+                    StorageTransferModel.lease_expires_at < now(),
+                )
+                .with_for_update(skip_locked=True)
+            ).all()
+            for transfer in expired:
+                self._release_content(db, transfer.content_id, transfer.lease_token)
+                transfer.status = "PENDING"
+                transfer.lease_token = transfer.lease_expires_at = None
+            db.flush()
             query = (
                 select(StorageTransferModel)
                 .join(
@@ -372,6 +376,7 @@ class StorageRepository:
                         StorageTransferModel.next_retry_at <= now(),
                     ),
                     YoutubeContentModel.deletion_requested.is_(False),
+                    YoutubeContentModel.step != ContentStep.DELETED,
                     YoutubeContentModel.lease_token.is_(None),
                 )
             )
@@ -392,6 +397,9 @@ class StorageRepository:
             item = db.get(YoutubeContentModel, task.content_id)
             backup = db.get(DriveBackupModel, task.content_id)
             assert item is not None and backup is not None
+            # Transfers and media jobs must share the same exclusion fence.
+            item.lease_token = task.lease_token
+            item.lease_expires_at = task.lease_expires_at
             event(db, task.content_id, task.operation + "_STARTED")
             return {
                 **self._content(item),
@@ -409,6 +417,12 @@ class StorageRepository:
             }
 
     @staticmethod
+    def _release_content(db: Session, content_id: int, token: str | None) -> None:
+        item = db.get(YoutubeContentModel, content_id, with_for_update=True)
+        if item is not None and token and item.lease_token == token:
+            item.lease_token = item.lease_expires_at = None
+
+    @staticmethod
     def _owned(db: Session, task: dict[str, Any]) -> StorageTransferModel:
         item = db.get(StorageTransferModel, task["task_id"], with_for_update=True)
         if item is None or item.lease_token != task["token"] or item.status != "RUNNING":
@@ -420,6 +434,14 @@ class StorageRepository:
             expires = expires.replace(tzinfo=timezone.utc)
         if expires <= now():
             raise TransferInterrupted("Transfer reservation expired.")
+        content = db.get(YoutubeContentModel, item.content_id, with_for_update=True)
+        if (
+            content is None
+            or content.lease_token != task["token"]
+            or content.deletion_requested
+            or content.step == ContentStep.DELETED
+        ):
+            raise TransferInterrupted("Content reservation was lost.")
         return item
 
     def checkpoint(
@@ -433,6 +455,9 @@ class StorageRepository:
             if session_uri is not None:
                 transfer.session_uri = session_uri
             transfer.lease_expires_at = now() + timedelta(seconds=300)
+            content = db.get(YoutubeContentModel, task["content_id"])
+            assert content is not None
+            content.lease_expires_at = transfer.lease_expires_at
             transfer.updated_at = now()
             paused = task["operation"] == "UPLOAD" and (
                 config.uploads_paused or config.mode == "LOCAL"
@@ -447,12 +472,20 @@ class StorageRepository:
             assert backup is not None
             backup.file_id = file_id
 
-    def finish(self, task: dict[str, Any], result: dict[str, Any]) -> None:
+    def finish(
+        self,
+        task: dict[str, Any],
+        result: dict[str, Any],
+        publish: Callable[[], None] | None = None,
+    ) -> None:
         with self.factory() as db, db.begin():
             transfer = self._owned(db, task)
             item = db.get(YoutubeContentModel, task["content_id"], with_for_update=True)
             backup = db.get(DriveBackupModel, task["content_id"])
             assert item is not None and backup is not None
+            if publish is not None:
+                # Publish the local file while deletion is excluded by the content row lock.
+                publish()
             previous = item.storage_location
             if task["operation"] == "UPLOAD":
                 backup.file_id = result["id"]
@@ -475,6 +508,7 @@ class StorageRepository:
             transfer.error = transfer.session_uri = transfer.lease_token = None
             transfer.lease_expires_at = transfer.next_retry_at = None
             transfer.updated_at = now()
+            self._release_content(db, task["content_id"], task["token"])
             event(
                 db,
                 item.id,
@@ -532,17 +566,21 @@ class StorageRepository:
             item.lease_token = None
             item.lease_expires_at = None
             item.updated_at = now()
+            self._release_content(db, task["content_id"], task["token"])
             event(db, item.content_id, item.operation + "_FAILED", item.error)
             if blocked:
                 self._settings(db).last_error = error[:2000]
 
     def release(self, task: dict[str, Any]) -> None:
         with self.factory() as db, db.begin():
-            item = self._owned(db, task)
+            item = db.get(StorageTransferModel, task["task_id"], with_for_update=True)
+            if item is None or item.lease_token != task["token"] or item.status != "RUNNING":
+                return
             item.status = "PENDING"
             item.attempts = max(0, item.attempts - 1)
             item.lease_token = None
             item.lease_expires_at = None
+            self._release_content(db, task["content_id"], task["token"])
 
     def retry_errors(self) -> int:
         with self.factory() as db, db.begin():
@@ -614,14 +652,15 @@ class StorageRepository:
                     .group_by(YoutubeContentModel.storage_location)
                 ).all()
             }
-            result["transfers"] = {
-                key: value
-                for key, value in db.execute(
+            result["transfers"] = dict(
+                db.execute(
                     select(
                         StorageTransferModel.status, func.count(StorageTransferModel.id)
                     ).group_by(StorageTransferModel.status)
-                ).all()
-            }
+                )
+                .tuples()
+                .all()
+            )
             result["queued_bytes"] = db.scalar(
                 select(
                     func.coalesce(
