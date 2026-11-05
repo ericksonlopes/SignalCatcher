@@ -409,6 +409,7 @@ class StorageRepository:
                 "mode": task.mode,
                 "token": task.lease_token,
                 "session_uri": task.session_uri,
+                "bytes_transferred": task.bytes_transferred,
                 "file_id": backup.file_id,
                 "relative_path": backup.relative_path,
                 "md5": backup.md5,

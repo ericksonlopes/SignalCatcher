@@ -4,7 +4,9 @@ import hashlib
 import os
 import re
 import stat
+from collections.abc import Callable
 from pathlib import Path
+from time import monotonic
 from typing import Any
 
 from src.core.utils.file_utils import sanitize_path_parts
@@ -109,9 +111,13 @@ class StorageFiles:
         )
 
     @staticmethod
-    def checksum(path: Path) -> str:
+    def checksum(path: Path, heartbeat: Callable[[], None] | None = None) -> str:
         digest = hashlib.md5(usedforsecurity=False)
+        renewed = monotonic()
         with path.open("rb") as source:
             while chunk := source.read(1024 * 1024):
                 digest.update(chunk)
+                if heartbeat is not None and monotonic() - renewed >= 20:
+                    heartbeat()
+                    renewed = monotonic()
         return digest.hexdigest()

@@ -185,12 +185,18 @@ class StorageManager:
         destination = self.files.destination(task, task["relative_path"])
         partial = None
         if destination.is_file():
-            if self.files.checksum(destination) != task["md5"]:
+            if (
+                self.files.checksum(destination, lambda: progress(task["size"], task["size"], None))
+                != task["md5"]
+            ):
                 raise ValueError("Restore conflict: a different local file already exists.")
         else:
             partial = self.files.confined(destination.with_name(destination.name + ".restore.part"))
             self.drive.download(task["file_id"], partial, progress)
-            if self.files.checksum(partial) != task["md5"]:
+            if (
+                self.files.checksum(partial, lambda: progress(task["size"], task["size"], None))
+                != task["md5"]
+            ):
                 partial.unlink(missing_ok=True)
                 raise ValueError("Restore checksum mismatch; the partial file was discarded.")
 
@@ -216,7 +222,12 @@ class StorageManager:
         if path is None:
             raise FileNotFoundError(f"Missing source: {task['external_id']}")
         before = path.stat()
-        checksum = self.files.checksum(path)
+        checksum = self.files.checksum(
+            path,
+            lambda: self.repository.checkpoint(
+                task, task["bytes_transferred"], before.st_size, task["session_uri"]
+            ),
+        )
         result = self._upload_copy(task, info, path, before.st_size, checksum, progress)
         after = path.stat()
         if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):

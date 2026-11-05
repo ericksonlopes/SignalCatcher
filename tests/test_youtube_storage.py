@@ -131,6 +131,55 @@ class YoutubeStorageTest(unittest.TestCase):
             events = db.scalars(select(StorageEventModel.action)).all()
             self.assertIn("UPLOAD_COMPLETED", events)
 
+    def test_slow_checksum_renews_transfer_and_content_reservations(self):
+        self.content()
+        clock = datetime.now(timezone.utc)
+        checksum = self.files.checksum
+
+        def slow_checksum(path, heartbeat=None):
+            nonlocal clock
+            for _ in range(3):
+                clock += timedelta(seconds=240)
+                heartbeat()
+                with self.factory() as db:
+                    content = db.scalar(select(YoutubeContentModel))
+                    transfer = db.scalar(select(StorageTransferModel))
+                    self.assertGreater(transfer.lease_expires_at, clock.replace(tzinfo=None))
+                    self.assertEqual(content.lease_expires_at, transfer.lease_expires_at)
+            return checksum(path)
+
+        with (
+            patch(
+                "src.modules.youtube.infrastructure.repositories.storage_repository.now",
+                side_effect=lambda: clock,
+            ),
+            patch.object(self.files, "checksum", side_effect=slow_checksum),
+        ):
+            self.manager.run()
+        self.assertEqual(self.drive.uploads, 1)
+        with self.factory() as db:
+            self.assertEqual(db.scalar(select(StorageTransferModel.status)), "COMPLETED")
+
+    def test_checksum_heartbeats_and_stops_when_reservation_is_lost(self):
+        path = self.content()
+        path.write_bytes(b"x" * (2 * 1024 * 1024 + 1))
+        heartbeat = Mock()
+        with patch(
+            "src.modules.youtube.infrastructure.services.storage_files.monotonic",
+            side_effect=[0, 21, 21, 42, 42, 63, 63],
+        ):
+            actual = self.files.checksum(path, heartbeat)
+        self.assertEqual(actual, hashlib.md5(path.read_bytes(), usedforsecurity=False).hexdigest())
+        self.assertEqual(heartbeat.call_count, 3)
+        with (
+            patch(
+                "src.modules.youtube.infrastructure.services.storage_files.monotonic",
+                side_effect=[0, 21],
+            ),
+            self.assertRaises(TransferInterrupted),
+        ):
+            self.files.checksum(path, Mock(side_effect=TransferInterrupted))
+
     def test_drive_only_cleans_only_staging_after_verified_copy(self):
         path = self.content(staging=True)
         self.manager.run()
