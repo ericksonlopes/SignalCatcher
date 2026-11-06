@@ -18,6 +18,7 @@ class DiarizationCardMapper:
         return DiarizationCardDTO(
             id=task.id or "",
             step=task.step.value,
+            error_message=task.error_message,
             progress_percent=task.progress_percent,
             queue_priority=task.queue_priority,
             created_at=task.created_at.isoformat() if task.created_at else None,

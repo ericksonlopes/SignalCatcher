@@ -153,6 +153,19 @@ class DiarizationTrackingTest(unittest.TestCase):
         self.session.rollback()
         self.assertEqual(self.session.scalars(select(StepTrackingModel)).all(), [])
 
+    def test_error_is_exposed_on_cards_and_cleared_on_reprocess(self):
+        message = "RuntimeError: Model download failed\nHTTP 403: Access denied"
+        task = DiarizationModel(file_path="audio.wav", step="ERROR", error_message=message)
+        self.session.add(task)
+        self.session.flush()
+        repository = DiarizationRepository(self.session)
+        entity = repository.get_task(task.id)
+        self.assertEqual(
+            DiarizationCardMapper.to_card(entity, None).model_dump()["error_message"], message
+        )
+        reset = repository.reprocess_task(task.id)
+        self.assertIsNone(DiarizationCardMapper.to_card(reset, None).error_message)
+
     def test_progress_is_exposed_on_cards_and_cleared_on_reprocess_and_cancel(self):
         task = DiarizationModel(file_path="audio.wav", step="ALIGNMENT", progress_percent=65)
         self.session.add(task)

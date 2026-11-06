@@ -21,6 +21,7 @@ class DiarizationCardDTO(BaseModel):
 
     id: str
     step: str
+    error_message: str | None = None
     progress_percent: int | None = None
     queue_priority: int = 0
     created_at: str | None = None
